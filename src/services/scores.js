@@ -1,9 +1,11 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { recordMatchOnProfile } from './users'
+import { getDayKey, getWeekKey } from '../utils/dates'
 
 // One document per finished match. displayName/photoURL are denormalized
-// onto the score so leaderboards (Milestone 16) render without N user reads.
+// onto the score so leaderboards render without N user reads; day/week
+// keys let the daily/weekly leaderboards equality-filter + sort by score.
 const saveScore = ({ user, mode, summary }) =>
   addDoc(collection(db, 'scores'), {
     uid: user.uid,
@@ -13,6 +15,8 @@ const saveScore = ({ user, mode, summary }) =>
     score: summary.score,
     accuracy: summary.accuracy,
     reactionTime: summary.averageReactionMs,
+    day: getDayKey(),
+    week: getWeekKey(),
     createdAt: serverTimestamp(),
   })
 
