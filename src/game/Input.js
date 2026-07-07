@@ -6,6 +6,8 @@
  * the frame: update → collision → render. `position` tracks the live
  * pointer for future modes (e.g. Tracking).
  */
+const EMPTY_CLICKS = Object.freeze([])
+
 export class Input {
   #canvas = null
   #clicks = []
@@ -26,8 +28,10 @@ export class Input {
     this.clear()
   }
 
-  // Returns queued clicks and empties the queue.
+  // Returns queued clicks and empties the queue. Most frames have no
+  // clicks, so a shared frozen array avoids a 60/s allocation.
   consumeClicks() {
+    if (this.#clicks.length === 0) return EMPTY_CLICKS
     const clicks = this.#clicks
     this.#clicks = []
     return clicks

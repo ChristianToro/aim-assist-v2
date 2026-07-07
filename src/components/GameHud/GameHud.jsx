@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import StatTile from '../StatTile/StatTile'
 
 // Live match statistics. Re-renders only when the scene pushes a new
@@ -25,4 +26,4 @@ const GameHud = ({ hud }) => {
   )
 }
 
-export default GameHud
+export default memo(GameHud)

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import Card from '../Card/Card'
 
 const formatMs = (ms) => (ms == null ? '—' : `${ms} ms`)
@@ -67,4 +68,4 @@ const SessionHistory = ({ matches }) => {
   )
 }
 
-export default SessionHistory
+export default memo(SessionHistory)

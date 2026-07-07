@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import Card from '../Card/Card'
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner'
 
@@ -104,4 +105,4 @@ const Leaderboard = ({
   )
 }
 
-export default Leaderboard
+export default memo(Leaderboard)

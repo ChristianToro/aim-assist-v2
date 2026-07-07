@@ -24,6 +24,9 @@ export class GameEngine {
   #rafId = null
   #lastFrameTime = 0
   #smoothedFps = 0
+  // Reused every frame — one object for the whole engine lifetime
+  // instead of a fresh allocation at 60/s.
+  #size = { width: 0, height: 0 }
 
   isRunning = false
   isPaused = false
@@ -97,10 +100,9 @@ export class GameEngine {
     )
     this.#lastFrameTime = now
 
-    const size = {
-      width: this.#canvas.clientWidth,
-      height: this.#canvas.clientHeight,
-    }
+    const size = this.#size
+    size.width = this.#canvas.clientWidth
+    size.height = this.#canvas.clientHeight
 
     this.#scene.update(dt, size, this.input)
     this.#ctx.clearRect(0, 0, size.width, size.height)
