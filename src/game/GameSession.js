@@ -22,8 +22,11 @@ const DEFAULT_DURATION_SECONDS = 30
  *   onHud(snapshot)     — on hit, miss, or displayed-second change
  *   onGameOver(summary) — once, when the countdown reaches zero
  */
+const COUNTDOWN_TICK_FROM_SECONDS = 3
+
 export const createGameSession = ({
   duration = DEFAULT_DURATION_SECONDS,
+  audio,
   onHud,
   onGameOver,
 } = {}) => {
@@ -53,8 +56,10 @@ export const createGameSession = ({
         hit.destroy()
         particles.push(...createBurst(hit.x, hit.y))
         floaters.push(new FloatingText(`+${points}`, hit.x, hit.y - hit.radius))
+        audio?.playHit()
       } else {
         scores.registerMiss()
+        audio?.playMiss()
       }
     })
 
@@ -73,8 +78,18 @@ export const createGameSession = ({
     lastDisplayedSecond = timer.displaySeconds
     if (clicks.length > 0 || secondChanged) emitHud()
 
+    // Tick through the final seconds (3, 2, 1 — not the game-over 0).
+    if (
+      secondChanged &&
+      !timer.isFinished &&
+      timer.displaySeconds <= COUNTDOWN_TICK_FROM_SECONDS
+    ) {
+      audio?.playCountdown()
+    }
+
     if (timer.isFinished) {
       isOver = true
+      audio?.playGameOver()
       onGameOver?.(scores.summary())
     }
   }

@@ -21,8 +21,10 @@ const Play = () => {
     hud,
     summary,
     isPaused,
+    isMuted,
     start,
     togglePause,
+    toggleMute,
     dismissResults,
   } = useGameSession({ duration: MATCH_SECONDS, showFps: true })
 
@@ -32,16 +34,26 @@ const Play = () => {
         <h1 className="text-3xl font-semibold tracking-tight text-heading">
           Play
         </h1>
-        {phase === 'running' && (
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={togglePause}>
-              {isPaused ? 'Resume' : 'Pause'}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={start}>
-              Restart
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {phase === 'running' && (
+            <>
+              <Button variant="secondary" size="sm" onClick={togglePause}>
+                {isPaused ? 'Resume' : 'Pause'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={start}>
+                Restart
+              </Button>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleMute}
+            aria-pressed={isMuted}
+          >
+            {isMuted ? 'Sound: Off' : 'Sound: On'}
+          </Button>
+        </div>
       </div>
 
       <div className="mt-6 space-y-4">
