@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
-import Button from '../Button/Button'
+import AuthControls from '../AuthControls/AuthControls'
 
 const navLinks = [
   { to: '/play', label: 'Play' },
@@ -36,16 +36,9 @@ const Navbar = () => (
         ))}
       </div>
 
-      {/* Placeholder until Google auth lands in Milestone 14 */}
-      <Button
-        variant="secondary"
-        size="sm"
-        disabled
-        title="Sign-in coming soon"
-        className="hidden sm:inline-flex"
-      >
-        Continue with Google
-      </Button>
+      <div className="hidden sm:block">
+        <AuthControls />
+      </div>
     </nav>
   </header>
 )
