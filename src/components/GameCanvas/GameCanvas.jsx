@@ -1,15 +1,14 @@
 import { useEffect, useRef } from 'react'
 
 /*
- * Bridge between React and the canvas world.
+ * Thin React↔DOM bridge for the game engine.
  *
- * Owns the requestAnimationFrame loop, devicePixelRatio-aware resizing,
- * and the debug FPS readout. Everything drawn comes from the `scene`
- * object ({ update(dt, size), render(ctx, size) }), keeping game logic
- * out of React per ARCHITECTURE.md. React re-renders never touch the
- * loop — state lives in refs and the scene itself.
+ * Handles what only React/DOM can: mounting the canvas element and keeping
+ * its backing store in sync with layout size × devicePixelRatio. The frame
+ * loop itself lives in GameEngine — this component never re-renders during
+ * gameplay.
  */
-const GameCanvas = ({ scene, showFps = false, className = '' }) => {
+const GameCanvas = ({ engine, className = '' }) => {
   const canvasRef = useRef(null)
 
   useEffect(() => {
@@ -17,7 +16,7 @@ const GameCanvas = ({ scene, showFps = false, className = '' }) => {
     const ctx = canvas.getContext('2d')
 
     // Match the backing store to CSS size × devicePixelRatio, then scale
-    // the context so the scene draws in CSS pixels.
+    // the context so scenes draw in CSS pixels.
     const resize = () => {
       const dpr = window.devicePixelRatio || 1
       const { width, height } = canvas.getBoundingClientRect()
@@ -29,37 +28,14 @@ const GameCanvas = ({ scene, showFps = false, className = '' }) => {
     const observer = new ResizeObserver(resize)
     observer.observe(canvas)
 
-    let rafId
-    let last = performance.now()
-    let smoothedFps = 0
-
-    const frame = (now) => {
-      // Clamp dt so a background tab doesn't produce a huge jump on return.
-      const dt = Math.min(Math.max((now - last) / 1000, 0.000001), 0.1)
-      last = now
-      const size = { width: canvas.clientWidth, height: canvas.clientHeight }
-
-      scene.update(dt, size)
-      ctx.clearRect(0, 0, size.width, size.height)
-      scene.render(ctx, size)
-
-      if (showFps) {
-        smoothedFps = smoothedFps * 0.95 + (1 / dt) * 0.05
-        ctx.font = '12px ui-monospace, Consolas, monospace'
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'
-        ctx.textBaseline = 'top'
-        ctx.fillText(`${Math.round(smoothedFps)} FPS`, 10, 10)
-      }
-
-      rafId = requestAnimationFrame(frame)
-    }
-    rafId = requestAnimationFrame(frame)
+    engine.attach(canvas)
+    engine.start()
 
     return () => {
-      cancelAnimationFrame(rafId)
       observer.disconnect()
+      engine.detach()
     }
-  }, [scene, showFps])
+  }, [engine])
 
   return <canvas ref={canvasRef} className={className} />
 }
