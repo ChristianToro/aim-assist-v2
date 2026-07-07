@@ -20,6 +20,8 @@ export class Spawner {
     maxRadius = 42,
     spacing = 14, // minimum gap between target edges
     targetLifespan = 3, // seconds before an unclicked target expires
+    targetValue = 100, // base points per hit
+    targetSpeed = null, // [min, max] px/s for moving targets, or null
     maxAttempts = 30,
   } = {}) {
     this.spawnInterval = spawnInterval
@@ -28,6 +30,8 @@ export class Spawner {
     this.maxRadius = maxRadius
     this.spacing = spacing
     this.targetLifespan = targetLifespan
+    this.targetValue = targetValue
+    this.targetSpeed = targetSpeed
     this.maxAttempts = maxAttempts
   }
 
@@ -69,7 +73,23 @@ export class Spawner {
           radius + other.radius + this.spacing
       )
       if (!crowded) {
-        return new Target({ x, y, radius, lifespan: this.targetLifespan })
+        let vx = 0
+        let vy = 0
+        if (this.targetSpeed) {
+          const angle = randomInRange(0, Math.PI * 2)
+          const speed = randomInRange(...this.targetSpeed)
+          vx = Math.cos(angle) * speed
+          vy = Math.sin(angle) * speed
+        }
+        return new Target({
+          x,
+          y,
+          radius,
+          lifespan: this.targetLifespan,
+          value: this.targetValue,
+          vx,
+          vy,
+        })
       }
     }
     return null

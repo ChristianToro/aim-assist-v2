@@ -12,30 +12,24 @@ const sweepDead = (entities) => {
   }
 }
 
-const DEFAULT_DURATION_SECONDS = 30
-
 /*
- * GameSession — one playable match: spawning targets, scoring, and a
- * countdown. Implements the engine's scene contract.
+ * GameSession — one playable match of a given mode: spawning targets,
+ * scoring, and a countdown. Implements the engine's scene contract.
+ * Mode presets (see modes.js) fully parameterize the session.
  *
  * Communication with React is one-way and event-driven:
  *   onHud(snapshot)     — on hit, miss, or displayed-second change
- *   onGameOver(summary) — once, when the countdown reaches zero
+ *   onGameOver(summary) — once, when the match ends
  */
 const COUNTDOWN_TICK_FROM_SECONDS = 3
 
-export const createGameSession = ({
-  duration = DEFAULT_DURATION_SECONDS,
-  audio,
-  onHud,
-  onGameOver,
-} = {}) => {
+export const createGameSession = ({ mode, audio, onHud, onGameOver } = {}) => {
   const targets = []
   const particles = []
   const floaters = []
-  const spawner = new Spawner()
+  const spawner = new Spawner(mode.spawner)
   const scores = new ScoreManager()
-  const timer = new Timer(duration)
+  const timer = new Timer(mode.duration)
   let isOver = false
   let lastDisplayedSecond = timer.displaySeconds
 
@@ -68,7 +62,7 @@ export const createGameSession = ({
     sweepDead(particles)
     sweepDead(floaters)
 
-    targets.forEach((target) => target.update(dt))
+    targets.forEach((target) => target.update(dt, size))
     particles.forEach((particle) => particle.update(dt))
     floaters.forEach((floater) => floater.update(dt))
     spawner.update(dt, size, targets)

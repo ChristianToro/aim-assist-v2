@@ -10,11 +10,7 @@ import { createGameSession } from '../game/GameSession'
  * The engine/session hold gameplay truth; React state here only mirrors
  * what the UI needs, updated by the session's event callbacks.
  */
-export const useGameSession = ({
-  duration = 30,
-  showFps = false,
-  onGameOver,
-} = {}) => {
+export const useGameSession = ({ mode, showFps = false, onGameOver } = {}) => {
   const [phase, setPhase] = useState('idle')
   const [hud, setHud] = useState(null)
   const [summary, setSummary] = useState(null)
@@ -36,7 +32,7 @@ export const useGameSession = ({
     // (event time), never during render — safe despite the refs rule.
     // eslint-disable-next-line react-hooks/refs
     const session = createGameSession({
-      duration,
+      mode,
       audio: audioManager,
       onHud: setHud,
       onGameOver: (result) => {
@@ -48,7 +44,7 @@ export const useGameSession = ({
     })
     engineInstance = new GameEngine(session, { showFps })
     return { engine: engineInstance, audio: audioManager }
-  }, [duration, showFps])
+  }, [mode, showFps])
   const [isMuted, setIsMuted] = useState(audio.muted)
 
   const toggleMute = () => setIsMuted(audio.toggleMute())

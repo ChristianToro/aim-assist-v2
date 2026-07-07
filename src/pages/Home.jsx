@@ -1,17 +1,6 @@
 import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
-
-const gameModes = [
-  { name: 'Precision', description: 'Large targets. Pure accuracy.' },
-  {
-    name: 'Speed',
-    description: 'Small targets, fast spawns, big multipliers.',
-  },
-  { name: 'Gridshot', description: 'Three targets up at all times.' },
-  { name: 'Tracking', description: 'Follow targets as they bounce around.' },
-  { name: 'Flick', description: 'Targets vanish fast — snap to them.' },
-  { name: 'Survival', description: 'Ever harder. Miss too much and it ends.' },
-]
+import { GAME_MODES } from '../game/modes'
 
 const Home = () => (
   <>
@@ -36,12 +25,9 @@ const Home = () => (
     <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
       <h2 className="text-xl font-semibold text-heading">Game Modes</h2>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {gameModes.map(({ name, description }) => (
-          <Card
-            key={name}
-            className="transition-colors hover:border-edge-strong"
-          >
-            <h3 className="font-medium text-heading">{name}</h3>
+        {GAME_MODES.map(({ id, label, description }) => (
+          <Card key={id} className="transition-colors hover:border-edge-strong">
+            <h3 className="font-medium text-heading">{label}</h3>
             <p className="mt-1 text-sm text-muted">{description}</p>
           </Card>
         ))}
