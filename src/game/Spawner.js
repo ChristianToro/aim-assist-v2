@@ -31,6 +31,10 @@ export class Spawner {
     this.maxAttempts = maxAttempts
   }
 
+  reset() {
+    this.#sinceLastSpawn = 0
+  }
+
   // Advances the spawn timer; pushes at most one new target per interval.
   // The timer caps at one interval, so when the field is full a freed
   // slot is refilled immediately (Gridshot-style).

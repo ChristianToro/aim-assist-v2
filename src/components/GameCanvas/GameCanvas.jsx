@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react'
  * loop itself lives in GameEngine — this component never re-renders during
  * gameplay.
  */
-const GameCanvas = ({ engine, className = '' }) => {
+const GameCanvas = ({ engine, autoStart = false, className = '' }) => {
   const canvasRef = useRef(null)
 
   useEffect(() => {
@@ -29,13 +29,13 @@ const GameCanvas = ({ engine, className = '' }) => {
     observer.observe(canvas)
 
     engine.attach(canvas)
-    engine.start()
+    if (autoStart) engine.start()
 
     return () => {
       observer.disconnect()
       engine.detach()
     }
-  }, [engine])
+  }, [engine, autoStart])
 
   return <canvas ref={canvasRef} className={className} />
 }

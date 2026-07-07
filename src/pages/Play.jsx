@@ -1,31 +1,23 @@
-import { useMemo, useState } from 'react'
 import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import GameCanvas from '../components/GameCanvas/GameCanvas'
 import GameHud from '../components/GameHud/GameHud'
-import { GameEngine } from '../game/GameEngine'
-import { createTargetScene } from '../game/targetScene'
+import { useGameSession } from '../hooks/useGameSession'
+
+const MATCH_SECONDS = 30
+
+// Dimmed overlay shown on top of the canvas between/within matches.
+const CanvasOverlay = ({ children }) => (
+  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-bg/70 backdrop-blur-sm">
+    {children}
+  </div>
+)
 
 const Play = () => {
-  // Stats land here only when the scene emits (hit/miss) — the canvas
-  // animation itself never triggers React renders.
-  const [hud, setHud] = useState(null)
-
-  // One engine per mount; a stable reference keeps GameCanvas's effect
-  // from re-attaching on re-renders.
-  const engine = useMemo(
-    () =>
-      new GameEngine(createTargetScene({ onHud: setHud }), { showFps: true }),
-    []
-  )
-  // React mirrors pause state for the UI; the engine holds the truth.
-  const [isPaused, setIsPaused] = useState(false)
-
-  const togglePause = () => {
-    if (engine.isPaused) engine.resume()
-    else engine.pause()
-    setIsPaused(engine.isPaused)
-  }
+  const { engine, phase, hud, isPaused, start, togglePause } = useGameSession({
+    duration: MATCH_SECONDS,
+    showFps: true,
+  })
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -33,23 +25,48 @@ const Play = () => {
         <h1 className="text-3xl font-semibold tracking-tight text-heading">
           Play
         </h1>
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-muted">
-            Click the targets — timed matches arrive in Milestone 8
-          </p>
-          <Button variant="secondary" size="sm" onClick={togglePause}>
-            {isPaused ? 'Resume' : 'Pause'}
-          </Button>
-        </div>
+        {phase === 'running' && (
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={togglePause}>
+              {isPaused ? 'Resume' : 'Pause'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={start}>
+              Restart
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 space-y-4">
         <GameHud hud={hud} />
-        <Card className="overflow-hidden p-0">
+
+        <Card className="relative overflow-hidden p-0">
           <GameCanvas
             engine={engine}
             className="block h-[60vh] min-h-96 w-full cursor-crosshair"
           />
+
+          {phase === 'idle' && (
+            <CanvasOverlay>
+              <h2 className="text-2xl font-semibold text-heading">
+                {MATCH_SECONDS}-second match
+              </h2>
+              <p className="max-w-sm text-center text-sm text-muted">
+                Click as many targets as you can. Consecutive hits build a score
+                multiplier — misses reset it.
+              </p>
+              <Button size="lg" onClick={start}>
+                Start Match
+              </Button>
+            </CanvasOverlay>
+          )}
+
+          {isPaused && (
+            <CanvasOverlay>
+              <h2 className="text-2xl font-semibold text-heading">Paused</h2>
+              <Button onClick={togglePause}>Resume</Button>
+            </CanvasOverlay>
+          )}
         </Card>
       </div>
     </section>
