@@ -94,6 +94,7 @@ const GameArea = ({ mode, onMatchFinished }) => {
       <Card className="relative overflow-hidden p-0">
         <GameCanvas
           engine={engine}
+          label={`${mode.label} game area — click targets as they appear`}
           className="block h-[60vh] min-h-96 w-full cursor-crosshair"
         />
 

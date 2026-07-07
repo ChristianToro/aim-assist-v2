@@ -24,7 +24,13 @@ const sweepDead = (entities) => {
  */
 const COUNTDOWN_TICK_FROM_SECONDS = 3
 
-export const createGameSession = ({ mode, audio, onHud, onGameOver } = {}) => {
+export const createGameSession = ({
+  mode,
+  audio,
+  reducedMotion = false,
+  onHud,
+  onGameOver,
+} = {}) => {
   const targets = []
   const particles = []
   const floaters = []
@@ -106,7 +112,9 @@ export const createGameSession = ({ mode, audio, onHud, onGameOver } = {}) => {
       if (hit) {
         const points = scores.registerHit(hit)
         hit.destroy()
-        particles.push(...createBurst(hit.x, hit.y))
+        // Under prefers-reduced-motion, keep the informative score text
+        // but skip the decorative burst.
+        if (!reducedMotion) particles.push(...createBurst(hit.x, hit.y))
         floaters.push(new FloatingText(`+${points}`, hit.x, hit.y - hit.radius))
         audio?.playHit()
       } else {

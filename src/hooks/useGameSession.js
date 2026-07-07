@@ -25,6 +25,9 @@ export const useGameSession = ({ mode, showFps = false, onGameOver } = {}) => {
 
   const { engine, audio } = useMemo(() => {
     const audioManager = new AudioManager()
+    const reducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches
     // `engineInstance` is assigned before any callback can fire — the
     // session only calls onGameOver from inside the engine's own loop.
     let engineInstance
@@ -34,6 +37,7 @@ export const useGameSession = ({ mode, showFps = false, onGameOver } = {}) => {
     const session = createGameSession({
       mode,
       audio: audioManager,
+      reducedMotion,
       onHud: setHud,
       onGameOver: (result) => {
         engineInstance.stop()

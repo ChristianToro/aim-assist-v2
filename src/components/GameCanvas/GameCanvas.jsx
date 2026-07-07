@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react'
  * loop itself lives in GameEngine — this component never re-renders during
  * gameplay.
  */
-const GameCanvas = ({ engine, autoStart = false, className = '' }) => {
+const GameCanvas = ({ engine, autoStart = false, label, className = '' }) => {
   const canvasRef = useRef(null)
 
   useEffect(() => {
@@ -37,7 +37,14 @@ const GameCanvas = ({ engine, autoStart = false, className = '' }) => {
     }
   }, [engine, autoStart])
 
-  return <canvas ref={canvasRef} className={className} />
+  return (
+    <canvas
+      ref={canvasRef}
+      role="img"
+      aria-label={label}
+      className={className}
+    />
+  )
 }
 
 export default GameCanvas
