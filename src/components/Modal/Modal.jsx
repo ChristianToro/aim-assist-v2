@@ -16,7 +16,7 @@ const Modal = ({ open, onClose, title, children }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -24,7 +24,7 @@ const Modal = ({ open, onClose, title, children }) => {
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="w-full max-w-md rounded-xl border border-edge bg-raised p-6 shadow-2xl"
+        className="w-full max-w-md animate-scale-in rounded-xl border border-edge bg-raised p-6 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         {title && (

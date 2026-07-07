@@ -1,13 +1,17 @@
+import { lazy } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import AuthProvider from './contexts/AuthProvider'
 import Layout from './components/Layout/Layout'
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute'
-import Home from './pages/Home'
-import Play from './pages/Play'
-import Leaderboards from './pages/Leaderboards'
-import Profile from './pages/Profile'
-import Settings from './pages/Settings'
-import NotFound from './pages/NotFound'
+
+// Route-level code splitting: each page loads on first visit
+// (Layout shows LoadingScreen via Suspense while a chunk downloads).
+const Home = lazy(() => import('./pages/Home'))
+const Play = lazy(() => import('./pages/Play'))
+const Leaderboards = lazy(() => import('./pages/Leaderboards'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Settings = lazy(() => import('./pages/Settings'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 
 const App = () => (
   <AuthProvider>
