@@ -29,7 +29,7 @@ const Play = () => {
         </h1>
         <div className="flex items-center gap-3">
           <p className="text-sm text-muted">
-            Targets spawn live — clicking arrives in Milestone 6
+            Click the targets — scoring arrives in Milestone 7
           </p>
           <Button variant="secondary" size="sm" onClick={togglePause}>
             {isPaused ? 'Resume' : 'Pause'}

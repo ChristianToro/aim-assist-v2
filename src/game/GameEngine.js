@@ -3,10 +3,12 @@
  *
  * React's entire interface to gameplay is the lifecycle API below
  * (attach/start/pause/resume/stop), per ARCHITECTURE.md. Each frame the
- * engine advances the current scene ({ update(dt, size), render(ctx, size) })
- * with a clamped delta time, then draws it. Targets, spawning, and scoring
- * plug in as scenes in Milestones 5–7.
+ * engine advances the current scene
+ * ({ update(dt, size, input), render(ctx, size) }) with a clamped delta
+ * time, then draws it. The engine owns pointer input so scenes consume
+ * clicks during update rather than in DOM event handlers.
  */
+import { Input } from './Input'
 
 // Cap delta time so returning from a background tab (rAF stops firing)
 // doesn't produce one huge physics step.
@@ -26,6 +28,7 @@ export class GameEngine {
   isRunning = false
   isPaused = false
   showFps = false
+  input = new Input()
 
   constructor(scene, { showFps = false } = {}) {
     this.#scene = scene
@@ -37,10 +40,12 @@ export class GameEngine {
   attach(canvas) {
     this.#canvas = canvas
     this.#ctx = canvas.getContext('2d')
+    this.input.attach(canvas)
   }
 
   detach() {
     this.stop()
+    this.input.detach()
     this.#canvas = null
     this.#ctx = null
   }
@@ -49,6 +54,8 @@ export class GameEngine {
     if (!this.#canvas || this.isRunning) return
     this.isRunning = true
     this.isPaused = false
+    // Drop clicks queued while the engine wasn't running.
+    this.input.clear()
     this.#lastFrameTime = performance.now()
     this.#rafId = requestAnimationFrame(this.#frame)
   }
@@ -70,7 +77,9 @@ export class GameEngine {
   resume() {
     if (!this.isRunning || !this.isPaused) return
     this.isPaused = false
-    // Re-anchor the clock so time paused doesn't count as elapsed.
+    // Drop clicks queued while paused and re-anchor the clock so time
+    // paused doesn't count as elapsed.
+    this.input.clear()
     this.#lastFrameTime = performance.now()
     this.#rafId = requestAnimationFrame(this.#frame)
   }
@@ -93,12 +102,16 @@ export class GameEngine {
       height: this.#canvas.clientHeight,
     }
 
-    this.#scene.update(dt, size)
+    this.#scene.update(dt, size, this.input)
     this.#ctx.clearRect(0, 0, size.width, size.height)
     this.#scene.render(this.#ctx, size)
     if (this.showFps) this.#drawFps(dt)
 
-    this.#rafId = requestAnimationFrame(this.#frame)
+    // Only reschedule if update() didn't stop or pause the engine
+    // (e.g. a scene's game-over callback calling stop()).
+    if (this.isRunning && !this.isPaused) {
+      this.#rafId = requestAnimationFrame(this.#frame)
+    }
   }
 
   #drawFps(dt) {
