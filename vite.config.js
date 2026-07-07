@@ -5,6 +5,10 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+  },
   build: {
     // The firebase vendor chunk is inherently ~560 kB minified (the SDK
     // itself); it's split out below so it caches independently of app code.
