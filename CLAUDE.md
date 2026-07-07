@@ -35,6 +35,15 @@ Every feature should feel production-ready.
 
 ---
 
+## Git
+- Do not include Co-Authored-By or any attribution lines in commit messages.
+- Do not push to remote — SSH keys are not available in this environment. The user pushes manually.
+- **CRITICAL: Never amend commits that have been pushed upstream.** Always check `git log origin/main..HEAD` before amending. If changes need to be added to a pushed commit, create a new commit instead.
+- **CRITICAL: Never force push.**
+- `gh pr edit` is broken on this repo (Projects-classic GraphQL deprecation). To edit a PR title/body, use `gh api -X PATCH /repos/{owner}/{repo}/pulls/{n}` instead.
+- **Bare `git push` can land on `main` here — always push working branches with an explicit refspec.** A branch created off a remote-tracking ref (e.g. `git checkout -b <feat> test/main`) auto-tracks that ref as upstream, and this environment's `push.default=upstream` makes a bare `git push` send the branch to its upstream — i.e. straight to `main`. Push feature branches with `git push -u test <branch>:refs/heads/<branch>` (the explicit refspec overrides `push.default`, and `-u` repoints upstream to the branch itself). Verify with `git rev-parse --abbrev-ref <branch>@{upstream}` before pushing. (This bit us once: a session's commits went to `main` instead of the feature branch and had to be reverted and re-landed via PR.)
+
+
 # Tech Stack
 
 ## Frontend

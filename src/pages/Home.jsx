@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import Button from '../components/Button/Button'
+import Card from '../components/Card/Card'
 
 const gameModes = [
   { name: 'Precision', description: 'Large targets. Pure accuracy.' },
@@ -16,42 +17,33 @@ const Home = () => (
   <>
     {/* Hero */}
     <section className="mx-auto max-w-6xl px-4 py-24 text-center sm:px-6">
-      <h1 className="mx-auto max-w-2xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-        Train your aim,{' '}
-        <span className="text-cyan-400">track your progress</span>
+      <h1 className="mx-auto max-w-2xl text-4xl font-semibold tracking-tight text-heading sm:text-5xl">
+        Train your aim, <span className="text-accent">track your progress</span>
       </h1>
-      <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-400">
+      <p className="mx-auto mt-4 max-w-xl text-lg text-muted">
         A browser-based aim trainer with six game modes, live statistics, and
         global leaderboards. No install required.
       </p>
       <div className="mt-8 flex items-center justify-center gap-4">
-        <Link
-          to="/play"
-          className="rounded-lg bg-cyan-500 px-5 py-2.5 font-medium text-zinc-950 transition-colors hover:bg-cyan-400"
-        >
-          Start Training
-        </Link>
-        <Link
-          to="/leaderboards"
-          className="rounded-lg border border-zinc-700 px-5 py-2.5 font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white"
-        >
+        <Button to="/play">Start Training</Button>
+        <Button to="/leaderboards" variant="secondary">
           Leaderboards
-        </Link>
+        </Button>
       </div>
     </section>
 
     {/* Game mode preview */}
     <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
-      <h2 className="text-xl font-semibold text-white">Game Modes</h2>
+      <h2 className="text-xl font-semibold text-heading">Game Modes</h2>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {gameModes.map(({ name, description }) => (
-          <div
+          <Card
             key={name}
-            className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700"
+            className="transition-colors hover:border-edge-strong"
           >
-            <h3 className="font-medium text-white">{name}</h3>
-            <p className="mt-1 text-sm text-zinc-400">{description}</p>
-          </div>
+            <h3 className="font-medium text-heading">{name}</h3>
+            <p className="mt-1 text-sm text-muted">{description}</p>
+          </Card>
         ))}
       </div>
     </section>

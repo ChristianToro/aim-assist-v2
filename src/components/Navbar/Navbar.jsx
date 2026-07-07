@@ -1,4 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
+import Button from '../Button/Button'
 
 const navLinks = [
   { to: '/play', label: 'Play' },
@@ -10,18 +11,18 @@ const navLinks = [
 const linkClass = ({ isActive }) =>
   `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
     isActive
-      ? 'bg-zinc-800 text-white'
-      : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+      ? 'bg-surface text-heading'
+      : 'text-muted hover:bg-surface hover:text-heading'
   }`
 
 const Navbar = () => (
-  <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
+  <header className="sticky top-0 z-10 border-b border-edge bg-bg/80 backdrop-blur">
     <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
       <Link
         to="/"
-        className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white"
+        className="flex items-center gap-2 text-lg font-semibold tracking-tight text-heading"
       >
-        <span aria-hidden="true" className="text-cyan-400">
+        <span aria-hidden="true" className="text-accent">
           ◎
         </span>
         Aim Assist
@@ -36,14 +37,15 @@ const Navbar = () => (
       </div>
 
       {/* Placeholder until Google auth lands in Milestone 14 */}
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
         disabled
         title="Sign-in coming soon"
-        className="hidden cursor-not-allowed rounded-lg border border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-500 sm:block"
+        className="hidden sm:inline-flex"
       >
         Continue with Google
-      </button>
+      </Button>
     </nav>
   </header>
 )

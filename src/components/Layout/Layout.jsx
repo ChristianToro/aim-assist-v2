@@ -4,7 +4,7 @@ import Footer from '../Footer/Footer'
 
 // App shell: every routed page renders inside <Outlet />.
 const Layout = () => (
-  <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-300">
+  <div className="flex min-h-screen flex-col bg-bg text-body">
     <Navbar />
     <main className="flex-1">
       <Outlet />

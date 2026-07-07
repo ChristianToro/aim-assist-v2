@@ -1,13 +1,47 @@
 @import 'tailwindcss';
 
-/* Dark mode first (see CLAUDE.md). Theme system arrives in Milestone 2/12. */
+/*
+ * Theme tokens (dark mode first, see CLAUDE.md).
+ *
+ * Components use only the semantic utilities below (bg-surface, text-muted,
+ * border-edge, ...). Milestone 12 adds themes by redefining these :root
+ * variables per theme — no component changes required.
+ */
 :root {
   color-scheme: dark;
+
+  --bg: #09090b; /* page background */
+  --surface: #18181b; /* cards, nav hover */
+  --raised: #1f1f23; /* modals, popovers */
+  --edge: #27272a; /* borders */
+  --edge-strong: #3f3f46; /* hovered/focused borders */
+  --body: #d4d4d8; /* default text */
+  --muted: #a1a1aa; /* secondary text */
+  --heading: #ffffff; /* headings, emphasized text */
+  --accent: #22d3ee; /* highlights, hovered primary buttons */
+  --accent-strong: #06b6d4; /* primary buttons */
+  --on-accent: #09090b; /* text on accent backgrounds */
+}
+
+/* Expose tokens as Tailwind color utilities (resolved at use time,
+   so runtime theme switching works). */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-edge: var(--edge);
+  --color-edge-strong: var(--edge-strong);
+  --color-body: var(--body);
+  --color-muted: var(--muted);
+  --color-heading: var(--heading);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-on-accent: var(--on-accent);
 }
 
 body {
   margin: 0;
-  background-color: #09090b; /* matches zinc-950 to avoid flash before paint */
+  background-color: var(--bg);
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
