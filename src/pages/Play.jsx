@@ -3,13 +3,13 @@ import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import GameCanvas from '../components/GameCanvas/GameCanvas'
 import { GameEngine } from '../game/GameEngine'
-import { createDemoScene } from '../game/demoScene'
+import { createTargetScene } from '../game/targetScene'
 
 const Play = () => {
   // One engine per mount; a stable reference keeps GameCanvas's effect
   // from re-attaching on re-renders.
   const engine = useMemo(
-    () => new GameEngine(createDemoScene(), { showFps: true }),
+    () => new GameEngine(createTargetScene(), { showFps: true }),
     []
   )
   // React mirrors pause state for the UI; the engine holds the truth.
@@ -29,7 +29,7 @@ const Play = () => {
         </h1>
         <div className="flex items-center gap-3">
           <p className="text-sm text-muted">
-            Engine demo — targets and scoring arrive in Milestones 5–7
+            Targets spawn live — clicking arrives in Milestone 6
           </p>
           <Button variant="secondary" size="sm" onClick={togglePause}>
             {isPaused ? 'Resume' : 'Pause'}
