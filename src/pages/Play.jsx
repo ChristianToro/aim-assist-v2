@@ -2,6 +2,7 @@ import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import GameCanvas from '../components/GameCanvas/GameCanvas'
 import GameHud from '../components/GameHud/GameHud'
+import ResultsModal from '../components/ResultsModal/ResultsModal'
 import { useGameSession } from '../hooks/useGameSession'
 
 const MATCH_SECONDS = 30
@@ -14,10 +15,16 @@ const CanvasOverlay = ({ children }) => (
 )
 
 const Play = () => {
-  const { engine, phase, hud, isPaused, start, togglePause } = useGameSession({
-    duration: MATCH_SECONDS,
-    showFps: true,
-  })
+  const {
+    engine,
+    phase,
+    hud,
+    summary,
+    isPaused,
+    start,
+    togglePause,
+    dismissResults,
+  } = useGameSession({ duration: MATCH_SECONDS, showFps: true })
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -69,6 +76,13 @@ const Play = () => {
           )}
         </Card>
       </div>
+
+      <ResultsModal
+        open={phase === 'over'}
+        summary={summary}
+        onRestart={start}
+        onClose={dismissResults}
+      />
     </section>
   )
 }
