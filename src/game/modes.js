@@ -74,6 +74,31 @@ export const GAME_MODES = [
       targetValue: 125,
     },
   },
+  {
+    id: 'survival',
+    label: 'Survival',
+    description: 'Ever harder. Miss too much and it ends.',
+    duration: Infinity,
+    missLimit: 5,
+    expiryCountsAsMiss: true,
+    // Difficulty ramp over the first 90s: smaller/faster/shorter-lived
+    // targets worth more points, spawning farther apart (see GameSession).
+    scaling: {
+      rampSeconds: 90,
+      radiusFactor: 0.5,
+      intervalFactor: 0.45,
+      lifespanFactor: 0.55,
+      spacingFactor: 1.6,
+      valueFactor: 2,
+    },
+    spawner: {
+      spawnInterval: 1.0,
+      maxTargets: 4,
+      minRadius: 28,
+      maxRadius: 44,
+      targetLifespan: 2.6,
+    },
+  },
 ]
 
 export const DEFAULT_MODE_ID = 'gridshot'

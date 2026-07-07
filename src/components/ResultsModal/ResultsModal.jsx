@@ -18,11 +18,18 @@ const Row = ({ label, value }) => (
 )
 
 // End-of-match statistics. Rendered when the session reports game over.
-const ResultsModal = ({ open, summary, saveStatus, onRestart, onClose }) => {
+const ResultsModal = ({
+  open,
+  summary,
+  saveStatus,
+  title = "Time's up!",
+  onRestart,
+  onClose,
+}) => {
   if (!summary) return null
 
   return (
-    <Modal open={open} onClose={onClose} title="Time's up!">
+    <Modal open={open} onClose={onClose} title={title}>
       <p className="text-center">
         <span className="text-5xl font-semibold text-accent tabular-nums">
           {summary.score}

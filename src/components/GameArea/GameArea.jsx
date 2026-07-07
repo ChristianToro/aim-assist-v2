@@ -55,9 +55,13 @@ const GameArea = ({ mode, onMatchFinished }) => {
     start()
   }
 
-  const matchTitle = Number.isFinite(mode.duration)
-    ? `${mode.duration}-second match`
-    : 'Endless match'
+  const isEndless = !Number.isFinite(mode.duration)
+  const matchTitle = isEndless
+    ? 'Endless match'
+    : `${mode.duration}-second match`
+  const overlayHint = mode.missLimit
+    ? `Targets get smaller, faster, and more valuable over time. ${mode.missLimit} misses (or expired targets) ends the run.`
+    : 'Click as many targets as you can. Consecutive hits build a score multiplier — misses reset it.'
 
   return (
     <div className="space-y-4">
@@ -99,8 +103,7 @@ const GameArea = ({ mode, onMatchFinished }) => {
               {mode.label} — {matchTitle}
             </h2>
             <p className="max-w-sm text-center text-sm text-muted">
-              Click as many targets as you can. Consecutive hits build a score
-              multiplier — misses reset it.
+              {overlayHint}
             </p>
             <Button size="lg" onClick={handleStart}>
               Start Match
@@ -120,6 +123,7 @@ const GameArea = ({ mode, onMatchFinished }) => {
         open={phase === 'over'}
         summary={summary}
         saveStatus={user ? saveStatus : 'signed-out'}
+        title={isEndless ? 'Run over!' : "Time's up!"}
         onRestart={handleStart}
         onClose={dismissResults}
       />

@@ -10,6 +10,9 @@ const GameHud = ({ hud }) => {
       {hud.timeRemaining !== undefined && (
         <StatTile label="Time" value={`${hud.timeRemaining}s`} accent />
       )}
+      {hud.lives !== undefined && (
+        <StatTile label="Lives" value={hud.lives} accent />
+      )}
       <StatTile label="Score" value={hud.score} accent />
       <StatTile label="Accuracy" value={`${hud.accuracy.toFixed(0)}%`} />
       <StatTile
