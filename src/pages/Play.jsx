@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import GameCanvas from '../components/GameCanvas/GameCanvas'
 import GameHud from '../components/GameHud/GameHud'
 import ResultsModal from '../components/ResultsModal/ResultsModal'
 import { useGameSession } from '../hooks/useGameSession'
+import { useAuth } from '../hooks/useAuth'
+import { saveMatchResult } from '../services/scores'
 
 const MATCH_SECONDS = 30
+const GAME_MODE = 'Classic' // mode selection arrives in Milestone 18
 
 // Dimmed overlay shown on top of the canvas between/within matches.
 const CanvasOverlay = ({ children }) => (
@@ -15,6 +19,22 @@ const CanvasOverlay = ({ children }) => (
 )
 
 const Play = () => {
+  const { user } = useAuth()
+  // null | 'saving' | 'saved' | 'error' — 'signed-out' is derived below.
+  const [saveStatus, setSaveStatus] = useState(null)
+
+  // Persist the finished match (event-driven, once per game over).
+  const handleGameOver = (result) => {
+    if (!user) return
+    setSaveStatus('saving')
+    saveMatchResult({ user, mode: GAME_MODE, summary: result })
+      .then(() => setSaveStatus('saved'))
+      .catch((error) => {
+        console.error('Failed to save match:', error)
+        setSaveStatus('error')
+      })
+  }
+
   const {
     engine,
     phase,
@@ -26,7 +46,16 @@ const Play = () => {
     togglePause,
     toggleMute,
     dismissResults,
-  } = useGameSession({ duration: MATCH_SECONDS, showFps: true })
+  } = useGameSession({
+    duration: MATCH_SECONDS,
+    showFps: true,
+    onGameOver: handleGameOver,
+  })
+
+  const handleStart = () => {
+    setSaveStatus(null)
+    start()
+  }
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -40,7 +69,7 @@ const Play = () => {
               <Button variant="secondary" size="sm" onClick={togglePause}>
                 {isPaused ? 'Resume' : 'Pause'}
               </Button>
-              <Button variant="ghost" size="sm" onClick={start}>
+              <Button variant="ghost" size="sm" onClick={handleStart}>
                 Restart
               </Button>
             </>
@@ -74,7 +103,7 @@ const Play = () => {
                 Click as many targets as you can. Consecutive hits build a score
                 multiplier — misses reset it.
               </p>
-              <Button size="lg" onClick={start}>
+              <Button size="lg" onClick={handleStart}>
                 Start Match
               </Button>
             </CanvasOverlay>
@@ -92,7 +121,8 @@ const Play = () => {
       <ResultsModal
         open={phase === 'over'}
         summary={summary}
-        onRestart={start}
+        saveStatus={user ? saveStatus : 'signed-out'}
+        onRestart={handleStart}
         onClose={dismissResults}
       />
     </section>
