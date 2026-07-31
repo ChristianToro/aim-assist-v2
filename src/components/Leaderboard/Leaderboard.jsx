@@ -8,6 +8,16 @@ const formatDate = (createdAt) =>
 const rankClass = (rank) =>
   rank <= 3 ? 'font-semibold text-accent' : 'text-muted'
 
+// A failed query and an empty result are very different problems, so they
+// must not look alike. Firestore reports a missing composite index as
+// 'failed-precondition' and puts a one-click creation link in the console.
+const errorMessage = (error) =>
+  error?.code === 'failed-precondition'
+    ? 'This view needs a Firestore composite index that has not been created yet. Run `firebase deploy --only firestore:indexes`, or open the setup link logged in the browser console.'
+    : error?.code === 'permission-denied'
+      ? 'Firestore rejected the read. Check that the security rules allow reads on the scores collection.'
+      : 'Something went wrong loading the leaderboard. See the browser console for details.'
+
 const PlayerCell = ({ entry }) => (
   <div className="flex items-center gap-2">
     {entry.photoURL ? (
@@ -44,11 +54,14 @@ const Leaderboard = ({
 
   if (error) {
     return (
-      <p className="py-16 text-center text-muted">
-        Couldn&apos;t load the leaderboard. If this view is new, its Firestore
-        index may still need creating — check the browser console for the setup
-        link.
-      </p>
+      <Card className="border-accent/40 bg-accent/5" role="alert">
+        <h2 className="font-medium text-heading">
+          This leaderboard failed to load
+        </h2>
+        <p className="mt-2 max-w-prose text-sm text-muted">
+          {errorMessage(error)}
+        </p>
+      </Card>
     )
   }
 

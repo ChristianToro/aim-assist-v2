@@ -23,7 +23,7 @@ A browser-based aim trainer inspired by Aimlabs — six game modes, live statist
 | Gameplay | HTML5 Canvas 2D, vanilla ES2022+ classes |
 | Backend | Firebase (Google Auth + Cloud Firestore, Spark plan) |
 | Build | Vite 8 (Rolldown) |
-| Quality | ESLint 10, Prettier, Vitest + React Testing Library (68 tests) |
+| Quality | ESLint 10, Prettier, Vitest + React Testing Library (72 tests) |
 
 ## Architecture
 
@@ -55,7 +55,13 @@ Firebase console setup (one time):
 
 1. **Authentication** → enable the Google provider
 2. **Firestore** → create a Standard database in production mode, then publish rules: public reads; `users/{uid}` writable only by its owner; `scores` create-only with `uid == request.auth.uid`
-3. **Indexes** — the daily/weekly/personal leaderboard views each need a composite index (`day+score`, `week+score`, `uid+score`). The first query without one logs a one-click creation link in the browser console.
+3. **Indexes** — the daily/weekly/personal leaderboard views each need a composite index (`day+score`, `week+score`, `uid+score`). All three are declared in [`firestore.indexes.json`](./firestore.indexes.json); deploy them with:
+
+   ```bash
+   npx firebase-tools deploy --only firestore:indexes --project <your-project-id>
+   ```
+
+   Without them those three tabs fail with `failed-precondition` (the page says so explicitly, and Firestore logs a one-click creation link in the browser console). All Time is unaffected — it sorts without a filter, so it needs no composite index.
 
 ### Scripts
 
@@ -75,7 +81,7 @@ Things this codebase demonstrates that a reviewer might care about:
 - **Firestore shaped the data model.** Firestore can't combine a `createdAt` range filter with an `orderBy(score)` sort, so score documents carry equality-filterable `day` ("2026-07-06") and `week` ("2026-W28") keys written at save time. Player identity is denormalized onto score docs so leaderboards render without N user lookups.
 - **Zero-asset audio.** All sound effects are synthesized with the Web Audio API (oscillator + exponential-decay envelope), created lazily after a user gesture to satisfy autoplay policies.
 - **Bundle discipline.** Route-level code splitting plus Rolldown `advancedChunks` puts the app shell at ~8 kB, with Firebase (~563 kB) and React (~232 kB) in independently cached vendor chunks.
-- **Pure game logic = trivial tests.** Because gameplay classes never touch React or the DOM, `ScoreManager`, `Spawner`, `Collision`, `Target`, and `Timer` are tested as plain classes — 68 tests run in about a second.
+- **Pure game logic = trivial tests.** Because gameplay classes never touch React or the DOM, `ScoreManager`, `Spawner`, `Collision`, `Target`, and `Timer` are tested as plain classes — 72 tests run in about a second.
 - **Frame-loop hygiene.** Delta time is clamped (backgrounded tabs can't cause physics jumps), pause re-anchors the clock, hit-testing uses the full target radius (shrinking targets stay fair), and hot paths avoid per-frame allocations.
 
 ## Roadmap
