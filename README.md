@@ -61,7 +61,7 @@ Firebase console setup (one time):
    npx firebase-tools deploy --only firestore:indexes --project <your-project-id>
    ```
 
-   Without them those three tabs fail with `failed-precondition` (the page says so explicitly, and Firestore logs a one-click creation link in the browser console). All Time is unaffected — it sorts without a filter, so it needs no composite index.
+   Index builds are asynchronous: after deploying, the three tabs keep failing for a few minutes until the console reports each index as **Enabled** rather than **Building**. Until then they fail with `failed-precondition` (the page says so explicitly, and Firestore logs a one-click creation link in the browser console). All Time is unaffected — it sorts without a filter, so it needs no composite index.
 
 ### Scripts
 
