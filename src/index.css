@@ -3,24 +3,47 @@
 /*
  * Theme tokens (dark mode first, see CLAUDE.md).
  *
- * Components use only the semantic utilities below (bg-surface, text-muted,
- * border-edge, ...). Milestone 12 adds themes by redefining these :root
- * variables per theme — no component changes required.
+ * Components use only the semantic utilities exposed below (bg-surface,
+ * text-muted, border-edge, ...). Each theme redefines the same variables,
+ * so switching themes needs no component changes.
  */
-:root {
-  color-scheme: dark;
+@import './styles/themes.css';
 
-  --bg: #09090b; /* page background */
-  --surface: #18181b; /* cards, nav hover */
-  --raised: #1f1f23; /* modals, popovers */
-  --edge: #27272a; /* borders */
-  --edge-strong: #3f3f46; /* hovered/focused borders */
-  --body: #d4d4d8; /* default text */
-  --muted: #a1a1aa; /* secondary text */
-  --heading: #ffffff; /* headings, emphasized text */
-  --accent: #22d3ee; /* highlights, hovered primary buttons */
-  --accent-strong: #06b6d4; /* primary buttons */
-  --on-accent: #09090b; /* text on accent backgrounds */
+/* Motion tokens: generate animate-* utilities for page and modal
+   transitions. Reduced-motion handling is global (see media query). */
+@theme {
+  --animate-fade-in: fade-in 0.2s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.3s ease-out both;
+  --animate-scale-in: scale-in 0.18s ease-out both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
 }
 
 /* Expose tokens as Tailwind color utilities (resolved at use time,
@@ -37,6 +60,12 @@
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-on-accent: var(--on-accent);
+
+  /* Canvas target rings — the theme picker previews gameplay colors with
+     these; the game itself reads the raw variables (see game/palette.js). */
+  --color-target-outer: var(--target-outer);
+  --color-target-mid: var(--target-mid);
+  --color-target-inner: var(--target-inner);
 }
 
 body {
@@ -46,3 +75,24 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Visible keyboard focus everywhere (buttons opt into their own ring). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Respect OS-level reduced-motion: collapse UI animations/transitions.
+   (Gameplay particle bursts are skipped separately in useGameSession.) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High-contrast preference is handled per theme, in styles/themes.css —
+   one global override can't suit five palettes. */

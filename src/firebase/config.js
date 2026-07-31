@@ -15,6 +15,18 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
+// Fail loudly in development if .env is missing or incomplete —
+// otherwise Firebase throws opaque errors much later.
+const missingKeys = Object.entries(firebaseConfig)
+  .filter(([, value]) => !value)
+  .map(([key]) => key)
+if (missingKeys.length > 0) {
+  console.warn(
+    `Firebase config is missing: ${missingKeys.join(', ')}. ` +
+      'Copy .env.example to .env and fill in your project credentials.'
+  )
+}
+
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
