@@ -1,8 +1,76 @@
 # PROMPT-HISTORY.md
 
-A record of the AI-assisted development session ("milestone sweep") that built this project. Each entry quotes the user prompt verbatim and condenses the assistant's response to its outcome and key decisions — full responses ran to thousands of words each and are summarized rather than reproduced. Commit hashes refer to the `milestone_sweep` branch.
+A record of the AI-assisted development of this project, across two sessions: a planning session that produced the specification documents, and an implementation session that wrote the code against them.
+
+Each entry quotes the user prompt verbatim and condenses the response to its outcome and key decisions — full responses ran to thousands of words each and are summarized rather than reproduced. Commit hashes refer to commits now on `main`, merged from the `milestone_sweep` branch.
 
 ---
+
+# Session 1 — Planning
+
+_6 July 2026. No code was written; the output of this session is the three planning documents the repo still carries._
+
+## 1. The initial idea
+
+> I want to make a simple webpage--built with css, html, and javascript--that is a sort of "aim-labs" with a leaderboard, SSO google log in, scores stored.
+
+Expanded a single page into a portfolio-scale project: five game modes (Precision, Speed, Tracking, Gridshot, Flick), Google OAuth via Firebase with scores in Firestore, global and personal leaderboards, Canvas gameplay, user profiles, and statistics spanning score, accuracy, reaction time, and combos. Difficulty scaling, particle effects, theme switching, and sound were added as polish, with daily challenges and achievements deferred to a roadmap. The stack at this point was still plain HTML, CSS, and JavaScript alongside Canvas, Firebase Authentication, and Firestore.
+
+## 2. Moving to React
+
+> Would with also work within a react framework?
+
+Recommended migrating off plain HTML/CSS/JS to React with Vite, keeping Canvas, Firebase Auth, and Firestore and adding React Router.
+
+This is where the project's defining split was drawn, and it survived unchanged into the implementation: **React** owns navigation, authentication, leaderboards, profiles, statistics, and settings; **Canvas** owns rendering, target spawning, collision detection, animation, and the game loop — driven by `requestAnimationFrame()` rather than React re-renders. Also sketched the `components/ pages/ hooks/ services/` structure and proposed building in milestones, game engine before backend.
+
+## 3. First CLAUDE.md
+
+> generate a markdown file with all of this information you provided in this session so that I can use it to develop a claude.md file
+
+Produced an initial `claude.md` covering the project overview, stack, folder structure, gameplay mechanics, the React/Canvas split, Firebase integration, statistics, profiles, roadmap, and engineering principles — then suggested a considerably larger specification.
+
+## 4. Expanded specification
+
+> generate the much more comprehensive version
+
+Grew it into a full specification: product vision, technical architecture, coding standards, development philosophy, Firebase schema, UI/UX guidelines, milestones, and Claude-specific coding instructions.
+
+## 5. Project plan
+
+> generate the project plan md
+
+Generated `PROJECT_PLAN.md` — 26 milestones with incremental tasks, a feature checklist, stretch goals, a definition of done, and a portfolio checklist. This became the spine of Session 2.
+
+## 6. Architecture document
+
+> generate the architecture md file
+
+Generated `ARCHITECTURE.md`: layered architecture, the React / Canvas / Firebase responsibility split, folder organization, game engine design, rendering pipeline, data flow, state ownership, performance guidelines, and AI development guidelines. Suggested a further `GAME_DESIGN.md`, which was never written.
+
+## 7. Retargeting to Vite and JavaScript
+
+> I am using Vite and javascript for this project. Adjust and rewrite each markdown file
+
+Rewrote the suite around React, Vite, JavaScript, Canvas, Firebase Auth, and Firestore, stripping out assumptions about Next.js, TypeScript, and server-side rendering. Proposed adding `FIREBASE_SCHEMA.md` and `COMPONENT_MAP.md`, and a full Documentation Suite v2.0.
+
+## 8. Documentation suite scope
+
+> generate documentation suite version 2.0
+
+Scoped the suite at eleven documents — README, CLAUDE, PROJECT_PLAN, ARCHITECTURE, GAME_DESIGN, COMPONENT_MAP, FIREBASE_SCHEMA, API, STYLE_GUIDE, TESTING, CONTRIBUTING — but declined to emit them in one response and recommended producing them individually. In the end only `CLAUDE.md`, `PROJECT_PLAN.md`, and `ARCHITECTURE.md` were written; the remaining eight never materialized, and the project proceeded without them.
+
+## 9. This file's ancestor
+
+> generate a prompt-history.md file based on this sessions prompts and responses
+
+Generated a `PROMPT_HISTORY.md` summarizing the session's prompts, architectural decisions, technology choices, gameplay direction, documentation planning, and development philosophy, with a suggestion to keep it as a living design journal — which is what this file became.
+
+---
+
+# Session 2 — Implementation
+
+_The "milestone sweep": Milestones 0–25 built against the plan above._
 
 ## 1. Orientation
 
@@ -184,7 +252,7 @@ Verified: 68 tests passing across 14 files (15 new, covering the registry, palet
 
 Appended sections 22–23 and refreshed the sweep summary below.
 
-_A run of prompts between here and §24 is not recorded — the leaderboard composite indexes, `.firebaserc`, the GitHub Pages walkthrough, Milestone 25 itself, repository secrets, and debugging the deployed 404. Sections 24–26 were requested specifically._
+_A run of prompts between here and §24 is not recorded — the leaderboard composite indexes, `.firebaserc`, the GitHub Pages walkthrough, Milestone 25 itself, repository secrets, and debugging the deployed 404. Sections 24–25 were requested specifically._
 
 ## 24. Choosing a Pages workflow
 
