@@ -30,13 +30,13 @@ const Settings = () => {
       <h1 className="text-3xl font-semibold tracking-tight text-heading">
         Settings
       </h1>
-      <p className="mt-3 max-w-prose text-muted">
+      <p className="mt-3 text-muted">
         Themes, sound, and accessibility preferences. Your theme is saved to
         this browser.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold tracking-tight text-heading">
-        Theme
+        Color Themes
       </h2>
       <p className="mt-1 max-w-prose text-sm text-muted">
         Applies to the whole app, including target and particle colors on the
@@ -49,8 +49,9 @@ const Settings = () => {
       <h2 className="mt-12 text-xl font-semibold tracking-tight text-heading">
         System preferences
       </h2>
-      <p className="mt-1 max-w-prose text-sm text-muted">
-        These follow your operating system — there's nothing to configure here.
+      <p className="mt-1 text-sm text-muted">
+        These follow your operating system — make the following changes through
+        your OS settings.
       </p>
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         {SYSTEM_PREFERENCES.map(({ label, detail }) => (

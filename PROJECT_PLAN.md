@@ -517,7 +517,7 @@ Reliable application.
 ### Tasks
 
 - [ ] Production build.
-- [ ] Deploy to Vercel or Firebase Hosting.
+- [ ] Deploy to Github Pages.
 - [ ] Configure environment variables.
 - [ ] Verify authentication.
 - [ ] Verify Firestore.
