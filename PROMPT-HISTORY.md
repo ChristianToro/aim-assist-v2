@@ -160,7 +160,29 @@ Honest costs flagged: `isPaused`/`isMuted` duplicated across engine and React st
 
 > append these prompts and your responses to the PROMPT-HISTORY.md file
 
-Appended sections 19–21.
+Appended sections 19–21 (`4e20221`).
+
+## 22. Milestone 12 — Themes
+
+> now complete milestone 12
+
+Built the deferred theme system (`105d3da`): Dark, Light, Cyberpunk, Terminal, and Aimlabs, selectable from a real Settings page (replacing the placeholder) and persisted to `localStorage`. Three decisions carried the implementation:
+
+- **CSS is the single source of truth for color.** Each theme is a `[data-theme='...']` block in `src/styles/themes.css` redefining the same semantic tokens; `src/styles/themes.js` holds only ids and copy. The alternative — palettes in JavaScript applied via `style.setProperty()` — was rejected because inline styles outrank stylesheet rules and would have silently broken the `prefers-contrast: more` support added in M22. Each theme instead carries its own contrast overrides in a nested media query, since one global override can't suit five palettes.
+- **Themes reach the canvas without breaking the seam.** This was exactly the inbound React → engine path flagged in §20. Themes also define target-ring, particle, and floating-text tokens; `src/game/palette.js` resolves them **once per theme change**, and the session swaps its palette via a new `setPalette()`. Entities take a palette at `draw()` time instead of storing hex values, so a theme switch recolors a match already in progress — particles mid-flight included — with no engine rebuild and no score reset. This improved on §20's own recommendation, which had assumed a remount would be needed.
+- **Attribute-scoped, not `:root`-scoped.** Writing `[data-theme='x']` rather than `:root[data-theme='x']` lets a theme apply to a subtree, which is what makes each picker option render a live miniature of the app *in its own colors*, target rings included, with no hand-maintained swatch list.
+
+Two details beyond the four milestone tasks: an inline script in `index.html` stamps the saved theme before first paint, and `ThemeProvider` writes the attribute synchronously in its setter rather than in an effect — child effects run before parent effects, so a deferred write would let the canvas read the previous theme's variables for one commit.
+
+Caught during the build: `peer-checked:` only reaches siblings, so the picker's nested "Active" badge would never have highlighted — replaced the CSS variant with plain JS state. Declined to add `@testing-library/user-event` for the provider tests (not installed; CLAUDE.md forbids unjustified dependencies) and used `fireEvent` from the existing RTL dependency instead.
+
+Verified: 68 tests passing across 14 files (15 new, covering the registry, palette resolution and per-token fallbacks, provider persistence and validation, and the picker), lint and Prettier clean, production build green with all five themes confirmed in the compiled CSS, and a dev-server smoke test confirming the pre-paint script is served ahead of the app bundle.
+
+## 23. This entry
+
+> append these prompts and results into PROMPT-HISTORY.md
+
+Appended sections 22–23 and refreshed the sweep summary below.
 
 ---
 
@@ -168,8 +190,8 @@ Appended sections 19–21.
 
 | | |
 |---|---|
-| Milestones completed | 0–11, 13–24 (12 & 25 deferred by user) |
-| Commits on `milestone_sweep` | 22 (including README and this file) |
-| Tests | 53 passing across 10 files |
+| Milestones completed | 0–24 (25, deployment, deferred by user) |
+| Commits on `milestone_sweep` | 27 (including README and this file) |
+| Tests | 68 passing across 14 files |
 | App shell bundle | ~8 kB (vendors split and cached separately) |
 | Recurring theme | Verification before every commit (lint + build, later + tests); the new react-hooks v7 lint rules twice forced event-driven designs that were better than the effect-based first drafts |
