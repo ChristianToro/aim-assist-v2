@@ -4,6 +4,11 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages serves project sites from /<repo>/, so every asset URL has
+  // to be prefixed or the deployed page loads nothing. Applied in dev too
+  // (the dev server moves to /Aim_Assist/) so local and production paths
+  // behave identically — BASE_URL feeds the router's basename in App.jsx.
+  base: '/Aim_Assist/',
   plugins: [react(), tailwindcss()],
   test: {
     environment: 'jsdom',
