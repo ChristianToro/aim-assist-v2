@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Aim Assist — Browser Aim Trainer</title>
+    <script>
+      // Apply the saved theme before first paint, so a non-default choice
+      // doesn't flash the dark default. Storage key and attribute must match
+      // src/contexts/ThemeProvider.jsx.
+      try {
+        var savedTheme = localStorage.getItem('aim-assist:theme')
+        if (savedTheme) document.documentElement.dataset.theme = savedTheme
+      } catch (error) {
+        // Storage unavailable — the CSS default applies.
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -4,6 +4,7 @@ import { Timer } from './Timer'
 import { findHitTarget } from './Collision'
 import { createBurst } from './Particle'
 import { FloatingText } from './FloatingText'
+import { FALLBACK_PALETTE } from './palette'
 import { lerp } from '../utils/math'
 
 // Sweep any list of entities with an isAlive flag, newest-safe.
@@ -21,6 +22,10 @@ const sweepDead = (entities) => {
  * Communication with React is one-way and event-driven:
  *   onHud(snapshot)     — on hit, miss, or displayed-second change
  *   onGameOver(summary) — once, when the match ends
+ *
+ * The one inbound channel is setPalette(), which swaps the theme colors
+ * used at draw time. It deliberately isn't a rebuild: recoloring a live
+ * match shouldn't reset it.
  */
 const COUNTDOWN_TICK_FROM_SECONDS = 3
 
@@ -28,6 +33,7 @@ export const createGameSession = ({
   mode,
   audio,
   reducedMotion = false,
+  palette = FALLBACK_PALETTE,
   onHud,
   onGameOver,
 } = {}) => {
@@ -49,6 +55,7 @@ export const createGameSession = ({
   let elapsed = 0
   let isOver = false
   let lastDisplayedSecond = timer.displaySeconds
+  let activePalette = palette
 
   const livesRemaining = () => Math.max(mode.missLimit - scores.misses, 0)
 
@@ -167,10 +174,14 @@ export const createGameSession = ({
     }
   }
 
+  const setPalette = (next) => {
+    activePalette = next
+  }
+
   const render = (ctx) => {
-    targets.forEach((target) => target.draw(ctx))
-    particles.forEach((particle) => particle.draw(ctx))
-    floaters.forEach((floater) => floater.draw(ctx))
+    targets.forEach((target) => target.draw(ctx, activePalette))
+    particles.forEach((particle) => particle.draw(ctx, activePalette))
+    floaters.forEach((floater) => floater.draw(ctx, activePalette))
   }
 
   const reset = () => {
@@ -187,5 +198,5 @@ export const createGameSession = ({
     emitHud()
   }
 
-  return { targets, update, render, reset }
+  return { targets, update, render, reset, setPalette }
 }

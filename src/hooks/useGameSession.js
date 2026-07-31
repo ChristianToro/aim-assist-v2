@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { GameEngine } from '../game/GameEngine'
 import { AudioManager } from '../game/AudioManager'
 import { createGameSession } from '../game/GameSession'
+import { readCanvasPalette } from '../game/palette'
+import { useTheme } from './useTheme'
 
 /*
  * useGameSession — the React side of a match.
@@ -11,6 +13,7 @@ import { createGameSession } from '../game/GameSession'
  * what the UI needs, updated by the session's event callbacks.
  */
 export const useGameSession = ({ mode, showFps = false, onGameOver } = {}) => {
+  const { themeId } = useTheme()
   const [phase, setPhase] = useState('idle')
   const [hud, setHud] = useState(null)
   const [summary, setSummary] = useState(null)
@@ -23,7 +26,7 @@ export const useGameSession = ({ mode, showFps = false, onGameOver } = {}) => {
     onGameOverRef.current = onGameOver
   })
 
-  const { engine, audio } = useMemo(() => {
+  const { engine, session, audio } = useMemo(() => {
     const audioManager = new AudioManager()
     const reducedMotion = window.matchMedia(
       '(prefers-reduced-motion: reduce)'
@@ -34,10 +37,11 @@ export const useGameSession = ({ mode, showFps = false, onGameOver } = {}) => {
     // onGameOverRef.current is only read inside the game-over callback
     // (event time), never during render — safe despite the refs rule.
     // eslint-disable-next-line react-hooks/refs
-    const session = createGameSession({
+    const gameSession = createGameSession({
       mode,
       audio: audioManager,
       reducedMotion,
+      palette: readCanvasPalette(),
       onHud: setHud,
       onGameOver: (result) => {
         engineInstance.stop()
@@ -46,10 +50,22 @@ export const useGameSession = ({ mode, showFps = false, onGameOver } = {}) => {
         onGameOverRef.current?.(result)
       },
     })
-    engineInstance = new GameEngine(session, { showFps })
-    return { engine: engineInstance, audio: audioManager }
+    engineInstance = new GameEngine(gameSession, { showFps })
+    return {
+      engine: engineInstance,
+      session: gameSession,
+      audio: audioManager,
+    }
   }, [mode, showFps])
   const [isMuted, setIsMuted] = useState(audio.muted)
+
+  // Recolor on theme change. ThemeProvider stamps <html data-theme>
+  // synchronously in its setter, so the variables are already resolved by
+  // the time this effect reads them. Swapping the palette leaves the match
+  // untouched — no engine rebuild, no reset.
+  useEffect(() => {
+    session.setPalette(readCanvasPalette())
+  }, [session, themeId])
 
   const toggleMute = () => setIsMuted(audio.toggleMute())
 

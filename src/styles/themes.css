@@ -1,0 +1,182 @@
+/*
+ * Theme token definitions (Milestone 12).
+ *
+ * Each theme redefines the same semantic tokens, so no component needs to
+ * know which theme is active — they style themselves with the Tailwind
+ * utilities mapped from these variables in index.css (`@theme inline`).
+ *
+ * Selectors are attribute-only (`[data-theme='x']`, not `:root[data-theme='x']`)
+ * so a theme can also be scoped to a subtree — that is what lets the theme
+ * picker render each option in its own colors. `:root` carries the dark
+ * defaults for the first paint before <html data-theme> is stamped.
+ *
+ * Token groups:
+ *   UI      — surfaces, text, borders, accent (consumed via Tailwind)
+ *   Canvas  — target rings, particle burst, floating score text. Read once
+ *             per theme by game/palette.js; the engine never touches the DOM.
+ *
+ * Each theme carries its own `prefers-contrast: more` overrides, since a
+ * single global override can't suit five different palettes.
+ */
+
+/* Dark — the default, applied when no data-theme attribute is present. */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #09090b; /* page background */
+  --surface: #18181b; /* cards, nav hover */
+  --raised: #1f1f23; /* modals, popovers */
+  --edge: #27272a; /* borders */
+  --edge-strong: #3f3f46; /* hovered/focused borders */
+  --body: #d4d4d8; /* default text */
+  --muted: #a1a1aa; /* secondary text */
+  --heading: #ffffff; /* headings, emphasized text */
+  --accent: #22d3ee; /* highlights, hovered primary buttons */
+  --accent-strong: #06b6d4; /* primary buttons */
+  --on-accent: #09090b; /* text on accent backgrounds */
+
+  --target-outer: #164e63;
+  --target-mid: #0e7490;
+  --target-inner: #22d3ee;
+  --burst-1: #22d3ee;
+  --burst-2: #0e7490;
+  --burst-3: #e4e4e7;
+  --float-text: #e4e4e7;
+
+  @media (prefers-contrast: more) {
+    --edge: #52525b;
+    --edge-strong: #71717a;
+    --muted: #d4d4d8;
+    --body: #f4f4f5;
+  }
+}
+
+/* Light — the one theme that inverts the target ramp: on a pale canvas the
+   bullseye reads as the darkest ring, not the brightest. */
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f4f4f5;
+  --surface: #ffffff;
+  --raised: #ffffff;
+  --edge: #e4e4e7;
+  --edge-strong: #d4d4d8;
+  --body: #3f3f46;
+  --muted: #71717a;
+  --heading: #18181b;
+  --accent: #0891b2;
+  --accent-strong: #0e7490;
+  --on-accent: #ffffff;
+
+  --target-outer: #67e8f9;
+  --target-mid: #0891b2;
+  --target-inner: #164e63;
+  --burst-1: #0891b2;
+  --burst-2: #164e63;
+  --burst-3: #52525b;
+  --float-text: #18181b;
+
+  @media (prefers-contrast: more) {
+    --edge: #a1a1aa;
+    --edge-strong: #71717a;
+    --muted: #3f3f46;
+    --body: #18181b;
+  }
+}
+
+/* Cyberpunk — violet-black with hot pink accent and a magenta target ramp. */
+[data-theme='cyberpunk'] {
+  color-scheme: dark;
+
+  --bg: #0b0616;
+  --surface: #1a1030;
+  --raised: #241640;
+  --edge: #33215c;
+  --edge-strong: #4c318a;
+  --body: #e2d9ff;
+  --muted: #a78bfa;
+  --heading: #ffffff;
+  --accent: #f472b6;
+  --accent-strong: #ec4899;
+  --on-accent: #0b0616;
+
+  --target-outer: #4c1d95;
+  --target-mid: #a21caf;
+  --target-inner: #f0abfc;
+  --burst-1: #f472b6;
+  --burst-2: #22d3ee;
+  --burst-3: #fde047;
+  --float-text: #fde047;
+
+  @media (prefers-contrast: more) {
+    --edge: #6d28d9;
+    --edge-strong: #8b5cf6;
+    --muted: #ddd6fe;
+    --body: #f5f3ff;
+  }
+}
+
+/* Terminal — black background, single phosphor-green hue throughout. */
+[data-theme='terminal'] {
+  color-scheme: dark;
+
+  --bg: #000000;
+  --surface: #0a140a;
+  --raised: #0f1f0f;
+  --edge: #1c3a1c;
+  --edge-strong: #2f6b2f;
+  --body: #b7f7b7;
+  --muted: #5fbf5f;
+  --heading: #d9ffd9;
+  --accent: #22c55e;
+  --accent-strong: #16a34a;
+  --on-accent: #000000;
+
+  --target-outer: #14532d;
+  --target-mid: #16a34a;
+  --target-inner: #4ade80;
+  --burst-1: #4ade80;
+  --burst-2: #16a34a;
+  --burst-3: #d9ffd9;
+  --float-text: #d9ffd9;
+
+  @media (prefers-contrast: more) {
+    --edge: #2f6b2f;
+    --edge-strong: #4ade80;
+    --muted: #86efac;
+    --body: #d9ffd9;
+  }
+}
+
+/* Aimlabs — navy slate with the vivid blue of the app it takes after. */
+[data-theme='aimlabs'] {
+  color-scheme: dark;
+
+  --bg: #0b1020;
+  --surface: #141b2e;
+  --raised: #1b2439;
+  --edge: #26314b;
+  --edge-strong: #3a4870;
+  --body: #cbd5e1;
+  --muted: #94a3b8;
+  --heading: #f8fafc;
+  --accent: #60a5fa;
+  --accent-strong: #3b82f6;
+  --on-accent: #0b1020;
+
+  --target-outer: #1e3a8a;
+  --target-mid: #3b82f6;
+  --target-inner: #93c5fd;
+  --burst-1: #60a5fa;
+  --burst-2: #a78bfa;
+  --burst-3: #f8fafc;
+  --float-text: #f8fafc;
+
+  @media (prefers-contrast: more) {
+    --edge: #3a4870;
+    --edge-strong: #64748b;
+    --muted: #cbd5e1;
+    --body: #f1f5f9;
+  }
+}

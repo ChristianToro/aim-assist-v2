@@ -2,7 +2,7 @@
 
 A browser-based aim trainer inspired by Aimlabs — six game modes, live statistics, Google sign-in, and global leaderboards. Built as a portfolio project to demonstrate modern React, interactive Canvas programming, and cloud integration.
 
-> **Status**: Milestones 0–24 complete. Remaining: theme system (M12) and GitHub Pages deployment (M25) — see [Roadmap](#roadmap) below.
+> **Status**: Milestones 0–24 complete. Remaining: GitHub Pages deployment (M25) — see [Roadmap](#roadmap) below.
 
 ## Features
 
@@ -11,6 +11,7 @@ A browser-based aim trainer inspired by Aimlabs — six game modes, live statist
 - **Scoring depth** — streak-based combo multiplier (up to 2×), accuracy, avg/best/worst reaction times
 - **Google authentication** — profiles with aggregate stats (highest score, games played, running average accuracy, favorite mode)
 - **Leaderboards** — all-time / daily / weekly top-100 and personal bests, backed by Firestore
+- **Five themes** — Dark, Light, Cyberpunk, Terminal, and Aimlabs, applied to the UI *and* the canvas, remembered per browser
 - **Feel** — particle bursts, floating score text, and Web Audio–synthesized sound effects (no audio assets)
 - **Accessibility** — keyboard focus rings, `prefers-reduced-motion` and `prefers-contrast` support, modal focus management, skip link
 
@@ -22,7 +23,7 @@ A browser-based aim trainer inspired by Aimlabs — six game modes, live statist
 | Gameplay | HTML5 Canvas 2D, vanilla ES2022+ classes |
 | Backend | Firebase (Google Auth + Cloud Firestore, Spark plan) |
 | Build | Vite 8 (Rolldown) |
-| Quality | ESLint 10, Prettier, Vitest + React Testing Library (53 tests) |
+| Quality | ESLint 10, Prettier, Vitest + React Testing Library (68 tests) |
 
 ## Architecture
 
@@ -74,20 +75,19 @@ Things this codebase demonstrates that a reviewer might care about:
 - **Firestore shaped the data model.** Firestore can't combine a `createdAt` range filter with an `orderBy(score)` sort, so score documents carry equality-filterable `day` ("2026-07-06") and `week` ("2026-W28") keys written at save time. Player identity is denormalized onto score docs so leaderboards render without N user lookups.
 - **Zero-asset audio.** All sound effects are synthesized with the Web Audio API (oscillator + exponential-decay envelope), created lazily after a user gesture to satisfy autoplay policies.
 - **Bundle discipline.** Route-level code splitting plus Rolldown `advancedChunks` puts the app shell at ~8 kB, with Firebase (~563 kB) and React (~232 kB) in independently cached vendor chunks.
-- **Pure game logic = trivial tests.** Because gameplay classes never touch React or the DOM, `ScoreManager`, `Spawner`, `Collision`, `Target`, and `Timer` are tested as plain classes — 53 tests run in about a second.
+- **Pure game logic = trivial tests.** Because gameplay classes never touch React or the DOM, `ScoreManager`, `Spawner`, `Collision`, `Target`, and `Timer` are tested as plain classes — 68 tests run in about a second.
 - **Frame-loop hygiene.** Delta time is clamped (backgrounded tabs can't cause physics jumps), pause re-anchors the clock, hit-testing uses the full target radius (shrinking targets stay fair), and hot paths avoid per-frame allocations.
 
 ## Roadmap
 
-### Milestone 12 — Themes (planned)
+### Milestone 12 — Themes (complete)
 
-The groundwork is already in place: every component styles itself through semantic tokens (`--bg`, `--surface`, `--edge`, `--body`, `--muted`, `--heading`, `--accent`) defined in `src/index.css` and mapped to Tailwind utilities via `@theme inline`, which resolves at use time. Suggested implementation:
+Five themes — Dark, Light, Cyberpunk, Terminal, Aimlabs — selectable from Settings and persisted to `localStorage`. Notes on how it was built:
 
-1. Define each theme (Dark, Light, Cyberpunk, Terminal, Aimlabs) as a `:root[data-theme='...']` block overriding the token values — no component changes needed
-2. Add a `ThemeContext` + `useTheme` hook that stamps `data-theme` on `<html>` and persists the choice to `localStorage` (mirror the `AudioManager` mute pattern)
-3. Build the Settings page UI (replacing the current placeholder) with theme cards/swatches
-4. **Canvas caveat**: target rings and particles currently hardcode cyan hex values. Either read the resolved CSS variables once per session (`getComputedStyle`) and pass a palette into `createGameSession`, or add a small theme→canvas-palette map in `src/game/`
-5. Keep the `prefers-contrast: more` overrides composing on top of whichever theme is active
+- **CSS is the single source of truth for color.** Each theme is a `[data-theme='...']` block in `src/styles/themes.css` redefining the same semantic tokens; `src/styles/themes.js` carries only ids and copy. Keeping values out of JavaScript means nothing can drift between two lists, and each theme's `prefers-contrast: more` overrides still compose on top of it (one global override couldn't suit five palettes).
+- **Themes reach the canvas.** Each theme also defines target-ring, particle, and floating-text tokens. `src/game/palette.js` resolves them once per theme change and the session swaps its palette — entities take a palette argument at *draw* time rather than storing hexes, so switching theme recolors a match already in progress without rebuilding the engine or resetting the score.
+- **The picker previews itself.** Because theme blocks are attribute-scoped rather than `:root`-scoped, each option in the picker renders inside its own `data-theme` and shows the real colors — including a miniature of the target rings — with no hand-maintained swatch list.
+- **No flash of the wrong theme.** A short inline script in `index.html` stamps the saved theme on `<html>` before first paint. `ThemeProvider` also writes the attribute synchronously in its setter, so consumers reading resolved CSS variables (the canvas palette) never see a stale theme for a commit.
 
 ### Milestone 25 — GitHub Pages deployment (planned)
 

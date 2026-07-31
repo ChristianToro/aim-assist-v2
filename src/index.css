@@ -3,25 +3,11 @@
 /*
  * Theme tokens (dark mode first, see CLAUDE.md).
  *
- * Components use only the semantic utilities below (bg-surface, text-muted,
- * border-edge, ...). Milestone 12 adds themes by redefining these :root
- * variables per theme — no component changes required.
+ * Components use only the semantic utilities exposed below (bg-surface,
+ * text-muted, border-edge, ...). Each theme redefines the same variables,
+ * so switching themes needs no component changes.
  */
-:root {
-  color-scheme: dark;
-
-  --bg: #09090b; /* page background */
-  --surface: #18181b; /* cards, nav hover */
-  --raised: #1f1f23; /* modals, popovers */
-  --edge: #27272a; /* borders */
-  --edge-strong: #3f3f46; /* hovered/focused borders */
-  --body: #d4d4d8; /* default text */
-  --muted: #a1a1aa; /* secondary text */
-  --heading: #ffffff; /* headings, emphasized text */
-  --accent: #22d3ee; /* highlights, hovered primary buttons */
-  --accent-strong: #06b6d4; /* primary buttons */
-  --on-accent: #09090b; /* text on accent backgrounds */
-}
+@import './styles/themes.css';
 
 /* Motion tokens: generate animate-* utilities for page and modal
    transitions. Reduced-motion handling is global (see media query). */
@@ -74,6 +60,12 @@
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-on-accent: var(--on-accent);
+
+  /* Canvas target rings — the theme picker previews gameplay colors with
+     these; the game itself reads the raw variables (see game/palette.js). */
+  --color-target-outer: var(--target-outer);
+  --color-target-mid: var(--target-mid);
+  --color-target-inner: var(--target-inner);
 }
 
 body {
@@ -102,12 +94,5 @@ body {
   }
 }
 
-/* High-contrast preference: stronger borders and brighter text. */
-@media (prefers-contrast: more) {
-  :root {
-    --edge: #52525b;
-    --edge-strong: #71717a;
-    --muted: #d4d4d8;
-    --body: #f4f4f5;
-  }
-}
+/* High-contrast preference is handled per theme, in styles/themes.css —
+   one global override can't suit five palettes. */

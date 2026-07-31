@@ -1,10 +1,13 @@
 import { clamp, distance } from '../utils/math'
+import { FALLBACK_PALETTE } from './palette'
 
-// Concentric rings, outermost first (cyan-900 → cyan-700 → cyan-400).
+// Concentric rings, outermost first. Colors come from the active theme's
+// palette at draw time (see palette.js), so targets restyle themselves
+// without any target needing to be rebuilt.
 const RINGS = [
-  { scale: 1, color: '#164e63' },
-  { scale: 0.66, color: '#0e7490' },
-  { scale: 0.33, color: '#22d3ee' },
+  { scale: 1, token: 'targetOuter' },
+  { scale: 0.66, token: 'targetMid' },
+  { scale: 0.33, token: 'targetInner' },
 ]
 
 const SPAWN_ANIMATION_SECONDS = 0.15
@@ -68,12 +71,12 @@ export class Target {
     return Math.min(growIn, shrinkOut)
   }
 
-  draw(ctx) {
+  draw(ctx, palette = FALLBACK_PALETTE) {
     const drawRadius = this.radius * this.scale
-    RINGS.forEach(({ scale, color }) => {
+    RINGS.forEach(({ scale, token }) => {
       ctx.beginPath()
       ctx.arc(this.x, this.y, drawRadius * scale, 0, Math.PI * 2)
-      ctx.fillStyle = color
+      ctx.fillStyle = palette[token]
       ctx.fill()
     })
   }

@@ -1,6 +1,7 @@
 import { lazy } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import AuthProvider from './contexts/AuthProvider'
+import ThemeProvider from './contexts/ThemeProvider'
 import Layout from './components/Layout/Layout'
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute'
 
@@ -14,22 +15,24 @@ const Settings = lazy(() => import('./pages/Settings'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 const App = () => (
-  <AuthProvider>
-    <BrowserRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="play" element={<Play />} />
-          <Route path="leaderboards" element={<Leaderboards />} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="profile" element={<Profile />} />
+  <ThemeProvider>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route index element={<Home />} />
+            <Route path="play" element={<Play />} />
+            <Route path="leaderboards" element={<Leaderboards />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="profile" element={<Profile />} />
+            </Route>
+            <Route path="settings" element={<Settings />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
-          <Route path="settings" element={<Settings />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  </AuthProvider>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  </ThemeProvider>
 )
 
 export default App
