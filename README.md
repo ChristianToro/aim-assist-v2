@@ -2,7 +2,25 @@
 
 A browser-based aim trainer inspired by Aimlabs — six game modes, live statistics, Google sign-in, and global leaderboards. Built as a portfolio project to demonstrate modern React, interactive Canvas programming, and cloud integration.
 
-> **Status**: Milestones 0–25 complete. The GitHub Pages pipeline is in place; first publish needs the one-time console setup in [Roadmap](#roadmap) below.
+## Live Demo
+
+[View my project here](https://christiantoro.github.io/Aim_Assist/)
+
+## Problem
+
+Serious aim trainers are desktop applications. Aimlabs ships through Steam, KovaaK's is paid, and both want an install, an account, and a launcher before you've clicked a single target. That's a lot of hassle for something people mostly want in five-minute bursts — a warm-up before a session, or a quick check of whether their tracking has actually improved.
+
+There's no reason the core of that experience needs a native client. Hit detection, a 60 FPS render loop, and persistent stats are all things a browser does well now. The gap is that nobody has built a version you can send someone as a link.
+
+## Value
+
+Zero install, works on any device with a browser, free, and your stats follow you across machines throughGoogle sign-in. Six distinct modes covering different skills — flicking, tracking, precision, target switching — plus
+reaction-time analytics to help FPS gamers actively work on improving their performance and competitive edge.
+
+## Project Plan
+
+I set out to build a browser-based aim trainer with canvas gameplay, a React interface, and Firebase for authentication and score storage — Aimlabs-inspired, but not an attempt to clone it feature-for-feature.
+The approach was to plan the architecture completely before writing any code. A separate planning session produced three documents — a project charter, an architecture spec, and a 26-milestone implementation plan — that fixed the important decisions up front. The central one, which everything else follows from: React never animates gameplay. React owns menus, routing, auth, and statistics; the canvas engine owns the frame loop, entities, collision, and particles; they communicate through a narrow lifecycle API and event callbacks, never per-frame state. Files [PROJECT-PLAN.md](./PROJECT_PLAN.md) and [ARCHITECTURE.md](./ARCHITECTURE.md) delve into this in greater detail.
 
 ## Features
 
@@ -13,7 +31,14 @@ A browser-based aim trainer inspired by Aimlabs — six game modes, live statist
 - **Leaderboards** — all-time / daily / weekly top-100 and personal bests, backed by Firestore
 - **Five themes** — Dark, Light, Cyberpunk, Terminal, and Aimlabs, applied to the UI *and* the canvas, remembered per browser
 - **Feel** — particle bursts, floating score text, and Web Audio–synthesized sound effects (no audio assets)
-- **Accessibility** — keyboard focus rings, `prefers-reduced-motion` and `prefers-contrast` support, modal focus management, skip link
+
+### Which features considered next?
+
+- **Server-authoritative scoring** — This is the honest weak point. Scores are computed client-side, so a signed-in user canpost a plausible fake straight from the browser console. The rules make it deliberate rather than trivial, but closing it properly means a Cloud Function that validates a match token — which requires the paid Firebase tier.
+- **Progress charts** — Every match is already stored with a timestamp; plotting score and accuracy over time is mostly a query and a chart component, and it's the single feature that would most change how the app feels to a returning user.
+- **Persistent session history** — Currently in-memory only, so a refresh clears it.Sensitivity calibration, so target sizes and speeds can be tuned to match the game a player is warming up for.
+- **AI powered Recommendations** — Based on a user's performance, specific games or mouse sensitivity customizations are suggested.
+- **Daily challenge** — a seeded target sequence so every player gets an identical run, which makes the leaderboard meaningfully comparable in a way the current free-play boards aren't.
 
 ## Tech Stack
 
@@ -24,6 +49,10 @@ A browser-based aim trainer inspired by Aimlabs — six game modes, live statist
 | Backend | Firebase (Google Auth + Cloud Firestore, Spark plan) |
 | Build | Vite 8 (Rolldown) |
 | Quality | ESLint 10, Prettier, Vitest + React Testing Library (72 tests) |
+
+## AI Tools Used
+
+The planning phase was completed in conjunction with OpenAI's ChatGPT, and the implementation with Claude's Fable model. Refer to the [prompt history](./PROMPT-HISTORY.md) for insight on their performance.
 
 ## Architecture
 
@@ -92,43 +121,6 @@ Things this codebase demonstrates that a reviewer might care about:
 - **Pure game logic = trivial tests.** Because gameplay classes never touch React or the DOM, `ScoreManager`, `Spawner`, `Collision`, `Target`, and `Timer` are tested as plain classes — 72 tests run in about a second.
 - **Frame-loop hygiene.** Delta time is clamped (backgrounded tabs can't cause physics jumps), pause re-anchors the clock, hit-testing uses the full target radius (shrinking targets stay fair), and hot paths avoid per-frame allocations.
 
-## Roadmap
-
-### Milestone 12 — Themes (complete)
-
-Five themes — Dark, Light, Cyberpunk, Terminal, Aimlabs — selectable from Settings and persisted to `localStorage`. Notes on how it was built:
-
-- **CSS is the single source of truth for color.** Each theme is a `[data-theme='...']` block in `src/styles/themes.css` redefining the same semantic tokens; `src/styles/themes.js` carries only ids and copy. Keeping values out of JavaScript means nothing can drift between two lists, and each theme's `prefers-contrast: more` overrides still compose on top of it (one global override couldn't suit five palettes).
-- **Themes reach the canvas.** Each theme also defines target-ring, particle, and floating-text tokens. `src/game/palette.js` resolves them once per theme change and the session swaps its palette — entities take a palette argument at *draw* time rather than storing hexes, so switching theme recolors a match already in progress without rebuilding the engine or resetting the score.
-- **The picker previews itself.** Because theme blocks are attribute-scoped rather than `:root`-scoped, each option in the picker renders inside its own `data-theme` and shows the real colors — including a miniature of the target rings — with no hand-maintained swatch list.
-- **No flash of the wrong theme.** A short inline script in `index.html` stamps the saved theme on `<html>` before first paint. `ThemeProvider` also writes the attribute synchronously in its setter, so consumers reading resolved CSS variables (the canvas palette) never see a stale theme for a commit.
-
-### Milestone 25 — GitHub Pages deployment
-
-The repo-side work is done; what remains is configuration in the GitHub and Firebase consoles.
-
-**In this repo**
-
-- `vite.config.js` sets `base: '/Aim_Assist/'` — project Pages sites serve from `/<repo>/`, and without the prefix every asset 404s and the page renders blank. It applies in dev too, so the dev server also moves to `/Aim_Assist/` and local paths match production.
-- `<BrowserRouter basename={import.meta.env.BASE_URL}>` in `src/App.jsx` — Vite sets `BASE_URL` from `base`, so routes resolve under the subpath without hardcoding it twice.
-- `npm run build` also runs `scripts/spa-fallback.mjs`, which copies `dist/index.html` to `dist/404.html`. Pages has no SPA rewrite, so a hard refresh or shared link to `/Aim_Assist/leaderboards` would otherwise hit GitHub's 404 page. Pages serves `404.html` for unmatched paths, which boots the app and lets the router read the preserved URL. (This only breaks on deep links, never on in-app navigation — which is why it survives casual testing.)
-- `.github/workflows/deploy.yml` runs lint, tests, and the build on every push to `main`, then publishes with `upload-pages-artifact` + `deploy-pages`. It needs `id-token: write` for the OIDC handshake. A guard step fails the run if the Firebase secrets are missing, since `firebase/config.js` only warns and would otherwise publish a build that looks fine and breaks at runtime.
-
-**Manual setup, once**
-
-1. **Settings → Pages → Source: GitHub Actions.** The branch-based option can't work — the site has to be built.
-2. **Settings → Secrets and variables → Actions** — add the six values the client needs: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`. (`MEASUREMENT_ID` sits in `.env` but nothing reads it.) Vite picks `VITE_`-prefixed variables up from the environment, ahead of any `.env`, so the workflow passes them as `env:` with no dotenv file.
-3. **Firebase → Authentication → Settings → Authorized domains** — add `christiantoro.github.io`. Sign-in uses `signInWithPopup`, which validates the calling origin; the default list covers only `localhost` and the Firebase domains, so Google sign-in works all through development and then fails in production with `auth/unauthorized-domain`.
-4. **Merge to `main`.** The site lands at `https://christiantoro.github.io/Aim_Assist/`.
-
-**Worth doing before the URL is public**
-
-Once the site is live the Firestore rules are the only thing guarding the data — there is no server-side code in this project. Two things worth doing:
-
-- **Deploy [`firestore.rules`](./firestore.rules)** if you haven't. Scores are create-only and immutable, every field is type- and range-checked, unknown keys are rejected, `mode` must be one of the six real modes, and `createdAt` is pinned to `request.time` so a score can't be filed under a clock the client chose. The `day` key is bounded to a window around server time rather than matched exactly, because it is built from the player's *local* calendar date and would otherwise reject anyone playing an evening west of UTC.
-- **Restrict the browser API key** to the `christiantoro.github.io/*` referrer in the Google Cloud console.
-
-What this does *not* buy is real anti-cheat: a signed-in user can still write a *plausible* score from the browser console, because nothing server-side ever observed the match. Closing that needs Cloud Functions (and therefore the Blaze plan) to mint scores from a validated match token. The rules raise the cost from trivial to deliberate, which is the right trade for a portfolio project.
 
 ## License
 
