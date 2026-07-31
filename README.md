@@ -58,8 +58,10 @@ Firebase console setup (one time):
 3. **Indexes** — the daily/weekly/personal leaderboard views each need a composite index (`day+score`, `week+score`, `uid+score`). All three are declared in [`firestore.indexes.json`](./firestore.indexes.json); deploy them with:
 
    ```bash
-   npx firebase-tools deploy --only firestore:indexes --project <your-project-id>
+   npx firebase-tools deploy --only firestore:indexes
    ```
+
+   The target project comes from [`.firebaserc`](./.firebaserc) — change it if you're running against your own Firebase project, or pass `--project <your-project-id>` instead.
 
    Index builds are asynchronous: after deploying, the three tabs keep failing for a few minutes until the console reports each index as **Enabled** rather than **Building**. Until then they fail with `failed-precondition` (the page says so explicitly, and Firestore logs a one-click creation link in the browser console). All Time is unaffected — it sorts without a filter, so it needs no composite index.
 

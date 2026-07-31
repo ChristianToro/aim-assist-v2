@@ -13,7 +13,7 @@ const rankClass = (rank) =>
 // 'failed-precondition' and puts a one-click creation link in the console.
 const errorMessage = (error) =>
   error?.code === 'failed-precondition'
-    ? 'This view needs a Firestore composite index. Deploy it with `firebase deploy --only firestore:indexes --project <project-id>`, or open the setup link logged in the browser console. A newly created index takes a few minutes to build, and the view keeps failing until it does.'
+    ? 'This view needs a Firestore composite index. Deploy it with `firebase deploy --only firestore:indexes`, or open the setup link logged in the browser console. A newly created index takes a few minutes to build, and the view keeps failing until it does.'
     : error?.code === 'permission-denied'
       ? 'Firestore rejected the read. Check that the security rules allow reads on the scores collection.'
       : 'Something went wrong loading the leaderboard. See the browser console for details.'
