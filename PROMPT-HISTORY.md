@@ -211,11 +211,6 @@ The score ceiling was also raised from the 100,000 originally floated to 10,000,
 
 Flagged three limits rather than implying the work was finished: the rules are **unverified** (the emulator needs Java and a download, neither available in the sandbox), deploying **overwrites** the console rules that were only reconstructed from the README's description, and none of this is real anti-cheat — a signed-in user can still write a *plausible* score, since nothing server-side observed the match. Closing that needs Cloud Functions and therefore the Blaze plan.
 
-## 26. This entry
-
-> add the last three prompts and responses to PROMPT-HISTORY.md EXCEPT the terminal diverged branch conflict prompt.
-
-Appended sections 24–26 and refreshed the sweep summary. The excluded prompt was a `git pull` refusing to reconcile a local `main` still sitting at Milestone 3, one unpushed commit ahead of a remote 34 commits further along.
 
 ---
 
