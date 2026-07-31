@@ -54,7 +54,13 @@ npm run dev
 Firebase console setup (one time):
 
 1. **Authentication** → enable the Google provider
-2. **Firestore** → create a Standard database in production mode, then publish rules: public reads; `users/{uid}` writable only by its owner; `scores` create-only with `uid == request.auth.uid`
+2. **Firestore** → create a Standard database in production mode, then deploy the rules in [`firestore.rules`](./firestore.rules):
+
+   ```bash
+   npx firebase-tools deploy --only firestore:rules
+   ```
+
+   Scores are world-readable (the leaderboards render signed-out), create-only, and validated field by field; `users/{uid}` is readable and writable only by its owner.
 3. **Indexes** — the daily/weekly/personal leaderboard views each need a composite index (`day+score`, `week+score`, `uid+score`). All three are declared in [`firestore.indexes.json`](./firestore.indexes.json); deploy them with:
 
    ```bash
@@ -117,7 +123,12 @@ The repo-side work is done; what remains is configuration in the GitHub and Fire
 
 **Worth doing before the URL is public**
 
-Once the site is live the Firestore rules are the only thing guarding the data. Restrict the browser API key to the `christiantoro.github.io/*` referrer in the Google Cloud console, and consider adding value bounds to the score-create rule — it currently checks `uid` ownership but not the score itself, so a signed-in user can write any value straight from the console.
+Once the site is live the Firestore rules are the only thing guarding the data — there is no server-side code in this project. Two things worth doing:
+
+- **Deploy [`firestore.rules`](./firestore.rules)** if you haven't. Scores are create-only and immutable, every field is type- and range-checked, unknown keys are rejected, `mode` must be one of the six real modes, and `createdAt` is pinned to `request.time` so a score can't be filed under a clock the client chose. The `day` key is bounded to a window around server time rather than matched exactly, because it is built from the player's *local* calendar date and would otherwise reject anyone playing an evening west of UTC.
+- **Restrict the browser API key** to the `christiantoro.github.io/*` referrer in the Google Cloud console.
+
+What this does *not* buy is real anti-cheat: a signed-in user can still write a *plausible* score from the browser console, because nothing server-side ever observed the match. Closing that needs Cloud Functions (and therefore the Blaze plan) to mint scores from a validated match token. The rules raise the cost from trivial to deliberate, which is the right trade for a portfolio project.
 
 ## License
 

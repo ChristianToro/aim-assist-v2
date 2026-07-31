@@ -1,0 +1,150 @@
+rules_version = '2';
+
+/*
+ * Firestore security rules.
+ *
+ * Once the site is public these rules are the only thing standing between
+ * the database and the open internet — there is no server-side code in this
+ * project. They are written to assume the client is hostile: a signed-in
+ * user can call addDoc() from the browser console with any payload they
+ * like, so every field a score claims is validated here.
+ *
+ * Deploy with: firebase deploy --only firestore:rules
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ---------- helpers ---------- */
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    /*
+     * A sanity bound, not anti-cheat. Survival is endless, so no exact
+     * maximum exists to derive: at its hardest the spawner yields roughly
+     * 1300 points/second, making this about two hours of flawless play.
+     * It rejects the absurd value without risking a real record.
+     */
+    function inScoreRange(value) {
+      return value is int && value >= 0 && value <= 10000000;
+    }
+
+    // Mode is stored as the display label (see GameArea), so the allowlist
+    // is the set of labels in game/modes.js.
+    function isKnownMode(mode) {
+      return mode in [
+        'Gridshot', 'Precision', 'Speed', 'Tracking', 'Flick', 'Survival'
+      ];
+    }
+
+    /*
+     * getDayKey() builds the key from the player's LOCAL calendar date,
+     * which sits up to a day either side of UTC. Matching it exactly against
+     * request.time would reject anyone playing an evening west of UTC, so
+     * the key is only required to land in a window around server time —
+     * enough to stop a score being backdated onto an old daily board.
+     */
+    function isRecentDayKey(day) {
+      let parts = day.split('-');
+      let asDate = timestamp.date(int(parts[0]), int(parts[1]), int(parts[2]));
+      return day is string
+        && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && asDate > request.time - duration.value(2, 'd')
+        && asDate < request.time + duration.value(2, 'd');
+    }
+
+    /* ---------- users ---------- */
+
+    /*
+     * Read access is owner-only. Leaderboards never touch this collection —
+     * player identity is denormalized onto each score precisely so they
+     * don't have to — and the profile page only ever loads the signed-in
+     * user's own document.
+     *
+     * Aggregates here are client-computed and therefore self-reported. That
+     * is tolerable because nothing public reads them: forging your own
+     * profile only misleads yourself. Field types are still pinned so the
+     * document can't be turned into arbitrary storage.
+     */
+    match /users/{uid} {
+      function validProfile(d) {
+        return d.keys().hasOnly([
+                 'displayName', 'photoURL', 'highestScore', 'gamesPlayed',
+                 'averageAccuracy', 'favoriteMode', 'modeCounts', 'createdAt'
+               ])
+          && d.displayName is string
+          && d.displayName.size() <= 100
+          && (d.photoURL == null || (d.photoURL is string && d.photoURL.size() <= 1000))
+          // Checked only when present: ensureUserDocument() merges identity
+          // fields alone on repeat sign-ins, and a document written by an
+          // earlier version shouldn't lock its owner out.
+          && (!('highestScore' in d) || inScoreRange(d.highestScore))
+          && (!('gamesPlayed' in d) || (d.gamesPlayed is int && d.gamesPlayed >= 0))
+          && (!('averageAccuracy' in d)
+              || (d.averageAccuracy is number
+                  && d.averageAccuracy >= 0
+                  && d.averageAccuracy <= 100))
+          && (!('favoriteMode' in d) || d.favoriteMode is string)
+          && (!('modeCounts' in d) || d.modeCounts is map)
+          && (!('createdAt' in d) || d.createdAt is timestamp);
+      }
+
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validProfile(request.resource.data);
+      allow delete: if false;
+    }
+
+    /* ---------- scores ---------- */
+
+    /*
+     * Public read: the leaderboards render for signed-out visitors.
+     *
+     * Create-only, and every field is bounded. hasOnly() rejects unknown
+     * keys, so adding a field to services/scores.js means updating this
+     * list too — a deliberate trade for not accepting arbitrary payloads.
+     */
+    match /scores/{scoreId} {
+      function validScore(d) {
+        return d.keys().hasOnly([
+                 'uid', 'displayName', 'photoURL', 'mode', 'score',
+                 'accuracy', 'reactionTime', 'day', 'week', 'createdAt'
+               ])
+          && d.keys().hasAll([
+                 'uid', 'displayName', 'photoURL', 'mode', 'score',
+                 'accuracy', 'reactionTime', 'day', 'week', 'createdAt'
+               ])
+          && d.displayName is string
+          && d.displayName.size() <= 100
+          && (d.photoURL == null || (d.photoURL is string && d.photoURL.size() <= 1000))
+          && isKnownMode(d.mode)
+          && inScoreRange(d.score)
+          && d.accuracy is number
+          && d.accuracy >= 0
+          && d.accuracy <= 100
+          // null when the match ended with zero hits (ScoreManager.summary).
+          && (d.reactionTime == null
+              || (d.reactionTime is int
+                  && d.reactionTime >= 0
+                  && d.reactionTime <= 60000))
+          && isRecentDayKey(d.day)
+          && d.week is string
+          && d.week.matches('^[0-9]{4}-W[0-9]{2}$')
+          // serverTimestamp() resolves to request.time, so the clock a score
+          // is filed under is the server's rather than the client's.
+          && d.createdAt == request.time;
+      }
+
+      allow read: if true;
+      allow create: if isOwner(request.resource.data.uid)
+                    && validScore(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Anything not matched above is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
