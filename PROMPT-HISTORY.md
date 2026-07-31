@@ -133,6 +133,35 @@ Replaced the stock Vite README (`bd5c950`) with a portfolio-facing one: features
 
 Produced this file.
 
+## 19. Repo state check
+
+> What is the current state of this repo? provide a quick summary
+
+Surveyed branches, commits, source tree, and toolchain health. Reported: `milestone_sweep` clean and in sync with its remote, while `origin/main` is stale at Milestone 3 — milestones 4–24 have never reached `main`. Confirmed 24 of 25 milestones committed one-per-commit. Verified the two known gaps are genuinely unimplemented rather than just uncommitted: **Milestone 12 (themes)** has no commit and `src/pages/Settings.jsx` is still an 11-line `PagePlaceholder` — no ThemeProvider, no localStorage persistence, no selector anywhere in `src/`; **Milestone 25 (deployment)** has no `vercel.json` or `firebase.json`. Health check passed clean: `npm test` → 53 tests across 10 files, `npm run lint` → no errors.
+
+## 20. Architecture review — the React/engine boundary
+
+> Is separating the game logic and isolating it from react the appropriate method for this application?
+
+Read `GameEngine`, `GameSession`, `useGameSession`, `GameCanvas`, and `GameArea` and argued yes, on evidence rather than principle:
+
+- **The frame-rate mismatch is real.** `GameSession.js:151` gates `emitHud()` to hits, misses, and changed *displayed* seconds — React re-renders a few times per second instead of 60+.
+- **Canvas gives React nothing to diff.** React's value is declarative DOM reconciliation; there is no DOM inside `<canvas>`. Routing entities through React would pay the reconciler tax for zero benefit — the distinction that makes this right *here* but wrong for a DOM-based target grid.
+- **Testability is the demonstrable payoff.** The five game-logic test files are plain unit tests — no jsdom, no RTL, no `act()` — which only works because those modules never import React.
+- **React 19 semantics would fight it.** StrictMode double-invocation, effect re-runs, and concurrent render replay all threaten simulation state in `useState`; a `ref` is just the same separation with worse ergonomics.
+
+Praised the seam as a real port rather than a `game/` folder: `GameEngine.js:41` exposes only attach/start/pause/resume/stop, `GameCanvas` is 50 lines of DOM-only work, data flows out one-way via callbacks, and `GameEngine.js:34` + `consumeClicks()` drains input *inside* the frame step so hit resolution is deterministic w.r.t. frame timing.
+
+Honest costs flagged: `isPaused`/`isMuted` duplicated across engine and React state (`useGameSession.js:54,69`) — the standard tax of this pattern, growing with UI-visible engine state; engine construction in `useMemo` is the fragile spot (`useMemo` is a hint, not a cache guarantee — hence the eslint-disable and `engineInstance` late-binding), where a lazy `useRef` init would be sturdier; and `reducedMotion` captured once at construction won't follow a mid-session OS change.
+
+**Forward-looking note for Milestone 12:** canvas colors are hardcoded at `Target.js:5-7`, `Particle.js:5`, and `FloatingText.js:27`. Themes are the first thing needing to flow *inbound* (React → engine), a path this design hasn't exercised. Recommendation: pass a palette into `createGameSession` at construction and let the existing remount-on-change mechanism handle switches — do **not** call `getComputedStyle` inside `draw()`, which is a per-frame layout read that punches straight through the seam.
+
+## 21. This entry
+
+> append these prompts and your responses to the PROMPT-HISTORY.md file
+
+Appended sections 19–21.
+
 ---
 
 ## Sweep summary
