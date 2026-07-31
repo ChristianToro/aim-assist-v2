@@ -184,14 +184,47 @@ Verified: 68 tests passing across 14 files (15 new, covering the registry, palet
 
 Appended sections 22–23 and refreshed the sweep summary below.
 
+_A run of prompts between here and §24 is not recorded — the leaderboard composite indexes, `.firebaserc`, the GitHub Pages walkthrough, Milestone 25 itself, repository secrets, and debugging the deployed 404. Sections 24–26 were requested specifically._
+
+## 24. Choosing a Pages workflow
+
+> the repo is public. since the source is github actions, which workflow do I use? Jekyll, or static html, or another option?
+
+Neither — the answer was to pick nothing. Selecting **GitHub Actions** in the Pages source dropdown *is* the setting; the Jekyll and Static HTML cards beneath it are starter templates for repos that don't already have a workflow, and this one has `.github/workflows/deploy.yml`.
+
+Warned against clicking either: Jekyll builds Markdown and would produce nothing usable from a React app, while Static HTML commits a second workflow that uploads a directory **with no build step** — publishing raw `src/` with no bundling and no env vars, then racing `deploy.yml` with whichever finished last winning. A genuinely confusing failure to debug. Noted that `deploy.yml` is that same Static HTML template plus the parts that matter, and that the `workflow_dispatch` trigger built into it allows a manual run without a fresh push.
+
+## 25. Hardening the Firestore rules
+
+> yml file is now part of main, and it is deployed.
+>
+> this was shared by you during this session: [the §20-era note that the score-write rule validates `uid` but not the score itself] … make those changes
+
+The rules existed only in the Firebase console, so this began by creating `firestore.rules` and wiring it into `firebase.json` (`55ab277`). Scores became create-only and immutable, with `hasOnly`/`hasAll` pinning the exact ten-field shape, `mode` constrained to the six real labels, ranges on score and accuracy, and `createdAt == request.time` so a score can't be filed under a clock the client chose. Reads on `users` were narrowed from public to owner-only — leaderboards never touch that collection, since identity is denormalized onto each score, and the profile page only loads the signed-in user's own document.
+
+Reading the data model first corrected two errors in the advice being implemented:
+
+- **`reactionTime` is nullable.** `ScoreManager.summary()` returns `null` for a match with zero hits, so the strict numeric check originally suggested would have rejected legitimate saves.
+- **`day` cannot be matched against `request.time`.** `getDayKey()` uses the player's *local* calendar date while `request.time` is UTC, so the proposed exact comparison would reject anyone playing an evening west of UTC — the user's own timezone included. Bounded to a ±2-day window instead, which still blocks backdating onto an old daily board.
+
+The score ceiling was also raised from the 100,000 originally floated to 10,000,000: at Survival's hardest the spawner yields roughly 1300 points/second, making 100,000 about eighty seconds of good play and a live risk to real records.
+
+Flagged three limits rather than implying the work was finished: the rules are **unverified** (the emulator needs Java and a download, neither available in the sandbox), deploying **overwrites** the console rules that were only reconstructed from the README's description, and none of this is real anti-cheat — a signed-in user can still write a *plausible* score, since nothing server-side observed the match. Closing that needs Cloud Functions and therefore the Blaze plan.
+
+## 26. This entry
+
+> add the last three prompts and responses to PROMPT-HISTORY.md EXCEPT the terminal diverged branch conflict prompt.
+
+Appended sections 24–26 and refreshed the sweep summary. The excluded prompt was a `git pull` refusing to reconcile a local `main` still sitting at Milestone 3, one unpushed commit ahead of a remote 34 commits further along.
+
 ---
 
 ## Sweep summary
 
 | | |
 |---|---|
-| Milestones completed | 0–24 (25, deployment, deferred by user) |
-| Commits on `milestone_sweep` | 27 (including README and this file) |
-| Tests | 68 passing across 14 files |
+| Milestones completed | 0–25 |
+| Commits on `main` | 37, merged over three pull requests |
+| Tests | 72 passing across 15 files |
 | App shell bundle | ~8 kB (vendors split and cached separately) |
 | Recurring theme | Verification before every commit (lint + build, later + tests); the new react-hooks v7 lint rules twice forced event-driven designs that were better than the effect-based first drafts |
