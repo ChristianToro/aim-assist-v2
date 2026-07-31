@@ -17,7 +17,9 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 const App = () => (
   <ThemeProvider>
     <AuthProvider>
-      <BrowserRouter>
+      {/* basename tracks Vite's `base`, so routes resolve under the
+          GitHub Pages subpath in production and at / in tests. */}
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Home />} />

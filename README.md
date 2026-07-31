@@ -2,7 +2,7 @@
 
 A browser-based aim trainer inspired by Aimlabs — six game modes, live statistics, Google sign-in, and global leaderboards. Built as a portfolio project to demonstrate modern React, interactive Canvas programming, and cloud integration.
 
-> **Status**: Milestones 0–24 complete. Remaining: GitHub Pages deployment (M25) — see [Roadmap](#roadmap) below.
+> **Status**: Milestones 0–25 complete. The GitHub Pages pipeline is in place; first publish needs the one-time console setup in [Roadmap](#roadmap) below.
 
 ## Features
 
@@ -97,15 +97,27 @@ Five themes — Dark, Light, Cyberpunk, Terminal, Aimlabs — selectable from Se
 - **The picker previews itself.** Because theme blocks are attribute-scoped rather than `:root`-scoped, each option in the picker renders inside its own `data-theme` and shows the real colors — including a miniature of the target rings — with no hand-maintained swatch list.
 - **No flash of the wrong theme.** A short inline script in `index.html` stamps the saved theme on `<html>` before first paint. `ThemeProvider` also writes the attribute synchronously in its setter, so consumers reading resolved CSS variables (the canvas palette) never see a stale theme for a commit.
 
-### Milestone 25 — GitHub Pages deployment (planned)
+### Milestone 25 — GitHub Pages deployment
 
-GitHub Pages works but has two SPA gotchas worth handling up front:
+The repo-side work is done; what remains is configuration in the GitHub and Firebase consoles.
 
-1. **Base path** — project pages serve from `/<repo>/`, so set `base: '/Aim_Assist/'` in `vite.config.js` and `basename={import.meta.env.BASE_URL}` on `<BrowserRouter>`
-2. **Deep-link 404s** — Pages has no SPA rewrite; copy `dist/index.html` to `dist/404.html` in the build step (the standard workaround), or switch to `HashRouter`
-3. **CI** — a GitHub Actions workflow on push to `main`: `npm ci` → `npm test` → `npm run build` → `actions/upload-pages-artifact` + `actions/deploy-pages`. Provide the `VITE_FIREBASE_*` values as repository secrets written to `.env` before the build (they're client-exposed by design, but secrets keep them out of the workflow file)
-4. **Firebase** — add `<username>.github.io` to Authentication → Settings → Authorized domains, or Google sign-in popups will be rejected in production
-5. Alternative worth weighing: Firebase Hosting or Vercel handle SPA rewrites natively and skip the base-path dance entirely, at the cost of another account/CLI in the loop
+**In this repo**
+
+- `vite.config.js` sets `base: '/Aim_Assist/'` — project Pages sites serve from `/<repo>/`, and without the prefix every asset 404s and the page renders blank. It applies in dev too, so the dev server also moves to `/Aim_Assist/` and local paths match production.
+- `<BrowserRouter basename={import.meta.env.BASE_URL}>` in `src/App.jsx` — Vite sets `BASE_URL` from `base`, so routes resolve under the subpath without hardcoding it twice.
+- `npm run build` also runs `scripts/spa-fallback.mjs`, which copies `dist/index.html` to `dist/404.html`. Pages has no SPA rewrite, so a hard refresh or shared link to `/Aim_Assist/leaderboards` would otherwise hit GitHub's 404 page. Pages serves `404.html` for unmatched paths, which boots the app and lets the router read the preserved URL. (This only breaks on deep links, never on in-app navigation — which is why it survives casual testing.)
+- `.github/workflows/deploy.yml` runs lint, tests, and the build on every push to `main`, then publishes with `upload-pages-artifact` + `deploy-pages`. It needs `id-token: write` for the OIDC handshake. A guard step fails the run if the Firebase secrets are missing, since `firebase/config.js` only warns and would otherwise publish a build that looks fine and breaks at runtime.
+
+**Manual setup, once**
+
+1. **Settings → Pages → Source: GitHub Actions.** The branch-based option can't work — the site has to be built.
+2. **Settings → Secrets and variables → Actions** — add the six values the client needs: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`. (`MEASUREMENT_ID` sits in `.env` but nothing reads it.) Vite picks `VITE_`-prefixed variables up from the environment, ahead of any `.env`, so the workflow passes them as `env:` with no dotenv file.
+3. **Firebase → Authentication → Settings → Authorized domains** — add `christiantoro.github.io`. Sign-in uses `signInWithPopup`, which validates the calling origin; the default list covers only `localhost` and the Firebase domains, so Google sign-in works all through development and then fails in production with `auth/unauthorized-domain`.
+4. **Merge to `main`.** The site lands at `https://christiantoro.github.io/Aim_Assist/`.
+
+**Worth doing before the URL is public**
+
+Once the site is live the Firestore rules are the only thing guarding the data. Restrict the browser API key to the `christiantoro.github.io/*` referrer in the Google Cloud console, and consider adding value bounds to the score-create rule — it currently checks `uid` ownership but not the score itself, so a signed-in user can write any value straight from the console.
 
 ## License
 
