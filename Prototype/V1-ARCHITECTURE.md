@@ -1,5 +1,7 @@
 # ARCHITECTURE.md
 
+> **Archived v1 prototype document.** Historical reference only — it describes the Firebase / GitHub Pages build. v2 guidance lives in [../CLAUDE.md](../CLAUDE.md) and [../PLAN-V2.md](../PLAN-V2.md).
+
 # Aim Trainer
 ## System Architecture
 

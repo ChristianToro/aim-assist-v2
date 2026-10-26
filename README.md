@@ -20,7 +20,7 @@ reaction-time analytics to help FPS gamers actively work on improving their perf
 ## Project Plan
 
 I set out to build a browser-based aim trainer with canvas gameplay, a React interface, and Firebase for authentication and score storage — Aimlabs-inspired, but not an attempt to clone it feature-for-feature.
-The approach was to plan the architecture completely before writing any code. A separate planning session produced three documents — a project charter, an architecture spec, and a 26-milestone implementation plan — that fixed the important decisions up front. The central one, which everything else follows from: React never animates gameplay. React owns menus, routing, auth, and statistics; the canvas engine owns the frame loop, entities, collision, and particles; they communicate through a narrow lifecycle API and event callbacks, never per-frame state. Files [PROJECT-PLAN.md](./PROJECT_PLAN.md) and [ARCHITECTURE.md](./ARCHITECTURE.md) delve into this in greater detail.
+The approach was to plan the architecture completely before writing any code. A separate planning session produced three documents — a project charter, an architecture spec, and a 26-milestone implementation plan — that fixed the important decisions up front. The central one, which everything else follows from: React never animates gameplay. React owns menus, routing, auth, and statistics; the canvas engine owns the frame loop, entities, collision, and particles; they communicate through a narrow lifecycle API and event callbacks, never per-frame state. Files [V1-PROJECT-PLAN.md](./Prototype/V1-PROJECT-PLAN.md) and [V1-ARCHITECTURE.md](./Prototype/V1-ARCHITECTURE.md) delve into this in greater detail.
 
 ## Features
 
@@ -52,7 +52,7 @@ The approach was to plan the architecture completely before writing any code. A 
 
 ## AI Tools Used
 
-The planning phase was completed in conjunction with OpenAI's ChatGPT, and the implementation with Claude's Fable model. Refer to the [prompt history](./PROMPT-HISTORY.md) for insight on their performance.
+The planning phase was completed in conjunction with OpenAI's ChatGPT, and the implementation with Claude's Fable model. Refer to the [prompt history](./Prototype/V1-PROMPT-HISTORY.md) for insight on their performance.
 
 ## Architecture
 
@@ -70,7 +70,7 @@ Firebase (users, scores, leaderboards)
 
 The non-negotiable rule: **React never animates gameplay.** The `GameEngine` owns the `requestAnimationFrame` loop and pushes stats to React only when something displayed changes (hit, miss, or second tick) — never per frame. A game mode is pure configuration (`src/game/modes.js`); all six modes and the difficulty ramp run on the same engine with zero bespoke mode logic.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design and [PROJECT_PLAN.md](./PROJECT_PLAN.md) for the milestone log.
+See [V1-ARCHITECTURE.md](./Prototype/V1-ARCHITECTURE.md) for the full design and [V1-PROJECT-PLAN.md](./Prototype/V1-PROJECT-PLAN.md) for the milestone log.
 
 ## Getting Started
 
