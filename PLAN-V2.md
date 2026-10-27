@@ -36,7 +36,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | # | Status | Milestone | Key files |
 |---|---|---|---|
 | M0 | Done | **Branch + docs reorg.** Create `release/v2.0`. Archive the v1 docs to `Prototype/V1-*`. Write the new root `CLAUDE.md`, `PLAN-V2.md` and `PROMPT-HISTORY.md`. Repoint the README links. | `Prototype/`, `CLAUDE.md`, `PLAN-V2.md`, `PROMPT-HISTORY.md`, `README.md` |
-| M1 | Not started | **Vercel hosting.** Set `vite.config.js` `base` to `'/'`. Add `vercel.json` with a SPA rewrite for every path except `/api`. Remove `scripts/spa-fallback.mjs` and its build step. Turn `deploy.yml` into a lint-and-test CI workflow. *User:* import the repo into Vercel. | `vite.config.js`, `vercel.json`, `package.json`, `.github/workflows/` |
+| M1 | Done | **Vercel hosting.** Set `vite.config.js` `base` to `'/'`. Add `vercel.json` with a SPA rewrite for every path except `/api`. Remove `scripts/spa-fallback.mjs` and its build step. Turn `deploy.yml` into a lint-and-test CI workflow. *User:* import the repo into Vercel. | `vite.config.js`, `vercel.json`, `package.json`, `.github/workflows/` |
 | M2 | Not started | **Neon + schema.** Add Neon through the Vercel Marketplace (user step). Write `db/migrations/001_init.sql` for the scores table with its CHECK constraints (see PLAN-CONVERSION). Make `/api` work in local dev (`vercel dev`, or a Vite proxy). | `db/migrations/`, `.env.example` |
 | M3 | Not started | **Auth server.** Better Auth with the Google provider, its Neon tables in a migration, and an `/api/auth/*` handler. *User:* create a Google OAuth client and set the env vars. | `api/auth/[...all].js`, `api/_lib/auth.js`, `api/_lib/db.js` |
 | M4 | Not started | **Auth client switchover.** Move `services/auth.js` and `AuthProvider` onto the Better Auth client. Keep the `useAuth()` shape (`uid`, `displayName`, `photoURL`) so consumers don't change. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx` |
@@ -76,3 +76,30 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 - No root doc or README links to a moved path, and every relative link resolves.
 - `npm run lint` and `npm test` still pass. M0 changes no code, and Prettier ignores `*.md`.
 - `git rev-parse --abbrev-ref release/v2.0@{upstream}` errors with "no upstream configured".
+
+## M1 detail
+
+1. `vite.config.js`: set `base` to `'/'`, since Vercel serves from the domain root. Drop the Pages comment.
+2. `src/App.jsx`: remove `basename={import.meta.env.BASE_URL}` from `BrowserRouter`. With `base: '/'` it is always `/`, which is the router's default.
+3. Add `vercel.json` with one rewrite that sends every path outside `/api` to `/index.html`. Vercel serves files that exist (such as `/assets/*` and `/favicon.svg`) before it applies rewrites, so only client routes reach the rewrite.
+4. Delete `scripts/spa-fallback.mjs` and remove it from the `build` script. The rewrite replaces the `404.html` copy.
+5. Rename `.github/workflows/deploy.yml` to `ci.yml` with `git mv`. It runs on pushes to `main` and `release/**` and on pull requests, with the steps `npm ci`, lint, `format:check`, test and build. The Pages upload, deploy job, Pages permissions and the Firebase secret check are removed, because Vercel now deploys.
+6. Stop for review.
+
+**User steps (outside the repo):**
+
+- **Required:** import the repo into Vercel. The Vite preset is detected automatically (build `npm run build`, output `dist`).
+- **Optional:** set `release/v2.0` as the Vercel production branch, so the stable domain tracks v2 while `main` still holds v1.
+
+**Optional interim Firebase steps.** v2 drops Firebase, but the code still runs on it until M4 (auth) and M6 (data). These steps only keep the deployed v1-era app working until then, and M6 undoes them. Without them, the hosting itself still deploys and can be verified.
+
+- **Copy the six `VITE_FIREBASE_*` values into the Vercel environment variables.** These are public config, not secrets. The page renders on Vercel and the leaderboards load. Without them, `getAuth()` in `src/firebase/config.js` throws on load, so the deployed page is likely blank. The deep-link check below still works, because the rewrite returns `index.html` either way. M6 removes these variables.
+- **Add the Vercel domain (`<project>.vercel.app`) to Firebase Auth → Settings → Authorized domains.** Firebase Google sign-in and score submission then work on that domain; without it, sign-in fails with `auth/unauthorized-domain`. It only works on domains you add (the production domain, and the stable branch alias if you test on it). It's discarded in M4, when Better Auth brings its own Google OAuth client and redirect URIs.
+
+### M1 verification
+
+- `npm run lint`, `npm run format:check` and `npm test` pass.
+- `npm run build` produces `dist/` with no `404.html`, and asset URLs in `dist/index.html` start with `/assets/`.
+- `npm run preview` serves `/` and a deep link such as `/leaderboards`. (`vite preview` has its own SPA fallback, so this checks the base path but not `vercel.json`.)
+- `vercel.json` is valid JSON, and the rewrite pattern matches client routes but not `/api` or `/api/*`, checked with a regex test.
+- The `vercel.json` rewrite itself is verified only on the user's first Vercel deploy: a hard refresh of `/leaderboards` (or `curl`) must return `index.html` with status 200. *Pending the Vercel import.*
