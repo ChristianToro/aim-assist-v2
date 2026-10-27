@@ -137,4 +137,4 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 - After the user steps:
   - `npm run db:migrate` applies `001_init.sql`, and a second run reports nothing to apply. *Confirmed 2026-10-27. A rolled-back transaction on Neon also showed every CHECK constraint and index live and a negative score rejected.*
   - Under `vercel dev`, `curl localhost:3000/api/health` returns `{"ok":true,"database":"up"}`. *Confirmed 2026-10-27 (200 `application/json`).*
-  - After a push, `/api/health` on the Vercel domain returns the same, confirming that the `vercel.json` rewrite leaves `/api` alone. *Pending the push.*
+  - After a push, `/api/health` on the Vercel domain returns the same, confirming that the `vercel.json` rewrite leaves `/api` alone. *Confirmed 2026-10-27 on `aim-assist-v2.vercel.app`: 200 `{"ok":true,"database":"up"}`, and unknown `/api` paths return Vercel's 404, not `index.html`.*

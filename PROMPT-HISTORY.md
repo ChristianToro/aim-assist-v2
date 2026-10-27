@@ -281,4 +281,28 @@ The `vercel env pull` output also contained `NEON_AUTH_BASE_URL` and `VITE_NEON_
 - `vercel dev --listen 3000`: `GET /api/health` returned `{"ok":true,"database":"up"}` (200, `application/json`), and `/leaderboards` returned 200 `text/html`. The server was stopped afterwards.
 - Pending: `/api/health` on the Vercel domain after a push.
 
+### Interaction 7 — M2 deployed check
+
+**User Prompt**
+
+> pushed, check the health endpoint on vercel and display the results
+
+**Agent Outcome**
+
+After the user pushed `c54837d`, the live deployment passed M2's last check. M2 is fully verified.
+
+**Verification**
+
+`curl` against `https://aim-assist-v2.vercel.app`:
+
+| Request | Result |
+|---|---|
+| `GET /api/health` | 200 `application/json`, `{"ok":true,"database":"up"}`, `x-vercel-cache: MISS` (a live round trip, region `iad1`) |
+| `GET /api`, `GET /api/nope` | 404 `text/plain`, Vercel's `NOT_FOUND` (not rewritten to the app) |
+| `GET /leaderboards` | 200 `text/html` (SPA rewrite intact) |
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md) — the deployed `/api/health` check is marked confirmed (uncommitted).
+
 
