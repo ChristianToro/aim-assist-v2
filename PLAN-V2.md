@@ -235,6 +235,11 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 - `vercel.json` rewrite:
   - `path-to-regexp@6.1.0` matches as intended in 18 cases: app routes and `/apiary` are rewritten; `/api*`, `/@vite/client`, `/@id/…`, `/src/main.jsx`, `/favicon.svg`, `/assets/*.js` and `/node_modules/.vite/deps/*` pass through.
   - Under `vercel dev`, modules are served as `text/javascript` (including `/src/services/auth.js` and the pre-bundled Neon Auth SDK), pages as HTML, `/api/health` as 200 and `/api/me` as 401.
+  - *Confirmed 2026-10-27 on `aim-assist-v2.vercel.app` (the M4 build, which preloads `auth-vendor`):*
+    - *`/`, `/leaderboards`, `/profile` and `/no-such-page` return 200 HTML.*
+    - *The real entry chunk returns 200 JavaScript, and `/favicon.svg` is served as `image/svg+xml`.*
+    - *A missing `/assets/index-OLDHASH.js` and `/missing.png` now return 404.*
+    - *`/api/health` returns 200, `/api/me` 401 and `/api/nope` 404.*
 - SDK smoke test in Node against the live Neon Auth instance:
   - `signIn.social`, `signOut`, `useSession` and `getJWTToken` exist.
   - `getJWTToken(false)` returns `null` when signed out.

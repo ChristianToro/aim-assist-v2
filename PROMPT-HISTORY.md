@@ -661,4 +661,32 @@ The user confirmed that Google sign-in works under `npm run dev:full`, which is 
 
 Only check 1 was reported. Checks 2–6 were not reported and are recorded as open in PLAN-V2's M4 verification: reload persistence, Safari or blocked third-party cookies, sign-out, `/profile`, and a browser JWT reaching `/api/me`. The new rewrite on the production deploy is also unverified until the push.
 
+### Interaction 18 — New rewrite checked on Vercel
+
+**User Prompt**
+
+> pushed, check the rewrite on vercel
+
+**Agent Outcome**
+
+The narrowed rewrite behaves as intended in production. The deployment is the M4 build: `index.html` preloads `/assets/auth-vendor-*.js`.
+
+**Verification**
+
+`curl` against `https://aim-assist-v2.vercel.app`:
+
+| Request | Result |
+|---|---|
+| `/`, `/leaderboards`, `/profile`, `/no-such-page` | 200 `text/html` (the SPA) |
+| `/assets/index-DnTMPsJ8.js` (live entry) | 200 `application/javascript` |
+| `/favicon.svg` | 200 `image/svg+xml` |
+| `/assets/index-OLDHASH.js`, `/missing.png` | **404** (previously HTML with 200) |
+| `/api/health` | 200 `{"ok":true,"database":"up"}` |
+| `/api/me` (no token) | 401 |
+| `/api/nope` | 404 |
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md) — the production results are recorded under M4's rewrite verification. Uncommitted.
+
 
