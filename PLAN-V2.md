@@ -37,7 +37,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 |---|---|---|---|
 | M0 | Done | **Branch + docs reorg.** Create `release/v2.0`. Archive the v1 docs to `Prototype/V1-*`. Write the new root `CLAUDE.md`, `PLAN-V2.md` and `PROMPT-HISTORY.md`. Repoint the README links. | `Prototype/`, `CLAUDE.md`, `PLAN-V2.md`, `PROMPT-HISTORY.md`, `README.md` |
 | M1 | Done | **Vercel hosting.** Set `vite.config.js` `base` to `'/'`. Add `vercel.json` with a SPA rewrite for every path except `/api`. Remove `scripts/spa-fallback.mjs` and its build step. Turn `deploy.yml` into a lint-and-test CI workflow. *User:* import the repo into Vercel. | `vite.config.js`, `vercel.json`, `package.json`, `.github/workflows/` |
-| M2 | Not started | **Neon + schema.** Add Neon through the Vercel Marketplace (user step). Write `db/migrations/001_init.sql` for the scores table with its CHECK constraints (see PLAN-CONVERSION). Make `/api` work in local dev (`vercel dev`, or a Vite proxy). | `db/migrations/`, `.env.example` |
+| M2 | Done | **Neon + schema.** Add Neon through the Vercel Marketplace (user step). Write `db/migrations/001_init.sql` for the scores table with its CHECK constraints (see PLAN-CONVERSION). Make `/api` work in local dev (`vercel dev`, or a Vite proxy). | `db/migrations/`, `.env.example` |
 | M3 | Not started | **Auth server.** Better Auth with the Google provider, its Neon tables in a migration, and an `/api/auth/*` handler. *User:* create a Google OAuth client and set the env vars. | `api/auth/[...all].js`, `api/_lib/auth.js`, `api/_lib/db.js` |
 | M4 | Not started | **Auth client switchover.** Move `services/auth.js` and `AuthProvider` onto the Better Auth client. Keep the `useAuth()` shape (`uid`, `displayName`, `photoURL`) so consumers don't change. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx` |
 | M5 | Not started | **Data API.** Add `GET /api/me` (stats derived in SQL), `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
@@ -103,3 +103,38 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 - `npm run preview` serves `/` and a deep link such as `/leaderboards`. (`vite preview` has its own SPA fallback, so this checks the base path but not `vercel.json`.)
 - `vercel.json` is valid JSON, and the rewrite pattern matches client routes but not `/api` or `/api/*`, checked with a regex test.
 - The `vercel.json` rewrite itself is verified only on the user's first Vercel deploy: a hard refresh of `/leaderboards` (or `curl`) must return `index.html` with status 200. *Confirmed 2026-10-27 on `aim-assist-v2.vercel.app`: `/leaderboards` returned `200 text/html`.*
+
+## M2 detail
+
+1. Add `@neondatabase/serverless` to `dependencies`, since the functions import it at runtime.
+2. `db/migrations/001_init.sql` creates the `scores` table from the PLAN-CONVERSION sketch, with its `CHECK` constraints (the same bounds as `firestore.rules`) and indexes for the leaderboard queries:
+   - The sketch's `users` table is dropped. Better Auth's `user` table (M3) holds name and image.
+   - The column is `user_id`, and its foreign key to `"user"(id)` is added in M3's migration, once that table exists.
+3. `scripts/migrate.js` and `npm run db:migrate`: a small runner that applies `db/migrations/*.sql` in filename order, each file in a transaction, and records it in `schema_migrations` so a rerun skips it.
+   - It connects with the Neon driver's WebSocket `Client`, because a migration file holds several statements.
+   - It prefers `DATABASE_URL_UNPOOLED`, since Neon recommends the direct endpoint for schema changes.
+   - It loads `.env.local` with Node's `--env-file-if-exists`, so no dotenv dependency is needed.
+   - A runner is needed because there's no `psql` here, and every Neon branch has to be migrated the same way.
+4. `api/_lib/db.js`, the shared `neon()` HTTP query function, moves here from M3. `api/health.js` uses it for `GET /api/health`, which runs `select 1` and returns `{ ok, database }` (status 503 when the database is unreachable). It's the smallest endpoint that proves `/api` and Neon work, both locally and once deployed.
+5. Local dev uses `vercel dev`, which runs Vite and the `/api` functions together on one port, just as production does. A Vite proxy would still need `vercel dev` running behind it, so it adds nothing.
+   - Add an `npm run dev:full` script.
+   - The Vercel CLI is installed globally by the user, not added as a devDependency, because it's large and only needed locally.
+6. ESLint: add Node globals for `api/**` and `scripts/**`, which run on the server.
+7. `.env.example`: add a server-only section for `DATABASE_URL` and `DATABASE_URL_UNPOOLED`, with a warning never to give them a `VITE_` prefix.
+8. `.gitignore`: add `.vercel/`, the link folder that `vercel link` writes.
+9. Stop for review.
+
+**User steps:**
+
+- Vercel → Storage (Marketplace) → **Neon** → create a database and connect it to the project for Development, Preview and Production. This injects `DATABASE_URL`, `DATABASE_URL_UNPOOLED` and related variables.
+- Install the CLI (`npm i -g vercel`), then run `vercel link` and `vercel env pull .env.local` in the repo.
+- Optional: enable the `VITE_FIREBASE_*` variables for Development too, so `vercel env pull` brings them and the app renders under `vercel dev`.
+
+### M2 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` and `npm run build` pass.
+- `001_init.sql` applies cleanly in PGlite (in-process Postgres, run in a scratch directory outside the repo). Valid rows insert; an out-of-range mode, score, accuracy or reaction time is rejected.
+- After the user steps:
+  - `npm run db:migrate` applies `001_init.sql`, and a second run reports nothing to apply. *Confirmed 2026-10-27. A rolled-back transaction on Neon also showed every CHECK constraint and index live and a negative score rejected.*
+  - Under `vercel dev`, `curl localhost:3000/api/health` returns `{"ok":true,"database":"up"}`. *Confirmed 2026-10-27 (200 `application/json`).*
+  - After a push, `/api/health` on the Vercel domain returns the same, confirming that the `vercel.json` rewrite leaves `/api` alone. *Pending the push.*

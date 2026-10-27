@@ -222,3 +222,63 @@ The checks were `curl` probes of the live HTML, entry chunk and `/leaderboards`.
 **Collaboration**
 
 The user ran every Vercel and Firebase dashboard step. Their remark that the key "is titled apiKey" exposed the naming mismatch.
+
+### Interaction 5 — Milestone 2: Neon schema, migration runner, health endpoint
+
+**User Prompt**
+
+> begin execution of milestone 2
+
+**Agent Outcome**
+
+Wrote the M2 step detail into `PLAN-V2.md` and executed the repo side. The work stops at the review gate, uncommitted, and M2 is marked "In review". The Neon integration, `vercel link` and `vercel env pull` are user steps, so nothing has run against a real Neon database yet.
+
+**Rationale**
+
+- **`scores` only, no `users` table.** The PLAN-CONVERSION sketch's `users` table was dropped, because Better Auth's `user` table (M3) will hold name and image. The column is `user_id`, with its foreign key deferred to M3's migration, once the table it references exists.
+- **A migration runner, not a tool.** There's no `psql` on this machine, and every Neon branch should be migrated the same way. `scripts/migrate.js` (about 70 lines) applies files in order, each in a transaction, and records them in `schema_migrations`. It uses the driver's WebSocket `Client` because migration files hold several statements, which the HTTP `neon()` function can't run.
+- **`api/_lib/db.js` moved here from M3.** M2 has to prove `/api` and Neon work, and `GET /api/health` (`select 1`) is the smallest endpoint that shows both.
+- **Vercel CLI installed globally.** `vercel dev` runs on a global install instead of a devDependency, since the CLI is large and only used locally.
+
+**Implementation**
+
+- [`db/migrations/001_init.sql`](db/migrations/001_init.sql) — the `scores` table: CHECK bounds copied from `firestore.rules`, plus score, user-and-score and `created_at` indexes.
+- [`scripts/migrate.js`](scripts/migrate.js) — key symbols `listPending()`, `applyMigration()`, `migrate()`. It prefers `DATABASE_URL_UNPOOLED`.
+- [`api/_lib/db.js`](api/_lib/db.js), [`api/health.js`](api/health.js) — a web-standard `export const GET` handler that returns `{ ok, database }`, or 503.
+
+**Changes**
+
+- `package.json` / `package-lock.json` — `@neondatabase/serverless@^1.2.0` added (the only new package in the lockfile). New scripts: `dev:full` (`vercel dev`) and `db:migrate` (`node --env-file-if-exists=.env.local`, so no dotenv dependency).
+- `eslint.config.js` — Node globals for `api/**` and `scripts/**`.
+- `.env.example` — server-only section for `DATABASE_URL` and `DATABASE_URL_UNPOOLED`, with a warning never to give them a `VITE_` prefix.
+- `.gitignore` — `.vercel`.
+- [`PLAN-V2.md`](PLAN-V2.md) — M2 detail, user steps and verification.
+
+**Verification**
+
+- `npm run lint`, `format:check` and `build` pass, and `npm test` passes 72 tests in 15 files.
+- `npm run db:migrate` without credentials exits 1 with "DATABASE_URL is not set. Run `vercel env pull .env.local` first."
+- `001_init.sql` was applied in PGlite (in-process Postgres, installed in a scratch directory outside the repo). Valid rows inserted, including the boundary values and a null reaction time. Unknown mode, score out of range, accuracy out of range, reaction time over 60000, and null `user_id` or `accuracy` were each rejected by the intended constraint. All three indexes exist.
+- `npm audit` reports 17 findings (3 moderate, 14 high, including zod). The lockfile diff shows `@neondatabase/serverless` as the only added package, with no transitive packages, so none of the findings come from M2. They were not addressed here.
+- **Not yet verified:** `migrate.js` against Neon (including its transaction and rerun behavior), `/api/health` under `vercel dev`, and `/api/health` on a Vercel deploy. All need the user steps first.
+
+### Interaction 6 — M2 verified against Neon
+
+**User Prompt**
+
+> neon is connected and env pulled, run the verification
+
+**Agent Outcome**
+
+M2 now works against the real Neon database and under `vercel dev`. The only remaining check is `/api/health` on the deployed site, which needs a push.
+
+The `vercel env pull` output also contained `NEON_AUTH_BASE_URL` and `VITE_NEON_AUTH_URL`, which means Neon Auth was turned on with the integration. That bears on M3's pre-check of Better Auth against Neon Auth; it's flagged, not acted on. `vercel link` also appended a `.env*` line to `.gitignore`. It duplicates the existing `.env` / `.env.*` rules and comes after the `!.env.example` exception, so it would ignore an untracked `.env.example`. At the user's direction ("remove the .gitignore line, then commit"), the line was removed. `git check-ignore --no-index` confirmed that `.env` and `.env.local` stay ignored and `.env.example` doesn't. M2 was marked Done and committed on `release/v2.0` as "Add Neon schema, migration runner and /api/health".
+
+**Verification**
+
+- `npm run db:migrate` printed "Applied 001_init.sql". A second run printed "Database is up to date."
+- In a transaction on Neon that was rolled back, the catalog showed `schema_migrations` holding `001_init.sql`, every `scores` CHECK constraint, and all three indexes. A valid row inserted, and a negative score was rejected by `scores_score_check`. The table held 0 rows after the rollback.
+- `vercel dev --listen 3000`: `GET /api/health` returned `{"ok":true,"database":"up"}` (200, `application/json`), and `/leaderboards` returned 200 `text/html`. The server was stopped afterwards.
+- Pending: `/api/health` on the Vercel domain after a push.
+
+
