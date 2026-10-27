@@ -189,3 +189,6 @@ Each dependency is added only in the milestone that uses it, with a justificatio
     - *The real JWT returned 200 with the user's uid. The same token with `sub` altered returned 401, and the opaque session token from sign-up also returned 401.*
     - *Token facts: `alg` is `EdDSA` with the JWKS `kid`; `iss` and `aud` are both the auth URL's origin; the lifetime is 900 s.*
     - *Deleting the test user cascaded to `session` and `account`, leaving 0 users.*
+- Deployed, *confirmed 2026-10-27 on `aim-assist-v2.vercel.app`*:
+  - `/api/me` returned 401 with no token, a malformed token and a forged token, with `Cache-Control: private, no-store`. That rules out a missing `NEON_AUTH_BASE_URL` (it would give 500) and shows the remote JWKS fetch works.
+  - A real token reaching 200 on Vercel is first exercised by M4's sign-in.

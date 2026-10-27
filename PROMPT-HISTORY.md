@@ -485,4 +485,37 @@ These are uncommitted.
 
 Recorded above. All requests used `curl` against the live Neon Auth instance and the local `vercel dev`. The dev server was stopped afterwards.
 
+**Collaboration**
+
+The user then had the doc updates committed (`9e822ec`) and pushed the branch.
+
+### Interaction 13 — `/api/me` on Vercel
+
+**User Prompt**
+
+> pushed, check /api/me on vercel
+
+**Agent Outcome**
+
+The deployed `/api/me` behaves as it did locally. Because the forged token produced a clean 401, the production function has `NEON_AUTH_BASE_URL` (a missing value would give a 500 at import) and can fetch Neon Auth's JWKS.
+
+**Verification**
+
+`curl` against `https://aim-assist-v2.vercel.app`:
+
+| Request | Result |
+|---|---|
+| `/api/me`, no token | 401 `{"error":"Unauthorized"}` |
+| `/api/me`, `Bearer not-a-jwt` | 401 |
+| `/api/me`, forged EdDSA token (correct `iss`/`aud`/`exp`, agent's own key) | 401 |
+| `/api/health` | 200 `{"ok":true,"database":"up"}` |
+
+Headers: `Cache-Control: private, no-store`, `x-vercel-cache: MISS`.
+
+A real token reaching 200 was **not** tested on Vercel. It was confirmed under `vercel dev` (Interaction 12), and M4's sign-in will exercise it.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md) — the deployed `/api/me` result is added to the M3 verification. Uncommitted.
+
 
