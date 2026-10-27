@@ -552,4 +552,113 @@ Documentation only. No code changed.
 
 The user's look at the Neon Console showed that the domain step was mostly automatic and that Google keys were already offered. That turned "create your own Google client before M4" into a deferred, before-launch step.
 
+### Interaction 15 — Milestone 4: client auth on Neon Auth
+
+**User Prompt**
+
+> localhost added to Neon Console. Begin execution of milestone 4
+
+**Agent Outcome**
+
+Moved the client from Firebase Auth to Neon Auth and wrote the M4 detail into `PLAN-V2.md`. The work stops at the review gate, uncommitted, and M4 is marked "In review". The browser sign-in checks are left to the user, since they need a real Google account and browser.
+
+Reading the SDK's source, not only its docs, changed the implementation twice:
+
+1. **`createAuthClient()` drops `getJWTToken()`.** In `neon-auth-*.mjs`, `createAuthClient()` returns `createInternalNeonAuth(...).adapter`. For an adapter without `initialize`, which includes the React adapter, that's the bare Better Auth client. The first draft of `getAuthToken()` would have thrown "not a function" on its first call in M6; no test caught it, because nothing calls it yet. The fix is to build `BetterAuthReactAdapter()(url)` directly and use the declared `getBetterAuthInstance()` and `getJWTToken(allowAnonymous)`.
+2. **`session.token` is the JWT through the SDK.** The SDK's `onSuccess` hook copies the `set-auth-jwt` header into `session.token`. That reconciles M3's finding (raw `session.token` is opaque) with Neon's Hono guide (which reads `session.token`).
+
+**Attempted Approach**
+
+The first build put a 239.5 kB (67.9 kB gzip) entry chunk in front of the app. Sourcemap attribution showed zod at 77 kB and `@supabase/auth-js` at 77 kB. Bypassing `createAuthClient()` didn't remove Supabase, because the SDK's shared `better-auth-helpers` imports Supabase's error classes for every adapter.
+
+**Resolution**
+
+The bundle cost was accepted as inherent to the SDK. The SDK moved into its own `auth-vendor` chunk (67 kB gzip), bringing the entry chunk back to 3.3 kB gzip. M4's net cost is +38 kB gzip, until M6 removes the 141 kB Firebase chunk.
+
+**Rationale**
+
+- **The SDK over a plain Better Auth client.** The SDK exchanges `neon_auth_session_verifier` after the OAuth redirect, which is Neon's mechanism for the callback across domains.
+- **Exact pin.** The install is about 200 packages, mostly the unused `@neondatabase/auth-ui` (36 `@radix-ui` packages), so it's pinned at `0.7.0-beta`.
+- **`ensureUserDocument` dropped.** It can't write to Firestore without a Firebase user, and M6 deletes it.
+- **`isUserCancellation` dropped.** It was a popup concept, and sign-in is now a redirect.
+- **Audience check added.** The verifier now checks `aud` (= Neon Auth origin), the hardening noted in M3.
+
+**Implementation**
+
+- [`src/services/auth.js`](src/services/auth.js) — `signInWithGoogle()`, `signOutUser()`, `useAuthSession`, `getAuthToken()`.
+- [`src/utils/authUser.js`](src/utils/authUser.js) — `toAppUser()`, with [`authUser.test.js`](src/utils/authUser.test.js) (3 tests).
+- [`src/contexts/AuthProvider.jsx`](src/contexts/AuthProvider.jsx) — a memoized `{ user, isLoading }` from `useAuthSession()`.
+
+**Changes**
+
+- `package.json` / `package-lock.json` — `@neondatabase/auth` `0.7.0-beta` (exact).
+- `src/components/AuthControls/AuthControls.jsx`, `src/pages/Leaderboards.jsx` — `isUserCancellation` removed.
+- `src/firebase/config.js` — `getAuth` and `GoogleAuthProvider` removed; now Firestore only.
+- `api/_lib/verifier.js`, `api/_lib/auth.js`, `api/_lib/verifier.test.js` — `audience` option and a wrong-audience test.
+- `vite.config.js` — the `auth-vendor` chunk group.
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - M4 detail and verification, with browser steps for the user.
+  - The dependency note gains the install and bundle costs.
+  - M4 status set to "In review".
+
+**Verification**
+
+- `npm run lint` and `format:check` are clean. `npm test` passes 87 tests in 17 files. `npm run build` passes: entry 3.3 kB gzip, `auth-vendor` 67.0 kB, `react-vendor` 71.8 kB, `firebase` 140.6 kB.
+- Node smoke test of the exact SDK calls against live Neon Auth:
+  - all four methods exist;
+  - `getJWTToken(false)` returned `null` while signed out;
+  - `signIn.social` (Google) with callback `http://localhost:3000/leaderboards` returned a `…/neondb/auth/sign-in/social/init?token=…` URL;
+  - callback `https://not-trusted.example.com/` returned 403.
+- **Not verified by the agent:** the Google round trip, reload persistence (including Safari or blocked third-party cookies), sign-out, `/profile` access, and a browser JWT reaching `/api/me`. These are listed as user steps in PLAN-V2's M4 verification.
+
+### Interaction 16 — `vercel dev` broken by the SPA rewrite
+
+**User Prompt**
+
+> received this error when running `npm run dev:full`: [Vite `Internal server error: Failed to parse source for import analysis because the content contains invalid JS syntax… File: …/index.html:7:51`, plugin `vite:import-analysis`]
+
+**Agent Outcome**
+
+Reproduced the problem under `vercel dev` with `curl`: `/src/main.jsx`, `/@vite/client`, `/@react-refresh` and even `/favicon.svg` all returned `index.html`. On the Vercel platform, existing files are served before rewrites apply. `vercel dev` has no built output, so M1's catch-all `/((?!api(?:/|$)).*)` rewrote every request, and Vite received module requests for `index.html`. The bug dates from M1. It went unnoticed because the M1 and M2 `vercel dev` checks only fetched `/api/health` and HTML pages, never a module.
+
+The fix narrows the rewrite to `/((?!api(?:/|$)|@)[^.]*)`, so it covers only paths without a file extension and skips `/api` and Vite's `/@…` paths.
+
+**Rationale**
+
+App routes never contain a dot, so the extension rule loses nothing. It also improves production: a missing hashed asset after a deploy now gets a real 404 instead of HTML with a 200, which browsers report as a MIME-type error. Excluding `/@` covers Vite's extensionless internals (`/@vite/client`, `/@react-refresh`, `/@id/…`, `/@fs/…`).
+
+**Changes**
+
+- [`vercel.json`](vercel.json) — the new rewrite pattern.
+- [`PLAN-V2.md`](PLAN-V2.md) — M1 step 3 now points to the revision. M4 gains step 9 (the fix, its cause and the verification gap) plus rewrite verification results.
+
+**Verification**
+
+- `path-to-regexp@6.1.0` in the scratch directory: 18 of 18 cases matched as intended.
+- Restarted `vercel dev`:
+  - `/` and `/leaderboards` returned `text/html`.
+  - `/src/main.jsx`, `/@vite/client`, `/@react-refresh`, `/src/App.jsx`, `/src/contexts/AuthProvider.jsx`, `/src/services/auth.js` and `/src/utils/authUser.js` returned `text/javascript`.
+  - The pre-bundled SDK (`/node_modules/.vite/deps/@neondatabase_auth_react_adapters.js`) returned 200 `text/javascript`.
+  - `/favicon.svg` returned `image/svg+xml`, `/api/health` 200 and `/api/me` 401.
+  - The server was stopped afterwards, so port 3000 is free.
+- **Not yet verified:** the production deploy of the new pattern (a deep-link hard refresh and an asset 404), and the page actually rendering in a browser.
+
+**Collaboration**
+
+The user's run of `npm run dev:full` exposed a defect that the agent's `curl`-based checks had missed since M1.
+
+### Interaction 17 — M4 approved and committed
+
+**User Prompt**
+
+> sign-in works locally; commit M4 and the doc changes
+
+**Agent Outcome**
+
+The user confirmed that Google sign-in works under `npm run dev:full`, which is browser check 1. M4 was marked Done and committed on `release/v2.0` together with the `vercel.json` fix and the doc updates, as "Move client sign-in to Neon Auth and fix the SPA rewrite under vercel dev".
+
+**Verification**
+
+Only check 1 was reported. Checks 2–6 were not reported and are recorded as open in PLAN-V2's M4 verification: reload persistence, Safari or blocked third-party cookies, sign-out, `/profile`, and a browser JWT reaching `/api/me`. The new rewrite on the production deploy is also unverified until the push.
+
 

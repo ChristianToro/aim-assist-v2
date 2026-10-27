@@ -21,6 +21,12 @@ export default defineConfig({
         advancedChunks: {
           groups: [
             { name: 'firebase', test: /node_modules[\\/]@?firebase/ },
+            // The Neon Auth SDK and what it bundles (~68 kB gzip): Better
+            // Auth, zod, and @supabase/auth-js for its error classes.
+            {
+              name: 'auth-vendor',
+              test: /node_modules[\\/](@neondatabase[\\/]auth|better-auth|@better-auth|better-call|@better-fetch|@supabase|zod|nanostores|defu)[\\/]/,
+            },
             {
               name: 'react-vendor',
               test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/,

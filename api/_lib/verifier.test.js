@@ -3,7 +3,9 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from 'jose'
 import { AuthError, createVerifier } from './verifier.js'
 
+// Neon Auth uses its origin for both claims.
 const ISSUER = 'https://auth.example.test'
+const AUDIENCE = ISSUER
 const UID = '0b9c1f9e-3c1a-4e57-9a43-5f1d2c6b7e80'
 const KEY_ID = 'test-key'
 
@@ -17,6 +19,7 @@ beforeAll(async () => {
   verify = createVerifier({
     keySet: createLocalJWKSet({ keys: [jwk] }),
     issuer: ISSUER,
+    audience: AUDIENCE,
   })
 })
 
@@ -26,11 +29,13 @@ const sign = ({
   alg = 'EdDSA',
   subject = UID,
   issuer = ISSUER,
+  audience = AUDIENCE,
   expiresIn = '15m',
 } = {}) => {
   const jwt = new SignJWT(claims)
     .setProtectedHeader({ alg, kid: KEY_ID })
     .setIssuer(issuer)
+    .setAudience(audience)
     .setIssuedAt()
   if (subject) jwt.setSubject(subject)
   if (expiresIn) jwt.setExpirationTime(expiresIn)
@@ -65,6 +70,11 @@ describe('createVerifier', () => {
   it('rejects a token from another issuer', async () =>
     expectRejected(
       requestWith(`Bearer ${await sign({ issuer: 'https://evil.test' })}`)
+    ))
+
+  it('rejects a token for another audience', async () =>
+    expectRejected(
+      requestWith(`Bearer ${await sign({ audience: 'https://other.test' })}`)
     ))
 
   it('rejects an expired token', async () =>

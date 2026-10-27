@@ -1,35 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { AuthContext } from './authContext'
-import { subscribeToAuth } from '../services/auth'
-import { ensureUserDocument } from '../services/users'
+import { useAuthSession } from '../services/auth'
+import { toAppUser } from '../utils/authUser'
 
-// Tracks the signed-in Firebase user. isLoading covers the initial
-// session restore so the UI doesn't flash "signed out" on refresh.
+// Exposes the signed-in Neon Auth user in the app's user shape. isLoading
+// covers the initial session restore so the UI doesn't flash "signed out"
+// on refresh.
 const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { data, isPending } = useAuthSession()
+  const sessionUser = data?.user
 
-  useEffect(
-    () =>
-      subscribeToAuth((nextUser) => {
-        setUser(nextUser)
-        setIsLoading(false)
-        // Fire-and-forget: the profile document isn't needed for the UI
-        // to proceed, and a failure here shouldn't block sign-in.
-        if (nextUser) {
-          ensureUserDocument(nextUser).catch((error) =>
-            console.error('Failed to ensure user document:', error)
-          )
-        }
-      }),
-    []
+  const value = useMemo(
+    () => ({ user: toAppUser(sessionUser), isLoading: isPending }),
+    [sessionUser, isPending]
   )
 
-  return (
-    <AuthContext.Provider value={{ user, isLoading }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export default AuthProvider

@@ -39,7 +39,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M1 | Done | **Vercel hosting.** Set `vite.config.js` `base` to `'/'`. Add `vercel.json` with a SPA rewrite for every path except `/api`. Remove `scripts/spa-fallback.mjs` and its build step. Turn `deploy.yml` into a lint-and-test CI workflow. *User:* import the repo into Vercel. | `vite.config.js`, `vercel.json`, `package.json`, `.github/workflows/` |
 | M2 | Done | **Neon + schema.** Add Neon through the Vercel Marketplace (user step). Write `db/migrations/001_init.sql` for the scores table with its CHECK constraints (see PLAN-CONVERSION). Make `/api` work in local dev (`vercel dev`, or a Vite proxy). | `db/migrations/`, `.env.example` |
 | M3 | Done | **Auth server (Neon Auth).** Add `api/_lib/auth.js`, which reads `Authorization: Bearer <jwt>`, verifies it with `jose` against Neon Auth's JWKS (`NEON_AUTH_BASE_URL/.well-known/jwks.json`) and checks the issuer and expiry. The uid is the token's `sub`. Vitest covers it with locally generated keys. Add `GET /api/me`, which returns the verified identity or 401; M5 adds stats. Migration `002` changes `scores.user_id` to `uuid` and adds a foreign key to `neon_auth."user"(id)` with `on delete cascade`. Add the Neon Auth vars to `.env.example`. *User:* in the Neon Console → Auth, add `localhost:3000` as a trusted domain (the Vercel domains are added automatically). Google sign-in uses Neon's shared keys during development, and your own Google OAuth client before the portfolio launch. | `api/_lib/auth.js`, `api/me.js`, `db/migrations/002_*.sql`, `.env.example` |
-| M4 | Not started | **Auth client switchover.** Add `@neondatabase/auth` and create the client from `VITE_NEON_AUTH_URL`. Move `services/auth.js` onto it: Google sign-in through `signIn.social`, sign-out, and the session. Move `AuthProvider` too, and keep the `useAuth()` shape by mapping `uid`, `displayName` and `photoURL` from the user's `id`, `name` and `image`, so consumers don't change. Add a `getAuthToken()` helper for the Bearer header that the M6 services send. Remove `getAuth` from `src/firebase/config.js`. Between M4 and M6 the Firestore writes have no Firebase user, so saving scores and profiles doesn't work on the branch; the data is being reset anyway. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx`, `src/firebase/config.js` |
+| M4 | Done | **Auth client switchover.** Add `@neondatabase/auth` and create the client from `VITE_NEON_AUTH_URL`. Move `services/auth.js` onto it: Google sign-in through `signIn.social`, sign-out, and the session. Move `AuthProvider` too, and keep the `useAuth()` shape by mapping `uid`, `displayName` and `photoURL` from the user's `id`, `name` and `image`, so consumers don't change. Add a `getAuthToken()` helper for the Bearer header that the M6 services send. Remove `getAuth` from `src/firebase/config.js`. Between M4 and M6 the Firestore writes have no Firebase user, so saving scores and profiles doesn't work on the branch; the data is being reset anyway. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx`, `src/firebase/config.js` |
 | M5 | Not started | **Data API.** Extend `GET /api/me` with stats derived in SQL, and add `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
 | M6 | Not started | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
 | M7 | Not started | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/anthropic.js`, migration |
@@ -52,7 +52,11 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 
 - `@neondatabase/serverless` (M2): the HTTP Postgres driver. It avoids connection-pool exhaustion in serverless functions.
 - `jose` (M3): verifies Neon Auth's JWTs against its JWKS in `/api`. It's standards-based, has no dependencies, and is what Neon's own backend guide uses.
-- `@neondatabase/auth` (M4): Neon's official Neon Auth client, wrapping a Better Auth client. It's still a beta (0.7.0-beta on 2026-10-27), so pin the exact version and re-check its docs before M4. It was chosen over `@neondatabase/neon-js`, which adds the Data API client and pulls in `pg`.
+- `@neondatabase/auth` (M4): Neon's official Neon Auth client, wrapping a Better Auth client. It's still a beta, so it's pinned exactly at `0.7.0-beta`. It was chosen over `@neondatabase/neon-js`, which adds the Data API client and pulls in `pg`.
+  - **Why not a plain Better Auth client:** after the Google redirect, the SDK exchanges Neon's `neon_auth_session_verifier` URL parameter for the session. That's how Neon handles the callback across domains, and a plain Better Auth client doesn't do it.
+  - **Install cost:** about 200 packages, mostly its unused UI kit (`@neondatabase/auth-ui`, 36 `@radix-ui` packages), which never reach the bundle.
+  - **Bundle cost:** 67 kB gzip in its own `auth-vendor` chunk (Better Auth, zod, and `@supabase/auth-js`, which its shared error helpers depend on).
+  - **Net effect:** +38 kB gzip until M6 removes the 141 kB Firebase chunk; after that, the total is far below v1's.
 
 ### Neon Auth notes
 
@@ -92,7 +96,7 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 
 1. `vite.config.js`: set `base` to `'/'`, since Vercel serves from the domain root. Drop the Pages comment.
 2. `src/App.jsx`: remove `basename={import.meta.env.BASE_URL}` from `BrowserRouter`. With `base: '/'` it is always `/`, which is the router's default.
-3. Add `vercel.json` with one rewrite that sends every path outside `/api` to `/index.html`. Vercel serves files that exist (such as `/assets/*` and `/favicon.svg`) before it applies rewrites, so only client routes reach the rewrite.
+3. Add `vercel.json` with one rewrite that sends every path outside `/api` to `/index.html`. Vercel serves files that exist (such as `/assets/*` and `/favicon.svg`) before it applies rewrites, so only client routes reach the rewrite. *Revised in M4:* `vercel dev` has no built files, so this catch-all also swallowed Vite's module requests. See M4 step 9.
 4. Delete `scripts/spa-fallback.mjs` and remove it from the `build` script. The rewrite replaces the `404.html` copy.
 5. Rename `.github/workflows/deploy.yml` to `ci.yml` with `git mv`. It runs on pushes to `main` and `release/**` and on pull requests, with the steps `npm ci`, lint, `format:check`, test and build. The Pages upload, deploy job, Pages permissions and the Firebase secret check are removed, because Vercel now deploys.
 6. Stop for review.
@@ -198,3 +202,49 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 - Deployed, *confirmed 2026-10-27 on `aim-assist-v2.vercel.app`*:
   - `/api/me` returned 401 with no token, a malformed token and a forged token, with `Cache-Control: private, no-store`. That rules out a missing `NEON_AUTH_BASE_URL` (it would give 500) and shows the remote JWKS fetch works.
   - A real token reaching 200 on Vercel is first exercised by M4's sign-in.
+
+## M4 detail
+
+1. Add `@neondatabase/auth@0.7.0-beta`, pinned exactly.
+2. `src/services/auth.js`:
+   - Build `BetterAuthReactAdapter()(VITE_NEON_AUTH_URL)` directly rather than through `createAuthClient()`. For this adapter, `createAuthClient()` returns only the Better Auth client, which has no `getJWTToken()` (found in the SDK source).
+   - Exports:
+     - `signInWithGoogle()`: a full-page redirect through `signIn.social`. `callbackURL` is the current absolute URL, because a relative one would resolve against the auth origin.
+     - `signOutUser()`.
+     - `useAuthSession`: the SDK's `useSession` hook.
+     - `getAuthToken()`: `adapter.getJWTToken(false)`. The SDK copies the `set-auth-jwt` header into `session.token`, so this returns the JWT that `/api` needs.
+3. `src/utils/authUser.js` holds `toAppUser()`, a pure mapping from `{ id, name, image }` to `{ uid, displayName, photoURL }`, with Vitest tests.
+4. `AuthProvider` builds `{ user, isLoading }` from `useAuthSession()` and `toAppUser`. The `ensureUserDocument` call is removed, since it can't write to Firestore without a Firebase user and M6 deletes it.
+5. `AuthControls` and `Leaderboards`: drop `isUserCancellation`, which was a popup-only concept; a redirect has no popup to close.
+6. `src/firebase/config.js`: remove `getAuth` and `GoogleAuthProvider`. Firestore stays until M6.
+7. `api/_lib/verifier.js` and `auth.js`: also check `aud`, which equals the Neon Auth origin (the hardening noted in M3), with a test for the wrong audience.
+8. `vite.config.js`: put the SDK in its own `auth-vendor` chunk, so app changes don't invalidate it in caches.
+9. **`vercel.json` fix (found by the user running `npm run dev:full`).**
+   - **Symptom:** Vite failed with "Failed to parse source for import analysis… index.html".
+   - **Cause:** under `vercel dev` there are no built files, so M1's catch-all rewrite sent everything to `/index.html`, including `/src/main.jsx`, `/@vite/client` and `/favicon.svg`. Vite then received module requests for `index.html`.
+   - **Fix:** the rewrite is now `/((?!api(?:/|$)|@)[^.]*)`. It applies only to paths without a file extension, and skips `/api` and Vite's `/@…` paths. App routes never contain a dot.
+   - **Production bonus:** a missing file such as an old `/assets/*.js` after a deploy now returns 404, where it used to return `index.html` with a 200, which surfaced as a confusing MIME-type error.
+   - **Verification gap:** M1's and M2's `vercel dev` checks only requested `/api/health` and HTML pages, never a module, which is why this wasn't caught earlier.
+10. Stop for review.
+
+**Known gap until M6:** Profile stats and score saving still go through Firestore, which no longer sees a signed-in user. They fail on this branch until M6 moves them to `/api`.
+
+### M4 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (87 tests) and `npm run build` pass. The entry chunk is 3.3 kB gzip, and `auth-vendor` is 67 kB gzip.
+- `vercel.json` rewrite:
+  - `path-to-regexp@6.1.0` matches as intended in 18 cases: app routes and `/apiary` are rewritten; `/api*`, `/@vite/client`, `/@id/…`, `/src/main.jsx`, `/favicon.svg`, `/assets/*.js` and `/node_modules/.vite/deps/*` pass through.
+  - Under `vercel dev`, modules are served as `text/javascript` (including `/src/services/auth.js` and the pre-bundled Neon Auth SDK), pages as HTML, `/api/health` as 200 and `/api/me` as 401.
+- SDK smoke test in Node against the live Neon Auth instance:
+  - `signIn.social`, `signOut`, `useSession` and `getJWTToken` exist.
+  - `getJWTToken(false)` returns `null` when signed out.
+  - A Google sign-in for a trusted callback (`localhost:3000`) returns Neon's `/sign-in/social/init` URL.
+  - An untrusted callback is rejected with 403.
+- *2026-10-27: the user reported that "sign-in works locally" under `npm run dev:full`, which covers check 1. Checks 2–6 (reload, Safari or blocked third-party cookies, sign-out, `/profile`, and a browser JWT reaching `/api/me`) weren't reported and remain open. Check 3 matters most before launch.*
+- **Browser checks (user):** on `vercel dev`, or on the Vercel deploy after a push.
+  1. "Continue with Google" goes to Google (Neon branding with the shared keys), returns to the same page, and the avatar appears.
+  2. Reload: still signed in.
+  3. Same in Safari, or in Chrome with third-party cookies blocked.
+  4. "Sign out", then reload: signed out.
+  5. `/profile` opens while signed in. Its stats error until M6 is expected.
+  6. In the DevTools console, signed in: `fetch('/api/me', { headers: { Authorization: 'Bearer ' + await (await import('/src/services/auth.js')).getAuthToken() } }).then((r) => r.json())` returns your `{ uid }`. This works under `vercel dev` only, because production bundles don't serve `/src`.

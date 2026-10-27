@@ -21,12 +21,12 @@ const isTokenError = (error) =>
   error instanceof errors.JOSEError && !(error instanceof errors.JWKSTimeout)
 
 /*
- * Builds a request verifier for one token issuer. It resolves to the
- * caller's identity, taken only from the verified token's subject, or
- * throws AuthError. auth.js wires it to Neon Auth; tests pass local keys.
+ * Builds a request verifier for one token issuer and audience. It resolves
+ * to the caller's identity, taken only from the verified token's subject,
+ * or throws AuthError. auth.js wires it to Neon Auth; tests pass local keys.
  */
 export const createVerifier =
-  ({ keySet, issuer }) =>
+  ({ keySet, issuer, audience }) =>
   async (request) => {
     const token = readBearerToken(request)
     if (!token) throw new AuthError('Missing bearer token')
@@ -34,6 +34,7 @@ export const createVerifier =
     try {
       const { payload } = await jwtVerify(token, keySet, {
         issuer,
+        audience,
         algorithms: ALGORITHMS,
         requiredClaims: REQUIRED_CLAIMS,
       })
