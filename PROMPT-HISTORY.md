@@ -187,3 +187,38 @@ No code changed after Interaction 2's checks. The commit was confirmed with `git
 **Collaboration**
 
 The user challenged the Firebase steps as contradicting v2's Firebase removal. That changed them from required setup into optional, explicitly temporary steps.
+
+### Interaction 4 — First Vercel deploy: blank page troubleshooting
+
+**User Prompt**
+
+> [Summarized: a series of Q&A turns covering where to find the Firebase web config, how to make `release/v2.0` Vercel's production branch, and why `https://aim-assist-v2.vercel.app/` stayed blank after the env vars were set.]
+
+> Mark the M1 deep-link check as confirmed
+
+> include a summarized note about the troubleshooting into prompt history, then include that change with the plan-v2 amendment as one commit
+
+**Agent Outcome**
+
+The blank page was diagnosed by fetching the live bundle with `curl`. Its entry chunk had the same hash as a local build made without `.env` (`index-DPXV9vf2.js`), and the Firebase config compiled to `apiKey:void 0` / `projectId:void 0`. So `getAuth()` threw on load, as predicted in Interaction 3. There were two causes, fixed in turn:
+
+1. **Variables added after the build.** Vite writes `VITE_*` values into the bundle at build time, so the deployment had to be rebuilt.
+2. **Wrong variable names.** The Vercel keys had been named after the Firebase config fields (such as `apiKey`) instead of `VITE_FIREBASE_*`, so Vite ignored them. They were renamed using the field → variable mapping from `src/firebase/config.js`.
+
+When the vars were saved, Vercel warned that the `VITE_` prefix exposes them to the browser. That's correct, and it's acceptable for Firebase web config, which is public by design. They were kept prefixed and set to Vercel's "Config" type. The same warning applies to the future server secrets (`DATABASE_URL` and the others), which must never take that prefix.
+
+After a clean redeploy, the entry chunk changed to `index-Cs0nb64U.js` with all six config fields populated. The M1 deep-link check was confirmed live: `/leaderboards` returned `200 text/html`.
+
+The user also asked whether values from the v1 build would matter. They don't: they identify the same Firebase project that this branch still uses until M6.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md) — the M1 rewrite check is marked confirmed on `aim-assist-v2.vercel.app`.
+
+**Verification**
+
+The checks were `curl` probes of the live HTML, entry chunk and `/leaderboards`. The API key was redacted from all output. Page rendering was **not** verified by the agent, since `curl` can't execute the app; the user hard-refreshes in a browser for that.
+
+**Collaboration**
+
+The user ran every Vercel and Firebase dashboard step. Their remark that the key "is titled apiKey" exposed the naming mismatch.
