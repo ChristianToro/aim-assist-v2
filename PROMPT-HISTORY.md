@@ -370,4 +370,78 @@ These are documentation changes. A grep confirms that the only remaining "Better
 
 The user overrode the agent's recommendation and chose Neon Auth.
 
+### Interaction 10 — Milestone 3: Neon Auth token verification
+
+**User Prompt**
+
+> commit, then begin execution of milestone 3
+
+**Agent Outcome**
+
+Committed the auth replan (`5b41e46`), wrote the M3 detail into `PLAN-V2.md`, and executed the repo side. The work stops at the review gate, uncommitted, and M3 is marked "In review". Applying `002` to Neon and testing with a real Neon Auth token are waiting on the user's approval.
+
+Neon Auth's public metadata was checked before any code was written. Its JWKS holds one `OKP`/`Ed25519` key with `alg: EdDSA`, and `/.well-known/openid-configuration` returns 404. So the verifier pins `EdDSA` and takes its issuer rule (the origin of `NEON_AUTH_BASE_URL`) from Neon's backend guide. `VITE_NEON_AUTH_URL` and `NEON_AUTH_BASE_URL` hold the same URL.
+
+**Rationale**
+
+- **Pure verifier, separate wiring.** `verifier.js` holds the pure `createVerifier({ keySet, issuer })`. `auth.js` builds the Neon Auth instance from env at import. The split came from the first draft: there, importing the module read `NEON_AUTH_BASE_URL` immediately, so tests couldn't import the verifier without the env var.
+- **401 vs 500.** Only jose token errors become a 401 `AuthError`. A JWKS timeout or any other error propagates as a 500, so an outage on our side isn't reported as the caller's fault.
+- **Required claims.** `requiredClaims: ['sub', 'exp']` rejects tokens that never expire, and tokens with no subject.
+
+**Implementation**
+
+- [`api/_lib/verifier.js`](api/_lib/verifier.js) — `createVerifier()`, `AuthError` (`status = 401`).
+- [`api/_lib/auth.js`](api/_lib/auth.js) — `verifyRequest`: a remote JWKS at `NEON_AUTH_BASE_URL/.well-known/jwks.json`, built once per cold start.
+- [`api/me.js`](api/me.js) — `GET` returns `{ uid }` or 401 `{ error: 'Unauthorized' }`, both with `Cache-Control: private, no-store`.
+- [`api/_lib/verifier.test.js`](api/_lib/verifier.test.js) — 11 tests using an Ed25519 key pair generated in the test, in Vitest's `node` environment.
+- [`db/migrations/002_scores_user_fk.sql`](db/migrations/002_scores_user_fk.sql) — `user_id` becomes `uuid`, with a foreign key to `neon_auth."user"(id)` and `on delete cascade`.
+
+**Changes**
+
+- `package.json` / `package-lock.json` — `jose@^6.2.13`, one package with no transitive dependencies.
+- `.env.example` — `NEON_AUTH_BASE_URL` and `VITE_NEON_AUTH_URL`.
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - M3 detail, user steps (own Google OAuth client and trusted domains in the Neon Console) and verification.
+  - A note on the risk that the foreign key depends on a managed table.
+  - M3 status set to "In review".
+
+**Verification**
+
+- `npm run lint` and `format:check` are clean. `npm test` passes 83 tests in 16 files, 11 of them new. `npm run build` passes.
+- PGlite (scratch directory), applying `001` then `002` on top of a stub `neon_auth."user"` (uuid primary key):
+  - `user_id` became `uuid`;
+  - a known user's score inserted;
+  - `'not-a-uuid'` was rejected;
+  - an unknown uuid was rejected by `scores_user_id_fkey`;
+  - deleting the user left 0 scores.
+- `vercel dev`: `/api/me` returned 401 `{"error":"Unauthorized"}` with no header, with a `Basic` scheme, and with `Bearer not-a-jwt`. A token forged with the correct issuer and expiry but the agent's own Ed25519 key was also refused with 401, which shows the remote JWKS fetch works. `Cache-Control: private, no-store` was present.
+- On the first run the forged-token probe was invalid: the URL was passed as an argument instead of an environment variable, so an empty token was sent. It was rerun correctly before the result above was recorded.
+- **Not yet verified:**
+  - `002` against Neon;
+  - a real Neon Auth token reaching 200, and its actual `iss`, `aud` and `alg`.
+
+### Interaction 11 — User applies `002` on Neon
+
+**User Prompt**
+
+> Would I be able to conduct step 1 to apply 002?
+
+**Agent Outcome**
+
+The agent gave the user the command, the expected output and SQL to check the result. The user ran `npm run db:migrate` themselves, and it printed "Applied 002_scores_user_fk.sql".
+
+**Verification**
+
+Read-only queries on Neon showed:
+
+- `schema_migrations` = `001_init.sql, 002_scores_user_fk.sql`;
+- `scores.user_id` is `uuid`;
+- `scores_user_id_fkey` is `FOREIGN KEY (user_id) REFERENCES neon_auth."user"(id) ON DELETE CASCADE`.
+
+A rerun of `db:migrate` printed "Database is up to date."
+
+**Collaboration**
+
+The user chose to run the production-adjacent migration themselves, rather than have the agent run it.
+
 

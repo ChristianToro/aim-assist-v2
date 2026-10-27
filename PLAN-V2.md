@@ -38,7 +38,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M0 | Done | **Branch + docs reorg.** Create `release/v2.0`. Archive the v1 docs to `Prototype/V1-*`. Write the new root `CLAUDE.md`, `PLAN-V2.md` and `PROMPT-HISTORY.md`. Repoint the README links. | `Prototype/`, `CLAUDE.md`, `PLAN-V2.md`, `PROMPT-HISTORY.md`, `README.md` |
 | M1 | Done | **Vercel hosting.** Set `vite.config.js` `base` to `'/'`. Add `vercel.json` with a SPA rewrite for every path except `/api`. Remove `scripts/spa-fallback.mjs` and its build step. Turn `deploy.yml` into a lint-and-test CI workflow. *User:* import the repo into Vercel. | `vite.config.js`, `vercel.json`, `package.json`, `.github/workflows/` |
 | M2 | Done | **Neon + schema.** Add Neon through the Vercel Marketplace (user step). Write `db/migrations/001_init.sql` for the scores table with its CHECK constraints (see PLAN-CONVERSION). Make `/api` work in local dev (`vercel dev`, or a Vite proxy). | `db/migrations/`, `.env.example` |
-| M3 | Not started | **Auth server (Neon Auth).** Add `api/_lib/auth.js`, which reads `Authorization: Bearer <jwt>`, verifies it with `jose` against Neon Auth's JWKS (`NEON_AUTH_BASE_URL/.well-known/jwks.json`) and checks the issuer and expiry. The uid is the token's `sub`. Vitest covers it with locally generated keys. Add `GET /api/me`, which returns the verified identity or 401; M5 adds stats. Migration `002` changes `scores.user_id` to `uuid` and adds a foreign key to `neon_auth."user"(id)` with `on delete cascade`. Add the Neon Auth vars to `.env.example`. *User:* in the Neon Console → Auth, add your own Google OAuth credentials and add the trusted domains (`localhost:3000` and the Vercel domain). | `api/_lib/auth.js`, `api/me.js`, `db/migrations/002_*.sql`, `.env.example` |
+| M3 | In review | **Auth server (Neon Auth).** Add `api/_lib/auth.js`, which reads `Authorization: Bearer <jwt>`, verifies it with `jose` against Neon Auth's JWKS (`NEON_AUTH_BASE_URL/.well-known/jwks.json`) and checks the issuer and expiry. The uid is the token's `sub`. Vitest covers it with locally generated keys. Add `GET /api/me`, which returns the verified identity or 401; M5 adds stats. Migration `002` changes `scores.user_id` to `uuid` and adds a foreign key to `neon_auth."user"(id)` with `on delete cascade`. Add the Neon Auth vars to `.env.example`. *User:* in the Neon Console → Auth, add your own Google OAuth credentials and add the trusted domains (`localhost:3000` and the Vercel domain). | `api/_lib/auth.js`, `api/me.js`, `db/migrations/002_*.sql`, `.env.example` |
 | M4 | Not started | **Auth client switchover.** Add `@neondatabase/auth` and create the client from `VITE_NEON_AUTH_URL`. Move `services/auth.js` onto it: Google sign-in through `signIn.social`, sign-out, and the session. Move `AuthProvider` too, and keep the `useAuth()` shape by mapping `uid`, `displayName` and `photoURL` from the user's `id`, `name` and `image`, so consumers don't change. Add a `getAuthToken()` helper for the Bearer header that the M6 services send. Remove `getAuth` from `src/firebase/config.js`. Between M4 and M6 the Firestore writes have no Firebase user, so saving scores and profiles doesn't work on the branch; the data is being reset anyway. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx`, `src/firebase/config.js` |
 | M5 | Not started | **Data API.** Extend `GET /api/me` with stats derived in SQL, and add `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
 | M6 | Not started | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
@@ -146,3 +146,40 @@ Each dependency is added only in the milestone that uses it, with a justificatio
   - `npm run db:migrate` applies `001_init.sql`, and a second run reports nothing to apply. *Confirmed 2026-10-27. A rolled-back transaction on Neon also showed every CHECK constraint and index live and a negative score rejected.*
   - Under `vercel dev`, `curl localhost:3000/api/health` returns `{"ok":true,"database":"up"}`. *Confirmed 2026-10-27 (200 `application/json`).*
   - After a push, `/api/health` on the Vercel domain returns the same, confirming that the `vercel.json` rewrite leaves `/api` alone. *Confirmed 2026-10-27 on `aim-assist-v2.vercel.app`: 200 `{"ok":true,"database":"up"}`, and unknown `/api` paths return Vercel's 404, not `index.html`.*
+
+## M3 detail
+
+1. Add `jose` to `dependencies`.
+2. `api/_lib/auth.js`:
+   - `createVerifier({ keySet, issuer })` returns a function that takes a `Request` and resolves to `{ uid }`, or throws `AuthError` (status 401).
+   - It reads `Authorization: Bearer <jwt>` and checks the token with `jwtVerify`:
+     - the algorithm must be `EdDSA`, the only one in Neon Auth's JWKS;
+     - the issuer must be the origin of `NEON_AUTH_BASE_URL`, as in Neon's backend guide;
+     - `sub` and `exp` must be present.
+   - Token errors from jose become `AuthError`. A JWKS fetch timeout and other errors propagate as server errors, not as 401.
+   - The exported `verifyRequest` is built once per cold start from a remote JWKS at `NEON_AUTH_BASE_URL/.well-known/jwks.json`. jose caches the keys and refetches when it sees an unknown `kid`.
+3. `api/_lib/auth.test.js` covers the verifier with an Ed25519 key pair generated in the test, with no mocks and no network: a valid token, a missing or non-Bearer header, the wrong issuer, an expired token, the wrong signing key, a missing `sub` or `exp`, and an HS256 token. It lives under `_lib`, so Vercel never deploys it as a function, and it runs in Vitest's `node` environment.
+4. `api/me.js`: `GET /api/me` returns `{ uid }` with `Cache-Control: private, no-store`, or 401 `{ error: 'Unauthorized' }`. M5 adds stats.
+5. `db/migrations/002_scores_user_fk.sql` changes `scores.user_id` from `text` to `uuid` (the table is empty) and adds a foreign key to `neon_auth."user"(id)` with `on delete cascade`.
+6. `.env.example`: add `NEON_AUTH_BASE_URL` and `VITE_NEON_AUTH_URL`, both public URLs that the Neon integration sets.
+7. Stop for review.
+
+**User steps (needed by M4 sign-in, and can be done now):**
+
+- In Google Cloud Console, create an OAuth client (type: Web application). Use the redirect URI that the Neon Console shows for Google.
+- In Neon Console → Auth → OAuth providers, set Google to use your client ID and secret instead of the shared development credentials.
+- In Neon Console → Auth → Domains, add the trusted domains `http://localhost:3000` and `https://aim-assist-v2.vercel.app`.
+
+**Risk:** the foreign key makes `neon_auth."user"` a dependency of our schema. If a future Neon Auth internal migration drops or rebuilds that table, it would fail on the foreign key. If that ever happens, removing the constraint is a one-line migration.
+
+### M3 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (including the new verifier tests) and `npm run build` pass.
+- `002_scores_user_fk.sql` applies in PGlite on top of `001` and a stub `neon_auth."user"`:
+  - a non-uuid `user_id` is rejected;
+  - an unknown user is rejected by the foreign key;
+  - deleting a user cascades to their scores.
+- Under `vercel dev`, `GET /api/me` returns 401 with no token, a malformed token or a forged token.
+- With the user's approval, against Neon:
+  - `npm run db:migrate` applies `002`. *Confirmed 2026-10-27: the user ran it. `user_id` is `uuid`, `scores_user_id_fkey` references `neon_auth."user"(id) ON DELETE CASCADE`, and a rerun reports nothing to apply.*
+  - a real Neon Auth token from a temporary email/password test user, deleted afterwards, returns 200 `{ uid }` from `/api/me` and confirms the token's `iss`, `aud` and `alg`.
