@@ -303,6 +303,71 @@ After the user pushed `c54837d`, the live deployment passed M2's last check. M2 
 
 **Changes**
 
-- [`PLAN-V2.md`](PLAN-V2.md) — the deployed `/api/health` check is marked confirmed (uncommitted).
+- [`PLAN-V2.md`](PLAN-V2.md) — the deployed `/api/health` check is marked confirmed. Committed as `f36d5df`.
+
+### Interaction 8 — Neon Auth vs Better Auth, before M3
+
+**User Prompt**
+
+> commit the changes first.
+>
+> Before the execution of milestone 3, I want to compare using Neon Auth or Better Auth for the application
+
+**Agent Outcome**
+
+Committed the M2 confirmation (`f36d5df`). Then compared Neon's Managed Better Auth ("Neon Auth") with self-hosted Better Auth, using Neon's docs, Better Auth's installation docs and `npm view`, all as of 2026-10-27. **Recommendation: self-hosted Better Auth, as already planned. The decision is the user's and is still pending.**
+
+Findings that shaped the recommendation:
+
+- **Maturity.** The Neon Auth *service* is GA and runs Better Auth 1.7.6. Its client SDKs are still pre-1.0 (`@neondatabase/auth` 0.7.0-beta, `@neondatabase/neon-js` 0.9.0-beta), and `@neondatabase/auth` pins `better-auth` 1.7.6. Self-hosted `better-auth` is at 1.7.14.
+- **Identity in `/api`.** Neon Auth runs on a Neon domain, so `/api` would verify a Bearer JWT against `{NEON_AUTH_URL}/.well-known/jwks.json` with `jose` and take the uid from `sub`. Neon's Hono guide checks only `iss`. Self-hosted, `/api/auth/*` runs on the app's own domain, and `/api` reads a first-party session cookie through `auth.api.getSession()`. That matches CLAUDE.md's "identity from the server session".
+- **Architecture fit.** Neon's roadmap lists "standalone frontend + backend" as "Coming soon", citing cookies that can't be shared across domains. Neon's own SPA + Hono guide still works through the Bearer-token pattern.
+- **Where Neon Auth wins.** Less code, no `BETTER_AUTH_SECRET`, shared Google credentials for testing, auth state that branches with each Neon branch, and up to 60k MAU free. The Neon integration already enabled it (`VITE_NEON_AUTH_URL` and `NEON_AUTH_BASE_URL` came down with `vercel env pull`).
+- **Where self-hosting costs more.** The user needs their own Google OAuth client. Google doesn't accept wildcard redirect URIs, so sign-in on per-deploy preview URLs needs Better Auth's OAuth proxy plugin or has to be tested on stable domains.
+
+**Verification**
+
+This was research only; nothing was installed or prototyped. Versions came from `npm view`. Neon Auth's cookie and session behavior across domains with a Vite SPA, under Safari's third-party-cookie blocking, was not tested.
+
+### Interaction 9 — Neon Auth chosen; M3 and M4 replanned
+
+**User Prompt**
+
+> We will be moving forward with Neon Auth. Make the appropriate changes to M3 and M4
+
+**Agent Outcome**
+
+The user chose Neon Auth over the recommended self-hosted Better Auth. A read-only query of the live database found that Neon Auth had created `neon_auth.{user, session, account, jwks, …}`, the `user` table has 0 rows, and `neon_auth."user".id` is a **`uuid`**, not text. The table is owned by `neon_auth`, and `neondb_owner` holds `REFERENCES` and `SELECT` on it. The `uuid` id changed M3: its migration must also convert `scores.user_id` from `text` to `uuid` before adding the foreign key.
+
+The plan and project docs were updated to match:
+
+- **M3** is now: `api/_lib/auth.js` verifies the Bearer JWT with `jose` against `NEON_AUTH_BASE_URL/.well-known/jwks.json` (issuer and expiry, uid from `sub`), with Vitest tests using locally generated keys. `GET /api/me` returns the verified identity or 401. Migration `002` changes `user_id` to `uuid` and adds an `on delete cascade` foreign key. User steps: own Google credentials and trusted domains in the Neon Console.
+- **M4** is now: add `@neondatabase/auth`, then move `services/auth.js` (`signIn.social`) and `AuthProvider` onto it, mapping `id`/`name`/`image` to the unchanged `useAuth()` shape. Add `getAuthToken()` and remove `getAuth` from the Firebase config. Saving scores is noted as unavailable between M4 and M6.
+- **M5** extends `/api/me` instead of creating it.
+
+**Rationale**
+
+`GET /api/me` moved into M3 so that server-side token verification has a live surface to test. `@neondatabase/auth` was picked over `@neondatabase/neon-js` because the latter adds the Data API client and `pg`. It's pinned exactly because it's a beta. `on delete cascade` removes a user's scores when Neon Auth deletes that user.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - Auth row in Decisions, revised and dated.
+  - M3, M4 and M5 rows.
+  - Dependencies: `better-auth` replaced by `jose` (M3) and `@neondatabase/auth` (M4).
+  - New "Neon Auth notes" section.
+  - Stale Better Auth references corrected in the M1 and M2 details.
+- [`CLAUDE.md`](CLAUDE.md):
+  - Auth stack row.
+  - Security rules: `BETTER_AUTH_SECRET` and `GOOGLE_CLIENT_SECRET` dropped from the secrets list, since Google credentials now live in the Neon Console. Identity now comes from the verified JWT's `sub`.
+- [`db/migrations/001_init.sql`](db/migrations/001_init.sql) — comment only. It now names `neon_auth."user"` and the uuid change. The file is already applied, and the runner tracks migrations by filename, so the edit doesn't re-run anything.
+
+**Verification**
+
+These are documentation changes. A grep confirms that the only remaining "Better Auth" mentions describe Neon Auth's internals. The schema facts come from `information_schema`, `pg_tables` and `has_table_privilege` queries against Neon. No tests were run, since no code changed.
+
+**Collaboration**
+
+The user overrode the agent's recommendation and chose Neon Auth.
 
 

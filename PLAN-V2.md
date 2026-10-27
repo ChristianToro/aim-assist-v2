@@ -17,7 +17,7 @@ Other UI and functionality changes happen later, on separate feature branches.
 
 | Decision | Choice | Departs from PLAN-CONVERSION? |
 |---|---|---|
-| Auth | Remove Firebase fully. Google OAuth goes through Better Auth, with sessions stored in Neon. | **Yes.** PLAN-CONVERSION recommended a hybrid that keeps Firebase Auth. |
+| Auth | Remove Firebase fully. Google sign-in goes through **Neon Auth**, Neon's managed Better Auth, which stores users in the `neon_auth` schema. `/api` verifies its JWTs. *Revised 2026-10-27:* this replaces self-hosted Better Auth after a comparison (PROMPT-HISTORY, 2026-10-27, Interaction 8). | **Yes.** PLAN-CONVERSION recommended a hybrid that keeps Firebase Auth. |
 | Existing Firestore data | Reset. The Neon leaderboards start empty. | No. This was one of its two options. |
 | AI features | Built as milestones on `release/v2.0`, after the data API exists | n/a (new scope) |
 | Prototype docs | Archived in `Prototype/` with a `V1-` prefix | n/a |
@@ -38,9 +38,9 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M0 | Done | **Branch + docs reorg.** Create `release/v2.0`. Archive the v1 docs to `Prototype/V1-*`. Write the new root `CLAUDE.md`, `PLAN-V2.md` and `PROMPT-HISTORY.md`. Repoint the README links. | `Prototype/`, `CLAUDE.md`, `PLAN-V2.md`, `PROMPT-HISTORY.md`, `README.md` |
 | M1 | Done | **Vercel hosting.** Set `vite.config.js` `base` to `'/'`. Add `vercel.json` with a SPA rewrite for every path except `/api`. Remove `scripts/spa-fallback.mjs` and its build step. Turn `deploy.yml` into a lint-and-test CI workflow. *User:* import the repo into Vercel. | `vite.config.js`, `vercel.json`, `package.json`, `.github/workflows/` |
 | M2 | Done | **Neon + schema.** Add Neon through the Vercel Marketplace (user step). Write `db/migrations/001_init.sql` for the scores table with its CHECK constraints (see PLAN-CONVERSION). Make `/api` work in local dev (`vercel dev`, or a Vite proxy). | `db/migrations/`, `.env.example` |
-| M3 | Not started | **Auth server.** Better Auth with the Google provider, its Neon tables in a migration, and an `/api/auth/*` handler. *User:* create a Google OAuth client and set the env vars. | `api/auth/[...all].js`, `api/_lib/auth.js`, `api/_lib/db.js` |
-| M4 | Not started | **Auth client switchover.** Move `services/auth.js` and `AuthProvider` onto the Better Auth client. Keep the `useAuth()` shape (`uid`, `displayName`, `photoURL`) so consumers don't change. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx` |
-| M5 | Not started | **Data API.** Add `GET /api/me` (stats derived in SQL), `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
+| M3 | Not started | **Auth server (Neon Auth).** Add `api/_lib/auth.js`, which reads `Authorization: Bearer <jwt>`, verifies it with `jose` against Neon Auth's JWKS (`NEON_AUTH_BASE_URL/.well-known/jwks.json`) and checks the issuer and expiry. The uid is the token's `sub`. Vitest covers it with locally generated keys. Add `GET /api/me`, which returns the verified identity or 401; M5 adds stats. Migration `002` changes `scores.user_id` to `uuid` and adds a foreign key to `neon_auth."user"(id)` with `on delete cascade`. Add the Neon Auth vars to `.env.example`. *User:* in the Neon Console → Auth, add your own Google OAuth credentials and add the trusted domains (`localhost:3000` and the Vercel domain). | `api/_lib/auth.js`, `api/me.js`, `db/migrations/002_*.sql`, `.env.example` |
+| M4 | Not started | **Auth client switchover.** Add `@neondatabase/auth` and create the client from `VITE_NEON_AUTH_URL`. Move `services/auth.js` onto it: Google sign-in through `signIn.social`, sign-out, and the session. Move `AuthProvider` too, and keep the `useAuth()` shape by mapping `uid`, `displayName` and `photoURL` from the user's `id`, `name` and `image`, so consumers don't change. Add a `getAuthToken()` helper for the Bearer header that the M6 services send. Remove `getAuth` from `src/firebase/config.js`. Between M4 and M6 the Firestore writes have no Firebase user, so saving scores and profiles doesn't work on the branch; the data is being reset anyway. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx`, `src/firebase/config.js` |
+| M5 | Not started | **Data API.** Extend `GET /api/me` with stats derived in SQL, and add `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
 | M6 | Not started | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
 | M7 | Not started | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/anthropic.js`, migration |
 | M8 | Not started | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
@@ -50,8 +50,16 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 
 Each dependency is added only in the milestone that uses it, with a justification:
 
-- `@neondatabase/serverless` (M2/M3): the HTTP Postgres driver. It avoids connection-pool exhaustion in serverless functions.
-- `better-auth` (M3/M4): Google OAuth with session cookies stored in Postgres. Hand-rolling OAuth would be a security risk. Before M3, check its current docs against Neon Auth, because Neon Auth is built on Better Auth and has changed recently.
+- `@neondatabase/serverless` (M2): the HTTP Postgres driver. It avoids connection-pool exhaustion in serverless functions.
+- `jose` (M3): verifies Neon Auth's JWTs against its JWKS in `/api`. It's standards-based, has no dependencies, and is what Neon's own backend guide uses.
+- `@neondatabase/auth` (M4): Neon's official Neon Auth client, wrapping a Better Auth client. It's still a beta (0.7.0-beta on 2026-10-27), so pin the exact version and re-check its docs before M4. It was chosen over `@neondatabase/neon-js`, which adds the Data API client and pulls in `pg`.
+
+### Neon Auth notes
+
+- The Vercel integration enabled Neon Auth and injects `NEON_AUTH_BASE_URL` (server) and `VITE_NEON_AUTH_URL` (client). Both are public URLs, not secrets.
+- `neon_auth."user".id` is a `uuid` (checked 2026-10-27), and our role has `REFERENCES` on it. That's why M3 changes `scores.user_id` from `text` to `uuid`.
+- Auth state branches with the database, so each Neon branch has its own users.
+- The auth server runs on a Neon domain, not the app's. M4 has to confirm that sessions persist in Safari (which blocks third-party cookies) and after a reload.
 - `@anthropic-ai/sdk` (M7): the official client for the AI features. Before M7, check the `claude-api` skill for the current model ids and structured-output support.
 
 ## M0 detail
@@ -94,7 +102,7 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 **Optional interim Firebase steps.** v2 drops Firebase, but the code still runs on it until M4 (auth) and M6 (data). These steps only keep the deployed v1-era app working until then, and M6 undoes them. Without them, the hosting itself still deploys and can be verified.
 
 - **Copy the six `VITE_FIREBASE_*` values into the Vercel environment variables.** These are public config, not secrets. The page renders on Vercel and the leaderboards load. Without them, `getAuth()` in `src/firebase/config.js` throws on load, so the deployed page is likely blank. The deep-link check below still works, because the rewrite returns `index.html` either way. M6 removes these variables.
-- **Add the Vercel domain (`<project>.vercel.app`) to Firebase Auth → Settings → Authorized domains.** Firebase Google sign-in and score submission then work on that domain; without it, sign-in fails with `auth/unauthorized-domain`. It only works on domains you add (the production domain, and the stable branch alias if you test on it). It's discarded in M4, when Better Auth brings its own Google OAuth client and redirect URIs.
+- **Add the Vercel domain (`<project>.vercel.app`) to Firebase Auth → Settings → Authorized domains.** Firebase Google sign-in and score submission then work on that domain; without it, sign-in fails with `auth/unauthorized-domain`. It only works on domains you add (the production domain, and the stable branch alias if you test on it). It's discarded in M4, when Neon Auth takes over sign-in with its own Google OAuth setup and trusted domains.
 
 ### M1 verification
 
@@ -108,8 +116,8 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 
 1. Add `@neondatabase/serverless` to `dependencies`, since the functions import it at runtime.
 2. `db/migrations/001_init.sql` creates the `scores` table from the PLAN-CONVERSION sketch, with its `CHECK` constraints (the same bounds as `firestore.rules`) and indexes for the leaderboard queries:
-   - The sketch's `users` table is dropped. Better Auth's `user` table (M3) holds name and image.
-   - The column is `user_id`, and its foreign key to `"user"(id)` is added in M3's migration, once that table exists.
+   - The sketch's `users` table is dropped. The auth provider's user table holds name and image; after the auth revision, that's Neon Auth's `neon_auth."user"`.
+   - The column is `user_id`. M3's migration changes it to `uuid` to match `neon_auth."user".id`, and adds the foreign key.
 3. `scripts/migrate.js` and `npm run db:migrate`: a small runner that applies `db/migrations/*.sql` in filename order, each file in a transaction, and records it in `schema_migrations` so a rerun skips it.
    - It connects with the Neon driver's WebSocket `Client`, because a migration file holds several statements.
    - It prefers `DATABASE_URL_UNPOOLED`, since Neon recommends the direct endpoint for schema changes.

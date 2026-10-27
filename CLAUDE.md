@@ -23,7 +23,7 @@ Work happens on `release/v2.0` in small milestones from PLAN-V2.md. Each milesto
 | Gameplay | HTML5 Canvas 2D engine in `src/game/` (unchanged from v1) |
 | Server | Vercel Functions in `/api` (helpers in `api/_lib/`, underscore = not a route) |
 | Database | Neon Postgres via `@neondatabase/serverless`; schema as plain SQL in `db/migrations/` |
-| Auth | Google sign-in via Better Auth, sessions in Neon (Firebase removed entirely) |
+| Auth | Google sign-in via Neon Auth (Neon's managed Better Auth, users in the `neon_auth` schema); `/api` verifies its JWTs with `jose` (Firebase removed entirely) |
 | AI | Anthropic API, called only from `/api` |
 | Hosting | Vercel |
 
@@ -37,8 +37,8 @@ Until M6 completes, parts of the code still use Firebase; PLAN-V2.md shows which
 
 ## Security rules
 
-- Client env vars (`VITE_*`) hold only public values. Secrets — `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_SECRET`, `ANTHROPIC_API_KEY` — live in server-only env vars read inside `/api`.
-- A request's user identity comes from the server session, never from the request body.
+- Client env vars (`VITE_*`) hold only public values (e.g. `VITE_NEON_AUTH_URL`). Secrets — `DATABASE_URL`, `ANTHROPIC_API_KEY` — live in server-only env vars read inside `/api`. Google OAuth credentials live in the Neon Console, not in env vars.
+- A request's user identity comes from the `sub` of a Neon Auth JWT verified in `/api` (`api/_lib/auth.js`), never from the request body.
 - Validate inputs in the handler and back them with SQL `CHECK` constraints.
 
 ## Coding standards

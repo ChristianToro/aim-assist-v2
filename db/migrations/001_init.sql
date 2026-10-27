@@ -2,8 +2,8 @@
 -- average accuracy, favourite mode) are derived from this table in SQL,
 -- never stored, so concurrent matches can't lose an update.
 --
--- user_id gains its foreign key to Better Auth's "user" table in the
--- auth migration (M3); nothing writes here before then.
+-- user_id becomes a uuid with a foreign key to Neon Auth's neon_auth."user"
+-- table in the auth migration (M3); nothing writes here before then.
 create table scores (
   id            bigint generated always as identity primary key,
   user_id       text        not null,
