@@ -444,4 +444,45 @@ A rerun of `db:migrate` printed "Database is up to date."
 
 The user chose to run the production-adjacent migration themselves, rather than have the agent run it.
 
+### Interaction 12 — M3 committed; real-token check
+
+**User Prompt**
+
+> commit M3 as it stands, and conduct step 2
+
+**Agent Outcome**
+
+Committed M3 as `ec851b9`, then ran the real-token check under `vercel dev` and marked M3 Done.
+
+1. **Created a temporary test user.** `POST {NEON_AUTH_BASE_URL}/sign-up/email` with `Origin: http://localhost:3000`, a throwaway `@example.com` address and a random password returned 200. The user's id was `059699e6-…`.
+2. **Got a JWT.** `GET {base}/token` with the session cookie returned an Ed25519 JWT. `get-session` also returned one in its `set-auth-jwt` header.
+3. **Inspected the token.** `alg: EdDSA`, `kid` matching the JWKS key, `iss` = `aud` = the auth URL's origin, and a lifetime of 900 s. The claims also carry the user's profile (`name`, `email`, `role`, …).
+4. **Called `/api/me`.**
+   - The real JWT returned **200** `{"uid":"059699e6-…"}`.
+   - The same JWT with `sub` altered returned **401**.
+   - The opaque session `token` from sign-up returned **401**.
+5. **Deleted the test user.** It was deleted by exact id and email with SQL (`neondb_owner` has `DELETE` on `neon_auth."user"`). The cascade removed its `session` and `account` rows. Afterwards `neon_auth."user"` and `scores` both held 0 rows, and the scratch files holding the credentials and tokens were deleted.
+
+**Rationale**
+
+The issuer rule taken from Neon's guide (`iss` = origin) now matches a real token. Two findings went into PLAN-V2's Neon Auth notes for M4:
+
+- **The JWT/session-token split.** `getAuthToken()` must return the JWT, while Neon's Hono guide reads `session.token`.
+- **An audience check.** Real tokens carry `aud`, so adding an `audience` check is a cheap hardening.
+
+The 15-minute stateless token lifetime was also noted.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - M3 status set to Done.
+  - Real-token results recorded in the M3 verification.
+  - Three Neon Auth notes added.
+
+These are uncommitted.
+
+**Verification**
+
+Recorded above. All requests used `curl` against the live Neon Auth instance and the local `vercel dev`. The dev server was stopped afterwards.
+
 
