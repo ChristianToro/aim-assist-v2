@@ -516,6 +516,40 @@ A real token reaching 200 was **not** tested on Vercel. It was confirmed under `
 
 **Changes**
 
-- [`PLAN-V2.md`](PLAN-V2.md) — the deployed `/api/me` result is added to the M3 verification. Uncommitted.
+- [`PLAN-V2.md`](PLAN-V2.md) — the deployed `/api/me` result is added to the M3 verification. Committed as `d4d3a65`.
+
+### Interaction 14 — Neon Auth domains and Google keys: plan updated
+
+**User Prompt**
+
+> The neon console includes these trusted domains: [the production domain, the team alias, the `git-release-v20` branch alias, and four per-deploy `…-<hash>-christian-toro.vercel.app` URLs]
+>
+> Google Oauth appears to be offered already through Neon console; this is included when "configure" is clicked: Shared keys are created by the Neon team for development. It helps you get started, but will show a Neon branding(logo and name) on the OAuth consent screen.
+
+> update the plan, then commit
+
+**Agent Outcome**
+
+Two points came out of the user's console findings:
+
+- **Domains.** The Vercel integration adds trusted domains on its own, including one per deployment, so the only missing entry is `http://localhost:3000` for `vercel dev`.
+- **Google keys.** Neon's shared keys need no setup but put Neon's branding on the consent screen.
+
+The agent recommended a two-stage approach, which the user accepted: shared keys for development, then the user's own Google client before the portfolio launch. Because the credentials live in the Neon Console, the switch involves no code change.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - The M3 row's user step now reads: add `localhost:3000`, shared keys for development, own client before launch.
+  - The M3 user steps are rewritten. Trusted domains come first, followed by the two-stage Google setup with the steps for creating your own client (External consent screen, basic scopes only, Neon's redirect URI).
+  - The M9 row gains a before-launch user step to switch to the user's own Google client.
+
+**Verification**
+
+Documentation only. No code changed.
+
+**Collaboration**
+
+The user's look at the Neon Console showed that the domain step was mostly automatic and that Google keys were already offered. That turned "create your own Google client before M4" into a deferred, before-launch step.
 
 
