@@ -29,7 +29,7 @@ const GameArea = ({ mode, onMatchFinished }) => {
     onMatchFinished?.({ ...result, mode: mode.label, finishedAt: new Date() })
     if (!user) return
     setSaveStatus('saving')
-    saveMatchResult({ user, mode: mode.label, summary: result })
+    saveMatchResult({ mode: mode.label, summary: result })
       .then(() => setSaveStatus('saved'))
       .catch((error) => {
         console.error('Failed to save match:', error)

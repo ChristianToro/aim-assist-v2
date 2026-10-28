@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { getUserProfile } from '../services/users'
 
-// Fetches the Firestore profile document for a uid. Loading state is
-// derived (requested uid vs landed uid) — no synchronous setState.
+// Fetches the signed-in player's profile. The request needs no uid (the
+// server reads it from the token); `uid` keys the result so a different
+// account never sees the last one's. Loading state is derived (requested
+// uid vs landed uid) — no synchronous setState.
 export const useUserProfile = (uid) => {
   const [result, setResult] = useState({
     uid: null,
@@ -14,7 +16,7 @@ export const useUserProfile = (uid) => {
     if (!uid) return undefined
 
     let cancelled = false
-    getUserProfile(uid)
+    getUserProfile()
       .then((profile) => {
         if (!cancelled) setResult({ uid, profile, error: null })
       })

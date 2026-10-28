@@ -41,7 +41,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M3 | Done | **Auth server (Neon Auth).** Add `api/_lib/auth.js`, which reads `Authorization: Bearer <jwt>`, verifies it with `jose` against Neon Auth's JWKS (`NEON_AUTH_BASE_URL/.well-known/jwks.json`) and checks the issuer and expiry. The uid is the token's `sub`. Vitest covers it with locally generated keys. Add `GET /api/me`, which returns the verified identity or 401; M5 adds stats. Migration `002` changes `scores.user_id` to `uuid` and adds a foreign key to `neon_auth."user"(id)` with `on delete cascade`. Add the Neon Auth vars to `.env.example`. *User:* in the Neon Console → Auth, add `localhost:3000` as a trusted domain (the Vercel domains are added automatically). Google sign-in uses Neon's shared keys during development, and your own Google OAuth client before the portfolio launch. | `api/_lib/auth.js`, `api/me.js`, `db/migrations/002_*.sql`, `.env.example` |
 | M4 | Done | **Auth client switchover.** Add `@neondatabase/auth` and create the client from `VITE_NEON_AUTH_URL`. Move `services/auth.js` onto it: Google sign-in through `signIn.social`, sign-out, and the session. Move `AuthProvider` too, and keep the `useAuth()` shape by mapping `uid`, `displayName` and `photoURL` from the user's `id`, `name` and `image`, so consumers don't change. Add a `getAuthToken()` helper for the Bearer header that the M6 services send. Remove `getAuth` from `src/firebase/config.js`. Between M4 and M6 the Firestore writes have no Firebase user, so saving scores and profiles doesn't work on the branch; the data is being reset anyway. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx`, `src/firebase/config.js` |
 | M5 | Done | **Data API.** Extend `GET /api/me` with stats derived in SQL, and add `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
-| M6 | Not started | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
+| M6 | Done | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
 | M7 | Not started | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/anthropic.js`, migration |
 | M8 | Not started | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
 | M9 | Not started | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* switch Neon Auth's Google provider from the shared keys to your own OAuth client (see the M3 detail). | `ARCHITECTURE.md`, `README.md` |
@@ -308,3 +308,52 @@ Each dependency is added only in the milestone that uses it, with a justificatio
   - *Signed out, the all, daily and weekly boards each held exactly one entry for the player: its best score, 3100.*
   - *After the user was deleted by exact id and email, the still-valid JWT got 401 from `/api/me` (no user row) and from `POST /api/scores` (foreign-key violation).*
   - *Cleanup left 0 test users, 0 of their sessions and 0 scores.*
+
+## M6 detail
+
+1. `src/services/api.js` (new) is the only place the browser calls `/api`:
+   - `apiFetch(path, { method, body, auth })` sends `body` as JSON. With `auth`, it adds `Authorization: Bearer <getAuthToken()>`. When signed out it throws a 401 `ApiError` without making a request.
+   - A non-2xx response becomes `ApiError { status, message }`, with the message taken from the server's `{ error }`. A network failure stays fetch's `TypeError`.
+2. The services keep their export names but are now `fetch` wrappers:
+   - `users.js`: `getUserProfile()` reads `GET /api/me`. `ensureUserDocument` and `recordMatchOnProfile` are deleted, because the server derives the stats.
+   - `scores.js`: `saveMatchResult({ mode, summary })` posts `toScoreSubmission(mode, summary)`, a pure function giving `{ mode, score, accuracy, reactionTime }`.
+   - `leaderboard.js`: `getTopScores(period)` and `getPersonalBestScores()` unwrap `{ entries }`.
+   - The `uid` and `user` arguments are gone, since identity comes from the token. The hooks still key their results by `uid`, and `GameArea` stops passing `user`.
+3. UI:
+   - `Leaderboard.jsx` and `ProfileCard.jsx` format the API's ISO `createdAt` strings. `ProfileCard`'s "Playing since" is now the Neon Auth account's creation date.
+   - `Leaderboard.jsx`'s Firestore errors (missing index, rules) are replaced by HTTP ones: a 401 asks you to sign in again, and a 5xx or network failure reads as an outage. Everything else gets the generic message.
+   - `Footer.jsx` reads "Built with React, Canvas, Neon & Vercel".
+4. Removed:
+   - the `firebase` dependency and `src/firebase/`;
+   - `firebase.json`, `.firebaserc`, `firestore.rules` and `firestore.indexes.json`;
+   - `src/utils/dates.js` and its test (the Firestore day/week keys, which the UTC windows in `/api` replace);
+   - the vite `firebase` chunk and its `chunkSizeWarningLimit`, since no chunk comes near the default 500 kB;
+   - the `VITE_FIREBASE_*` block in `.env.example`, and CLAUDE.md's "until M6" note.
+5. Tests:
+   - `users.test.js` is rewritten.
+   - New tests: `api.test.js` (stubbed `fetch` and a stubbed token), `scores.test.js` and `leaderboard.test.js`.
+   - `Leaderboard.test.jsx` now covers the HTTP error messages and ISO dates.
+   - README's Firebase sections wait for M9.
+6. Stop for review.
+
+**User steps:**
+
+- Vercel → Settings → Environment Variables: delete the six `VITE_FIREBASE_*` variables. Nothing reads them now.
+- Keep the Firebase project for as long as v1 on `main` uses it.
+
+### M6 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (116 tests, up from 109) and `npm run build` pass.
+- Bundle:
+  - The 141 kB gzip `firebase` chunk is gone. All JS is now 156 kB gzip, of which `react-vendor` is 72 kB and `auth-vendor` 67 kB.
+  - The entry chunk is still 3.3 kB gzip.
+  - `dist/` has no Firebase, Firestore or `googleapis` strings, and `package-lock.json` has no `@firebase` packages.
+- The server routes the client now calls were checked end to end with a real JWT in M5.
+- Under `vercel dev`, `/leaderboards` returns HTML, the new client modules (`/src/services/api.js`, `leaderboard.js`, `Leaderboard.jsx`) are served as `text/javascript`, and `/api/leaderboard` returns 200 JSON.
+- *2026-10-28: the user reported "browser checks pass". That covers the five M6 checks below. Whether the M4 checks run in the same pass (reload, Safari or blocked third-party cookies, sign-out) wasn't stated, so they stay open under M4.*
+- **Browser checks (user):** under `npm run dev:full`, then on the Vercel deploy after a push. The open M4 checks (reload, Safari or blocked third-party cookies, sign-out) can run in the same pass.
+  1. Signed out, `/leaderboards`: All Time, Today and This Week load, and Personal Best shows the sign-in prompt.
+  2. Signed in, finish a match: the results say "Saved to your profile."
+  3. The score appears once on All Time, Today and This Week, and on Personal Best.
+  4. `/profile`: the stat tiles, "Playing since" and Best Matches reflect the match.
+  5. Play a lower-scoring match: the public boards still show one entry for you, Personal Best lists both, and Games Played is 2.

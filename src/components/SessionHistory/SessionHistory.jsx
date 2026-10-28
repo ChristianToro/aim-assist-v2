@@ -6,7 +6,7 @@ const formatMs = (ms) => (ms == null ? '—' : `${ms} ms`)
 /*
  * Matches played this browser session (kept in React state, newest
  * first — this is deliberately ephemeral; persistent history lives in
- * Firestore via the Profile page).
+ * Neon via the Profile page).
  */
 const SessionHistory = ({ matches }) => {
   if (matches.length === 0) return null

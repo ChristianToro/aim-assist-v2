@@ -3,7 +3,7 @@ import { getPersonalBestScores, getTopScores } from '../services/leaderboard'
 
 /*
  * Fetches leaderboard entries for a view: 'all' | 'daily' | 'weekly' |
- * 'personal' (the latter needs a uid).
+ * 'personal' (the latter needs a signed-in uid, which also keys it).
  *
  * Loading state is derived by comparing the requested key against the
  * key of the last landed result — no synchronous setState in effects.
@@ -20,7 +20,7 @@ export const useLeaderboard = (view, uid = null) => {
     let cancelled = false
     const requestKey = `${view}:${uid ?? ''}`
     const request =
-      view === 'personal' ? getPersonalBestScores(uid) : getTopScores(view)
+      view === 'personal' ? getPersonalBestScores() : getTopScores(view)
 
     request
       .then((entries) => {

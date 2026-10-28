@@ -12,7 +12,7 @@ dist
 dist-ssr
 *.local
 
-# Local env (Firebase and database credentials)
+# Local env (database credentials and Neon Auth URLs)
 .env
 .env.*
 !.env.example

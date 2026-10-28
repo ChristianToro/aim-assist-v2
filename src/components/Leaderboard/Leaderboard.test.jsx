@@ -10,6 +10,7 @@ const entries = [
     score: 900,
     accuracy: 91.25,
     mode: 'Gridshot',
+    createdAt: '2026-10-28T12:00:00.000Z',
   },
 ]
 
@@ -24,7 +25,7 @@ describe('Leaderboard', () => {
     rerender(
       <Leaderboard
         entries={[]}
-        error={{ code: 'unavailable' }}
+        error={{ status: 400 }}
         emptyMessage="No scores today yet."
       />
     )
@@ -32,26 +33,25 @@ describe('Leaderboard', () => {
     expect(screen.queryByText('No scores today yet.')).toBeNull()
   })
 
-  it('names the missing index as the cause of a failed-precondition', () => {
-    render(
-      <Leaderboard
-        entries={[]}
-        error={{ code: 'failed-precondition' }}
-        emptyMessage="No scores today yet."
-      />
-    )
-    expect(screen.getByRole('alert')).toHaveTextContent(/composite index/i)
+  it('asks for a fresh sign-in on a 401', () => {
+    render(<Leaderboard entries={[]} error={{ status: 401 }} emptyMessage="" />)
+    expect(screen.getByRole('alert')).toHaveTextContent(/sign in again/i)
   })
 
-  it('calls out rejected reads separately from missing indexes', () => {
-    render(
+  it('reports server errors and network failures as an outage', () => {
+    const { rerender } = render(
+      <Leaderboard entries={[]} error={{ status: 503 }} emptyMessage="" />
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent(/unreachable/i)
+
+    rerender(
       <Leaderboard
         entries={[]}
-        error={{ code: 'permission-denied' }}
-        emptyMessage="No scores today yet."
+        error={new TypeError('Failed to fetch')}
+        emptyMessage=""
       />
     )
-    expect(screen.getByRole('alert')).toHaveTextContent(/security rules/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/unreachable/i)
   })
 
   it('ranks entries in the order received', () => {
@@ -59,5 +59,12 @@ describe('Leaderboard', () => {
     expect(screen.getByText('Ada')).toBeInTheDocument()
     expect(screen.getByText('900')).toBeInTheDocument()
     expect(screen.getByText('91.3%')).toBeInTheDocument()
+  })
+
+  it('formats the ISO timestamp from the API as a date', () => {
+    render(<Leaderboard entries={entries} emptyMessage="none" />)
+    expect(
+      screen.getByText(new Date(entries[0].createdAt).toLocaleDateString())
+    ).toBeInTheDocument()
   })
 })

@@ -2,21 +2,28 @@ import { memo } from 'react'
 import Card from '../Card/Card'
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner'
 
+const UNAUTHORIZED = 401
+const SERVER_ERROR = 500
+
+// createdAt is an ISO timestamp from /api/leaderboard.
 const formatDate = (createdAt) =>
-  createdAt?.toDate ? createdAt.toDate().toLocaleDateString() : '—'
+  createdAt ? new Date(createdAt).toLocaleDateString() : '—'
 
 const rankClass = (rank) =>
   rank <= 3 ? 'font-semibold text-accent' : 'text-muted'
 
 // A failed query and an empty result are very different problems, so they
-// must not look alike. Firestore reports a missing composite index as
-// 'failed-precondition' and puts a one-click creation link in the console.
-const errorMessage = (error) =>
-  error?.code === 'failed-precondition'
-    ? 'This view needs a Firestore composite index. Deploy it with `firebase deploy --only firestore:indexes`, or open the setup link logged in the browser console. A newly created index takes a few minutes to build, and the view keeps failing until it does.'
-    : error?.code === 'permission-denied'
-      ? 'Firestore rejected the read. Check that the security rules allow reads on the scores collection.'
-      : 'Something went wrong loading the leaderboard. See the browser console for details.'
+// must not look alike. Errors carry the /api status (ApiError); a network
+// failure has none, and reads the same as a server outage.
+const errorMessage = (error) => {
+  if (error?.status === UNAUTHORIZED) {
+    return 'Your session has expired. Sign in again to see your personal bests.'
+  }
+  if (error?.status === undefined || error.status >= SERVER_ERROR) {
+    return 'The leaderboard service is unreachable right now. Try again in a moment.'
+  }
+  return 'Something went wrong loading the leaderboard. See the browser console for details.'
+}
 
 const PlayerCell = ({ entry }) => (
   <div className="flex items-center gap-2">

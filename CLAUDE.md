@@ -27,8 +27,6 @@ Work happens on `release/v2.0` in small milestones from PLAN-V2.md. Each milesto
 | AI | Anthropic API, called only from `/api` |
 | Hosting | Vercel |
 
-Until M6 completes, parts of the code still use Firebase; PLAN-V2.md shows which layers have moved.
-
 ## Ownership
 
 - **React** owns menus, routing, auth state, settings, statistics, leaderboards, themes.
