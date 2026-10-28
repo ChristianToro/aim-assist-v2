@@ -351,3 +351,76 @@ M9 was marked Done in PLAN-V2 and committed on `release/v2.0`, which completes e
 **Verification**
 
 The docs were committed as reviewed. Lint, format check, tests (193) and build last ran at the review gate (Interaction 13), and nothing has changed since.
+
+### Interaction 15 — CI moved to Node 24
+
+*Logged retroactively on 2026-10-28 from commit `ed8295c`. The original prompt wasn't recorded.*
+
+**Agent Outcome**
+
+CI was failing `npm ci` on every push since `e5799de`. The lockfile is written by npm 11 (Node 24, as in local dev), which leaves out an optional peer (`ajv`, under `@neondatabase/auth`) that npm 10 (Node 22) expects to find. CI now runs on Node 24, and the README's Node requirement matches.
+
+**Changes**
+
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml): `node-version` 22 → 24, with a comment saying why.
+- [`README.md`](README.md): the Node requirement.
+
+**Verification**
+
+Not recorded in this file. The fix was committed as `ed8295c`, before the PR #1 merge.
+
+---
+
+## Session: 2026-10-28
+
+**Objective:** Situation report on the repository against PLAN-V2 after the v2 merge.
+
+### Interaction 1 — SITREP after the v2.0 merge
+
+**User Prompt**
+
+> /prompt-history /sitrep
+
+**Agent Outcome**
+
+A read-only SITREP. `release/v2.0` was merged into `main` through PR #1 (`47f242a`), and `main` is level with `origin/main`. All ten milestones (M0–M9) are Done in PLAN-V2, and the code backs that up: the `/api` routes, migrations `001`–`003`, `src/services/*` calling `/api`, and no Firebase references left in `src/`, `api/` or `package.json`. Still open, outside the repo:
+
+- the pre-launch steps: your own Google OAuth client, and the Neon credentials stored as Vercel Secrets (with the key rotated);
+- the M4 browser checks (reload, Safari or blocked third-party cookies, sign-out).
+
+Two small doc gaps also turned up. PLAN-V2's pre-launch section still says "M9 is detailed when it starts", and commit `ed8295c` (CI on Node 24) has no entry in this file.
+
+**Verification**
+
+Git state, the docs and the file layout were inspected. Tests weren't run.
+
+### Interaction 2 — Moved to `refactor/UI`; doc gaps and pre-launch items closed
+
+**User Prompt**
+
+> instead of making these changes on main; revert, and place the sitrep onto a new branch: "refactor/UI".
+>
+> Fix the two doc gaps. A google OAuth was obtained and being used, Neon credentials are secrets. M4 browser checks conducted
+
+**Agent Outcome**
+
+- Created `refactor/UI` from `main`, bringing the uncommitted SITREP entry with it. `main` is back to clean, and the new branch has no upstream.
+- Fixed the two doc gaps:
+  - Removed PLAN-V2's stale "M9 is detailed when it starts" line.
+  - Added Interaction 15 to the previous session, a retroactive entry for `ed8295c`.
+- Recorded what the user reported in PLAN-V2:
+  - both pre-launch steps are done (the user's own Google OAuth client is in use, and the Neon credentials are Secrets), noted on the M9 row, in M9 verification and in the pre-launch section;
+  - the M4 browser checks were conducted, closing checks 2–6, with the matching note in M6 updated.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md): the M9 row, M4 and M6 verification, M9 verification, and the pre-launch section.
+- [`PROMPT-HISTORY.md`](PROMPT-HISTORY.md): previous session Interaction 15, and this entry.
+
+**Verification**
+
+Docs only. The pre-launch and M4 items are recorded as the user reported them and weren't checked independently. The credential rotation and the `ANTHROPIC_API_KEY` Secret type weren't mentioned, so they're not marked.
+
+**Collaboration**
+
+The user found `main` still showing the two modified files in another terminal. Uncommitted edits sit in the shared working tree, not on a branch, so the user approved committing them on `refactor/UI`, which leaves `main` clean.
