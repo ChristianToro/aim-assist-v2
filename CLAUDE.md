@@ -5,9 +5,10 @@ Browser-based aim trainer (Aimlabs-inspired), portfolio quality. v2 moves the v1
 ## Documents
 
 - [PLAN-V2.md](PLAN-V2.md) — **read first.** Milestone tracker, v2 decisions, and current status. Update a milestone's status when it changes.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — the v2 system design: layers, `/api` routes, data model, request flows, security and testing. Keep it in step with structural changes.
 - [PLAN-CONVERSION.md](PLAN-CONVERSION.md) — the Firebase → Neon/Vercel feasibility report (schema sketch, endpoint design, gotchas). PLAN-V2.md's Decisions table overrides it where they differ.
 - [PROMPT-HISTORY.md](PROMPT-HISTORY.md) — v2 collaboration log.
-- `Prototype/V1-*.md` — archived v1 docs. Historical only; consult `V1-ARCHITECTURE.md` for the game-engine design, which v2 keeps unchanged.
+- `Prototype/V1-*.md` — archived v1 docs. Historical only.
 
 Use the `prompt-history` skill to maintain PROMPT-HISTORY.md — invoke it at the start of the session and keep it updated as work progresses.
 

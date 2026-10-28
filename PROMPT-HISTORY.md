@@ -299,3 +299,55 @@ The user reported that the browser checks pass: both panels generating, the cach
 **Verification**
 
 The user ran the browser checks. The agent didn't see the generated answers, so their content isn't recorded here. Lint, format check, tests and build last ran at the review gate (Interaction 11), and no code has changed since.
+
+### Interaction 13 — Milestone 9: ARCHITECTURE.md and the README for v2
+
+**User Prompt**
+
+> pushed, begin execution of M9
+
+**Agent Outcome**
+
+The user pushed M8. M9 was detailed and done, and it stops at the review gate (status: In review), uncommitted.
+
+- **A new root `ARCHITECTURE.md`**, written from the code as built: the three rules, a section per layer, the `/api` routes, the factory-plus-wiring pattern, the data model, the request flows (sign-in, saving a match, leaderboards, AI insights), security, testing and deployment.
+- **The README:**
+  - updated for v2: live demo, stack, setup, scripts, architecture, AI tools and engineering notes;
+  - an honest rewrite of the anti-cheat item;
+  - the Problem and Value sections kept in the user's voice, with typos fixed.
+- **`CLAUDE.md`** now points at the new architecture doc.
+
+**Rationale**
+
+- **Described, not copied.** v1's architecture doc was a pre-build spec that named modules which never existed (`Renderer.js`, `useGame`, a `settings` collection). So the new doc describes what the code does, and its claims were checked against the source files.
+- **Anti-cheat stated as it is.** The README now says what v2 fixed (server validation, identity from the token, `CHECK` constraints) and what it didn't: scores are still computed in the browser. It names the next step, a server-signed match token.
+
+**Changes**
+
+- New: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+- Rewritten: [`README.md`](README.md).
+- Edited:
+  - [`CLAUDE.md`](CLAUDE.md): the document list;
+  - [`PLAN-V2.md`](PLAN-V2.md): M9 is In review, with its detail and verification.
+
+**Verification**
+
+- A link-check script over the five root docs found 0 broken relative links or anchors.
+- The live demo returns 200.
+- The test count, bundle sizes, routes, limits and model id were checked against the repo.
+- Lint, format check, tests (193) and build pass.
+- The pre-launch user steps (own Google OAuth client, credentials stored as Secrets) remain open and are recorded under PLAN-V2's pre-launch section.
+
+### Interaction 14 — M9 approved and committed
+
+**User Prompt**
+
+> commit M9 and the doc changes
+
+**Agent Outcome**
+
+M9 was marked Done in PLAN-V2 and committed on `release/v2.0`, which completes every v2 milestone (M0–M9). Still open, outside the repo: the pre-launch user steps (own Google OAuth client, database credentials stored as Vercel Secrets) and the M4 browser checks the user hasn't reported (reload, Safari or blocked third-party cookies, sign-out).
+
+**Verification**
+
+The docs were committed as reviewed. Lint, format check, tests (193) and build last ran at the review gate (Interaction 13), and nothing has changed since.

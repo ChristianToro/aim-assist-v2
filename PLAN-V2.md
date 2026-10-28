@@ -44,7 +44,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M6 | Done | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
 | M7 | Done | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/claude.js`, migration `003` |
 | M8 | Done | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
-| M9 | Not started | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* the steps in [Pre-launch user steps](#pre-launch-user-steps-m9): your own Google OAuth client, and the database credentials stored as Secrets. | `ARCHITECTURE.md`, `README.md` |
+| M9 | Done | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* the steps in [Pre-launch user steps](#pre-launch-user-steps-m9): your own Google OAuth client, and the database credentials stored as Secrets. | `ARCHITECTURE.md`, `README.md` |
 
 ### Dependencies
 
@@ -494,6 +494,36 @@ Steps:
     2. A second click gives the same answer instantly, marked cached.
     3. Entering a DPI and polling rate in the mouse panel gives a fresh hardware answer.
     4. An invalid DPI (for example 50) shows the inline message without a request.
+
+## M9 detail
+
+1. **`ARCHITECTURE.md`** (new, at the root) describes the system as built rather than as first specified.
+   - **Why a rewrite:** v1's spec named modules that never existed, such as `Renderer.js`.
+   - **Overview:** a diagram and three rules: React never animates gameplay, the browser never touches data directly, and identity comes only from a verified token.
+   - **Layer 1, React:** the folders, the services and `ApiError`, and data fetching.
+   - **Layer 2, the canvas engine:** the modules, the scene contract and the React boundary, all unchanged from v1.
+   - **Layer 3, the server:** the routes, the factory-plus-wiring pattern in `api/_lib/`, and the data model with derived stats.
+   - **Request flows:** sign-in and identity, saving a match, leaderboards, and AI insights with their status codes.
+   - Plus sections on security, testing, and deployment and local development.
+2. **`README.md`.** The Problem and Value sections stay in the user's words, with three run-together-word typos fixed.
+   - **Rewritten:** the intro, the live demo (`aim-assist-v2.vercel.app`), a v2 paragraph under Project Plan, Features (derived stats, one entry per player, UTC days, AI insights), the stack table, AI Tools Used (with v2 prompt-history links), the Architecture diagram and its second rule, Getting Started and Scripts.
+   - **Getting Started:** the Vercel, Neon Marketplace, `ANTHROPIC_API_KEY`, `vercel env pull`, `db:migrate`, trusted-domain and `dev:full` setup.
+   - **Anti-cheat ("server-authoritative scoring"):** rewritten. The server now validates bounds and ownership, but scores are still computed client-side. The fix is a server-signed match token, and with a server in place it's a feature to build, no longer a hosting limitation.
+   - **Removed:** "AI-powered recommendations" (shipped) from the next-features list, which also had two bullets run together.
+   - **Engineering notes:** Postgres versus Firestore, validation in two places, structured AI output, injected dependencies, and current bundle numbers.
+3. **`CLAUDE.md`:** the document list adds `ARCHITECTURE.md`, and the line pointing at `V1-ARCHITECTURE.md` for the engine design goes.
+4. Stop for review.
+
+### M9 verification
+
+- A script checked every relative link and in-page anchor in `README.md`, `ARCHITECTURE.md`, `CLAUDE.md`, `PLAN-V2.md` and `PROMPT-HISTORY.md`: 0 broken. The live demo URL returns 200.
+- The figures in the docs were checked against the repo:
+  - 193 tests;
+  - the bundle: 3.3 kB entry, 72 kB `react-vendor` and 67 kB `auth-vendor` (gzip), with Firebase's 141 kB chunk gone;
+  - the routes and their auth;
+  - the table columns, the insight limits (5 matches, 5 per day) and the model id.
+- `npm run lint`, `npm run format:check`, `npm test` and `npm run build` pass. Only docs changed.
+- **Still open, user steps outside the repo:** the two pre-launch steps below. M9's doc work doesn't depend on them.
 
 ## Pre-launch user steps (M9)
 
