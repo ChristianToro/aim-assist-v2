@@ -17,7 +17,7 @@ Other UI and functionality changes happen later, on separate feature branches.
 
 | Decision | Choice | Departs from PLAN-CONVERSION? |
 |---|---|---|
-| Auth | Remove Firebase fully. Google sign-in goes through **Neon Auth**, Neon's managed Better Auth, which stores users in the `neon_auth` schema. `/api` verifies its JWTs. *Revised 2026-10-27:* this replaces self-hosted Better Auth after a comparison (PROMPT-HISTORY, 2026-10-27, Interaction 8). | **Yes.** PLAN-CONVERSION recommended a hybrid that keeps Firebase Auth. |
+| Auth | Remove Firebase fully. Google sign-in goes through **Neon Auth**, Neon's managed Better Auth, which stores users in the `neon_auth` schema. `/api` verifies its JWTs. *Revised 2026-10-27:* this replaces self-hosted Better Auth after a comparison ([PROMPT-HISTORY-2026-Q4.md](PROMPT-HISTORY-2026-Q4.md), 2026-10-27, Interaction 8). | **Yes.** PLAN-CONVERSION recommended a hybrid that keeps Firebase Auth. |
 | Existing Firestore data | Reset. The Neon leaderboards start empty. | No. This was one of its two options. |
 | AI features | Built as milestones on `release/v2.0`, after the data API exists | n/a (new scope) |
 | Prototype docs | Archived in `Prototype/` with a `V1-` prefix | n/a |
@@ -40,7 +40,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M2 | Done | **Neon + schema.** Add Neon through the Vercel Marketplace (user step). Write `db/migrations/001_init.sql` for the scores table with its CHECK constraints (see PLAN-CONVERSION). Make `/api` work in local dev (`vercel dev`, or a Vite proxy). | `db/migrations/`, `.env.example` |
 | M3 | Done | **Auth server (Neon Auth).** Add `api/_lib/auth.js`, which reads `Authorization: Bearer <jwt>`, verifies it with `jose` against Neon Auth's JWKS (`NEON_AUTH_BASE_URL/.well-known/jwks.json`) and checks the issuer and expiry. The uid is the token's `sub`. Vitest covers it with locally generated keys. Add `GET /api/me`, which returns the verified identity or 401; M5 adds stats. Migration `002` changes `scores.user_id` to `uuid` and adds a foreign key to `neon_auth."user"(id)` with `on delete cascade`. Add the Neon Auth vars to `.env.example`. *User:* in the Neon Console → Auth, add `localhost:3000` as a trusted domain (the Vercel domains are added automatically). Google sign-in uses Neon's shared keys during development, and your own Google OAuth client before the portfolio launch. | `api/_lib/auth.js`, `api/me.js`, `db/migrations/002_*.sql`, `.env.example` |
 | M4 | Done | **Auth client switchover.** Add `@neondatabase/auth` and create the client from `VITE_NEON_AUTH_URL`. Move `services/auth.js` onto it: Google sign-in through `signIn.social`, sign-out, and the session. Move `AuthProvider` too, and keep the `useAuth()` shape by mapping `uid`, `displayName` and `photoURL` from the user's `id`, `name` and `image`, so consumers don't change. Add a `getAuthToken()` helper for the Bearer header that the M6 services send. Remove `getAuth` from `src/firebase/config.js`. Between M4 and M6 the Firestore writes have no Firebase user, so saving scores and profiles doesn't work on the branch; the data is being reset anyway. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx`, `src/firebase/config.js` |
-| M5 | Not started | **Data API.** Extend `GET /api/me` with stats derived in SQL, and add `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
+| M5 | Done | **Data API.** Extend `GET /api/me` with stats derived in SQL, and add `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
 | M6 | Not started | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
 | M7 | Not started | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/anthropic.js`, migration |
 | M8 | Not started | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
@@ -253,3 +253,58 @@ Each dependency is added only in the milestone that uses it, with a justificatio
   4. "Sign out", then reload: signed out.
   5. `/profile` opens while signed in. Its stats error until M6 is expected.
   6. In the DevTools console, signed in: `fetch('/api/me', { headers: { Authorization: 'Bearer ' + await (await import('/src/services/auth.js')).getAuthToken() } }).then((r) => r.json())` returns your `{ uid }`. This works under `vercel dev` only, because production bundles don't serve `/src`.
+
+## M5 detail
+
+1. `api/_lib/http.js` holds the response helpers shared by every route:
+   - `json()` sends `Cache-Control: private, no-store` on every response. Public boards aren't CDN-cached either, so a score shows up the moment it's saved.
+   - `readJson()` turns a malformed body into a 400.
+   - `handle(handler)` maps an `AuthError` to 401 `{ error: 'Unauthorized' }` and an `HttpError` (built with `badRequest()`) to its status and details. Anything else propagates, so Vercel answers 500.
+2. `api/_lib/scoreInput.js` holds `parseScoreSubmission(body)`, a pure validator. It returns `{ score }` with only the four known fields, or `{ invalid: [field, …] }` listing every bad field.
+   - The bounds match `001_init.sql`'s CHECKs. The mode allowlist is built from `src/game/modes.js`, so the client and server lists can't drift; the SQL CHECK stays as the backstop.
+   - Unknown keys, a `uid` included, are dropped. `reactionTime` must be present, either `null` or an integer.
+3. `api/_lib/leaderboardView.js` holds `VIEWS` and `periodStart(view, now)`, which is pure. It returns UTC midnight for `daily`, Monday 00:00 UTC for `weekly`, and `null` otherwise.
+4. `api/_lib/scoreStore.js` holds `createScoreStore(sql)`, which owns every query. `db.js` wires it to Neon as `scoreStore`. The same pattern as `verifier.js` / `auth.js` lets a check script run the real queries on PGlite.
+   - `insert` returns `{ id, createdAt }`.
+   - `profileStats(uid)` derives `gamesPlayed`, `highestScore`, `averageAccuracy` and `favoriteMode` (`mode() within group`) from `scores`, plus the account's `createdAt` from `neon_auth."user"`. It returns zeros and a `null` mode for a player with no matches, and `null` for an unknown user.
+   - `topScores(since)` keeps each player's best score in the window (`DISTINCT ON (user_id)`), ranks the top 100, and breaks ties in favour of the earlier score.
+   - `personalBests(uid)` returns the caller's own top 10, with several entries per player allowed.
+   - Entries come back in the shape `Leaderboard.jsx` renders: `{ id, uid, displayName, photoURL, mode, score, accuracy, reactionTime, createdAt }`. Name and avatar are joined from `neon_auth."user"`, and the email is never selected.
+5. Routes:
+   - `GET /api/me` returns `{ uid, gamesPlayed, highestScore, averageAccuracy, favoriteMode, createdAt }`, the flat shape `getUserProfile` returned, so M6 changes no consumer. A valid token whose user was deleted gets 401.
+   - `POST /api/scores` checks the token, then validates the body (400 `{ error, invalid }`), then inserts, and returns 201 `{ id, createdAt }`. A foreign-key violation (`23503`: the token outlived its user) becomes 401.
+   - `GET /api/leaderboard?view=all|daily|weekly|personal` (default `all`) returns `{ entries }`. Only `personal` needs a token; an unknown view returns 400 with the valid list.
+6. Vitest tests for `scoreInput`, `leaderboardView` and `http` run in the `node` environment with no mocks.
+7. Stop for review.
+
+**Behaviour changes from v1:**
+
+- Public boards now show one entry per player; in v1 one player could fill the daily top 100.
+- Names and avatars come live from Neon Auth, so a renamed Google account updates its old entries. In v1 they were copied onto each score.
+- Daily and weekly boards use UTC days; in v1 they used the player's local day keys.
+
+**Known gap:** `POST /api/scores` has sanity bounds but no rate limit, as in v1. A signed-in user can post many plausible scores. M7 builds per-user rate limiting for the AI endpoints, and the same table could cover score submissions later.
+
+### M5 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (109 tests, up from 87) and `npm run build` pass.
+- `scoreStore` on PGlite, with `001` and `002` applied on a stub `neon_auth."user"` that has the live columns, passes 12 checks:
+  - The all-time, weekly and daily boards each keep one best entry per player, and the UTC windows exclude last week's and yesterday's scores.
+  - Tied scores rank the earlier one first.
+  - The personal board lists several of the player's own matches.
+  - Entries have the client's shape and no email.
+  - Stats are right for a player with matches, zeros and `null` for one with none, and `null` for an unknown user.
+  - `insert` returns `{ id, createdAt }`, and an unknown user is rejected with SQLSTATE `23503`.
+- Under `vercel dev` against Neon (scores table empty):
+  - `/api/leaderboard` with no view, `daily` and `weekly` return 200 `{"entries":[]}`, so the windowed query runs on Neon through the real driver.
+  - `?view=bogus` returns 400. `?view=personal`, `/api/me` and `POST /api/scores` without a token or with a forged one return 401.
+  - `GET /api/scores` returns 405.
+  - Every M5 response carries `private, no-store`.
+- Signed-in paths, *confirmed 2026-10-28 (UTC) under `vercel dev` against Neon*, with a temporary email/password user and its JWT from `{base}/token`. All 22 checks passed:
+  - *A new user's `/api/me` showed zero stats, a `null` favourite mode and the account's `createdAt`, and the personal board was empty.*
+  - *A body with a bad mode and a negative score got 400 `{"error":"Invalid score","invalid":["mode","score"]}`. Malformed JSON got 400, and no token got 401.*
+  - *Three valid posts got 201 `{ id, createdAt }`. The `uid` in one body was ignored: 3 rows were saved under the token's uid, and 0 under the body's.*
+  - *`/api/me` then showed 3 games, a high score of 3100, 80 average accuracy and Precision as the favourite mode. The personal board listed 3100, 2500, 1800 with the client's entry shape and no email.*
+  - *Signed out, the all, daily and weekly boards each held exactly one entry for the player: its best score, 3100.*
+  - *After the user was deleted by exact id and email, the still-valid JWT got 401 from `/api/me` (no user row) and from `POST /api/scores` (foreign-key violation).*
+  - *Cleanup left 0 test users, 0 of their sessions and 0 scores.*

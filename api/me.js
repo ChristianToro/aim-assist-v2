@@ -1,18 +1,12 @@
 import { AuthError, verifyRequest } from './_lib/auth.js'
+import { scoreStore } from './_lib/db.js'
+import { handle, json } from './_lib/http.js'
 
-// Identity is per user, so neither the browser nor a CDN may cache it.
-const NO_STORE = { 'Cache-Control': 'private, no-store' }
-
-// GET /api/me: the signed-in caller's identity. M5 adds derived stats.
-export const GET = async (request) => {
-  try {
-    const { uid } = await verifyRequest(request)
-    return Response.json({ uid }, { headers: NO_STORE })
-  } catch (error) {
-    if (!(error instanceof AuthError)) throw error
-    return Response.json(
-      { error: 'Unauthorized' },
-      { status: error.status, headers: NO_STORE }
-    )
-  }
-}
+// GET /api/me: the signed-in caller's identity and profile stats.
+export const GET = handle(async (request) => {
+  const { uid } = await verifyRequest(request)
+  const stats = await scoreStore.profileStats(uid)
+  // A token outlives its user by up to 15 minutes after a deletion.
+  if (!stats) throw new AuthError('User no longer exists')
+  return json({ uid, ...stats })
+})
