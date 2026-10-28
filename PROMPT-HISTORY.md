@@ -225,3 +225,77 @@ From the variable names in `.env.local` (values never printed), the agent split 
 **Collaboration**
 
 The user reported the dashboard flag. The agent recommended no immediate change if the user is the only member of the Vercel team, with the hardening deferred to before the launch. The user chose to add it to M9 and commit.
+
+### Interaction 11 — Milestone 8: game recommendations and the Profile insights UI
+
+**User Prompt**
+
+> pushed, begin execution of M8
+
+**Agent Outcome**
+
+The original request ("recommend gaming platforms based on their score") was ambiguous, so the agent asked two questions before building. The user chose:
+
+- game and genre picks (3–5 shooters with their platforms), the recommended option, over PC-vs-console advice;
+- showing both insights on Profile.
+
+M8 was then detailed in PLAN-V2 and built. It stops at the review gate (status: In review), uncommitted.
+
+- **Server.**
+  - `POST /api/insights/platforms` is added.
+  - M7's route logic moved into a shared `requestInsight`, so each insight kind is just a module: prompt, schema, `buildPrompt`, `parseAdvice`.
+  - The mode reference and the type guards are shared.
+  - The hardware cache key and prompt are unchanged.
+- **Client.**
+  - `ApiError.details`, an insights service, and pure error-message and setup-form helpers.
+  - An on-demand `useInsight` hook.
+  - An `InsightPanel` frame, with `HardwareInsight` and `PlatformInsight` in a new "AI Insights" section on Profile.
+
+**Rationale**
+
+- **Asked first.** "Platforms" changed the schema and the prompt, and the trainer measures only mouse aim, so titles that suit the player's skills were the better-grounded reading. The decision was the user's.
+- **On-demand, not on mount.** Every fresh answer is a paid Claude call, so the panels wait for a click. A cached answer is labelled as cached, so a player knows to play more matches for a new one.
+- **`parseAdvice` enforces the array rules.** Structured outputs can't constrain array length, so the pick count and uniqueness are checked server-side, and a bad answer becomes a 502, not a broken UI.
+
+**Changes**
+
+- New:
+  - server: `api/insights/platforms.js`, `api/_lib/{insightRequest,platformAdvice,modeReference,checks}.js` and `platformAdvice.test.js`;
+  - client: `src/services/insights.js`, `src/hooks/useInsight.js`, `src/utils/{insightErrors,mouseSetup}.js` and `src/components/{InsightPanel,HardwareInsight,PlatformInsight}/`;
+  - tests: `insights.test.js`, `insightErrors.test.js`, `mouseSetup.test.js` and `InsightPanel.test.jsx`.
+- Edited:
+  - `api/insights/hardware.js`, now on `requestInsight`;
+  - `api/_lib/hardwareAdvice.js` and `scoreInput.js`, now using the shared guards and mode reference;
+  - `hardwareAdvice.test.js`: `buildPrompt` takes `{ setup }`;
+  - `src/services/api.js` and its test: `details`;
+  - `src/pages/Profile.jsx`.
+- [`PLAN-V2.md`](PLAN-V2.md): M8 is In review, with its scope, detail and verification.
+
+**Verification**
+
+- Lint, format check and build pass. `npm test` passes with 193 tests, up from 154.
+- No-cost live check under `vercel dev` against Neon with a temporary user (deleted afterwards), 8/8:
+  - the 401 and 422 paths on `platforms`;
+  - the 422 and 400 paths on `hardware` after the refactor;
+  - no `insights` rows written;
+  - cleanup complete.
+- The Profile modules are served under `vercel dev`.
+- **Not run:** a real platforms answer from Claude, and the UI in a browser. Both need the user's sign-in or approval for the API spend.
+
+**Collaboration**
+
+The user chose the meaning of "gaming platforms" and the scope of the Profile UI.
+
+### Interaction 12 — M8 approved and committed
+
+**User Prompt**
+
+> browser checks pass; commit M8 and the doc changes
+
+**Agent Outcome**
+
+The user reported that the browser checks pass: both panels generating, the cached repeat, a fresh hardware answer with a setup entered, and the inline invalid-DPI message. These ran signed in, so they include real Claude answers for both kinds. M8 was marked Done in PLAN-V2, with the report recorded, and committed on `release/v2.0`.
+
+**Verification**
+
+The user ran the browser checks. The agent didn't see the generated answers, so their content isn't recorded here. Lint, format check, tests and build last ran at the review gate (Interaction 11), and no code has changed since.

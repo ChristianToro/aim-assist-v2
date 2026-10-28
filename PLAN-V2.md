@@ -43,7 +43,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M5 | Done | **Data API.** Extend `GET /api/me` with stats derived in SQL, and add `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
 | M6 | Done | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
 | M7 | Done | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/claude.js`, migration `003` |
-| M8 | Not started | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
+| M8 | Done | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
 | M9 | Not started | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* the steps in [Pre-launch user steps](#pre-launch-user-steps-m9): your own Google OAuth client, and the database credentials stored as Secrets. | `ARCHITECTURE.md`, `README.md` |
 
 ### Dependencies
@@ -437,6 +437,63 @@ Steps:
     - *So the content matches. Only the key order differs between a fresh answer and a cached one, which consumers reading by key don't notice.*
   - *Not measured: token usage and cost per call. The responses weren't logged with `usage`.*
 - **For M8's UI:** a fresh answer takes about 12–15 s, so the display needs a visible loading state.
+
+## M8 detail
+
+**Scope** (the user's choices, 2026-10-28):
+
+- "Gaming platforms" means **games and genres**: 3 to 5 shooter titles that suit the player's aim profile, each with the platforms it's on. This was chosen over recommending PC vs console, since every player here aims with a mouse.
+- The Profile page shows **both** insights, hardware and platforms.
+
+Steps:
+
+1. **Server: the shared parts are factored out of M7.**
+   - `api/_lib/insightRequest.js`: `requestInsight({ uid, kind, advice, context })` holds the steps after authentication. It loads `modeStats`, requires 5 matches (422), and runs the M7 runner around one Claude call validated by the kind's `parseAdvice`. Its `advice` argument is a kind's module.
+   - `api/_lib/modeReference.js` holds the per-mode prompt text from M7, unchanged.
+   - `api/_lib/checks.js` holds the type guards that `scoreInput`, `hardwareAdvice` and `platformAdvice` share.
+   - `hardware.js` now calls `requestInsight`. Its cache key is still `{ version, modeStats, setup }` and its system prompt is byte-identical, so `PROMPT_VERSION` stays 1.
+2. **`api/_lib/platformAdvice.js`.**
+   - `SYSTEM_PROMPT` maps the modes to aiming skills and asks for released, actively played games only, each with a fit that cites the player's numbers.
+   - `ADVICE_SCHEMA` is `{ summary, picks: [{ title, genre, platforms[], fit }], avoidForNow }`. The platforms enum is PC, PlayStation, Xbox, Nintendo Switch and Mobile.
+   - `parseAdvice` enforces what the schema can't: 3–5 picks, distinct titles ignoring case, and at least one known platform per pick with no repeats.
+3. **`POST /api/insights/platforms`** takes no body. It uses its own cache and daily limit (`kind: 'platforms'`).
+4. **Client.**
+   - `ApiError` now carries the error body as `details`.
+   - `services/insights.js` has `getHardwareInsight(setup)` and `getPlatformInsight()`.
+   - Pure helpers: `utils/insightErrors.js` turns a 422, 429 (with the wait formatted as "in about 3 hours"), 401, 502, 503 or network failure into a message. `utils/mouseSetup.js` turns the form fields into `setup`, leaving blanks out and rejecting an out-of-range DPI.
+   - The `useInsight(request)` hook runs on demand, never on mount, since each fresh answer costs a Claude call. It keeps the last answer through a reload or a failure, and only the latest of overlapping requests lands.
+5. **UI.**
+   - `InsightPanel` is the shared frame: title, inputs, button, a loading line ("Asking Claude. This can take 15 seconds."), the error, the answer, and a "Generated …" line that says when the answer is cached.
+   - `HardwareInsight` has optional DPI and polling-rate inputs. `PlatformInsight` lists the picks and the "Hold off on" line.
+   - `Profile.jsx` gains an "AI Insights" section with the two panels side by side from `md` up.
+   - Polished UI comes later, on feature branches.
+6. Stop for review.
+
+### M8 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (193 tests, up from 154) and `npm run build` pass. `Profile` is 3.2 kB gzip, and the entry chunk is unchanged at 3.3 kB.
+- New tests:
+  - `platformAdvice`: a closed schema, including nested objects, and every rejection rule.
+  - `insightErrors` and `mouseSetup`.
+  - `services/insights`.
+  - `ApiError` details.
+  - `InsightPanel`: the button, the loading state, the answer, the cached note, and an error shown with the previous answer kept.
+- No-cost live check under `vercel dev` against Neon, with a temporary user (deleted afterwards). Every path that stops before Claude passed, 8 checks:
+  - `platforms` with no token returns 401;
+  - with no body and 0 matches, 422;
+  - with 3 matches, 422 with `played: 3`;
+  - `hardware` (after the refactor) with 3 matches returns 422, and with a bad polling rate, 400;
+  - no `insights` rows were written;
+  - cleanup was complete.
+- The `/profile` page and the new client modules are served under `vercel dev`, and `GET /api/insights/platforms` returns 405.
+- *2026-10-28: the user reported "browser checks pass", which covers the four Profile checks below. They ran signed in with Google, so they include real platforms and hardware answers from Claude.*
+- **Browser checks (user):**
+  - a real platforms recommendation (a Claude call);
+  - the Profile UI in a browser, signed in with Google and with 5 or more matches:
+    1. "Get recommendation" on each panel shows the loading line, then the answer.
+    2. A second click gives the same answer instantly, marked cached.
+    3. Entering a DPI and polling rate in the mouse panel gives a fresh hardware answer.
+    4. An invalid DPI (for example 50) shows the inline message without a request.
 
 ## Pre-launch user steps (M9)
 

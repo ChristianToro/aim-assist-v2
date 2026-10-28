@@ -2,13 +2,15 @@ import { getAuthToken } from './auth'
 
 const UNAUTHORIZED = 401
 
-// A non-2xx answer from /api. `status` lets the UI word the failure; a
+// A non-2xx answer from /api. `status` lets the UI word the failure, and
+// `details` holds the rest of the error body (e.g. { needed, played }). A
 // network failure stays a TypeError from fetch and has no status.
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, details = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.details = details
   }
 }
 
@@ -36,9 +38,11 @@ export const apiFetch = async (path, { method = 'GET', body, auth } = {}) => {
 
   const payload = await response.json().catch(() => null)
   if (!response.ok) {
+    const { error, ...details } = payload ?? {}
     throw new ApiError(
       response.status,
-      payload?.error ?? `Request failed (${response.status})`
+      error ?? `Request failed (${response.status})`,
+      details
     )
   }
   return payload

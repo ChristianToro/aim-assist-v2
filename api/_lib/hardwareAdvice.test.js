@@ -68,7 +68,9 @@ describe('ADVICE_SCHEMA', () => {
 describe('buildPrompt', () => {
   it('includes the setup and the per-mode statistics', () => {
     const stats = [{ mode: 'Flick', matches: 6, averageAccuracy: 71.2 }]
-    const prompt = buildPrompt(stats, { dpi: 800, pollingRateHz: null })
+    const prompt = buildPrompt(stats, {
+      setup: { dpi: 800, pollingRateHz: null },
+    })
     expect(prompt).toContain('{"dpi":800,"pollingRateHz":null}')
     expect(prompt).toContain('"averageAccuracy": 71.2')
   })

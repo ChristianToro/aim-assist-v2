@@ -1,5 +1,7 @@
+import HardwareInsight from '../components/HardwareInsight/HardwareInsight'
 import Leaderboard from '../components/Leaderboard/Leaderboard'
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner'
+import PlatformInsight from '../components/PlatformInsight/PlatformInsight'
 import ProfileCard from '../components/ProfileCard/ProfileCard'
 import { useAuth } from '../hooks/useAuth'
 import { useLeaderboard } from '../hooks/useLeaderboard'
@@ -33,6 +35,15 @@ const Profile = () => {
         ) : (
           <ProfileCard user={user} profile={profile} />
         )}
+      </div>
+
+      <h2 className="mt-10 text-xl font-semibold text-heading">AI Insights</h2>
+      <p className="mt-1 text-sm text-muted">
+        Recommendations from Claude, based on your scores in each mode.
+      </p>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <HardwareInsight />
+        <PlatformInsight />
       </div>
 
       <h2 className="mt-10 text-xl font-semibold text-heading">Best Matches</h2>

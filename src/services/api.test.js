@@ -65,6 +65,18 @@ describe('apiFetch', () => {
     expect(error).toMatchObject({ status: 400, message: 'Unknown view' })
   })
 
+  it('keeps the rest of the error body as details', async () => {
+    vi.stubGlobal(
+      'fetch',
+      respond(422, { error: 'Not enough matches yet', needed: 5, played: 2 })
+    )
+    await expect(apiFetch('/api/insights/platforms')).rejects.toMatchObject({
+      status: 422,
+      message: 'Not enough matches yet',
+      details: { needed: 5, played: 2 },
+    })
+  })
+
   it('still reports the status when an error response has no JSON body', async () => {
     vi.stubGlobal('fetch', respond(500))
     await expect(apiFetch('/api/me')).rejects.toMatchObject({
