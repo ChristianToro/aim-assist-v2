@@ -193,3 +193,35 @@ The `.env*` line that `vercel env pull` appended was removed, which leaves `.git
 **Verification**
 
 `git check-ignore --no-index -v` shows `.env` and `.env.local` ignored, and `.env.example` matched only by its `!.env.example` exception. Lint, format check, tests and build last ran at the review gate (Interaction 7). Since then only docs have changed, plus `.gitignore` going back to its committed state.
+
+### Interaction 10 — Vercel flags the Neon variables as visible secrets
+
+**User Prompt**
+
+> on the vercel dashboard, in environment variables tab, all variables affiliated with postgress, neon auth, and database are labeled as "needs attention" - each have this message flag: POSTGRES_PRISMA_URL looks like a secret, but its value is visible to anyone with access. Consider rotating at the source and saving as Secret.
+
+Follow-up: "yes, add it to M9 and commit".
+
+**Agent Outcome**
+
+Vercel's current docs were checked:
+
+- Environment variables are now either Config (readable) or Secret (write-only).
+- Integration-created variables can't be switched to Secret in place. The documented path is to disconnect, rotate, then reconnect with Development deselected and Sensitive enabled.
+
+From the variable names in `.env.local` (values never printed), the agent split the flagged variables into real secrets (the eight variables that carry the database password) and false positives (host, user and database names, the project id, and the Neon Auth URLs). A fresh build's `dist/` contains no connection strings or API keys.
+
+**Rationale**
+
+- The exposure is limited to members of the Vercel team, not the public. The fix also costs `vercel env pull` its database credentials for local development.
+- So it was recorded as a pre-launch step rather than done now. It pairs with a separate Neon development branch, which also keeps local testing off production data.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - the M9 row links to a new "Pre-launch user steps (M9)" section;
+  - that section holds the existing own-Google-OAuth-client step, plus the credentials step: which variables are secrets, the four-step fix, the local-development consequences, and `ANTHROPIC_API_KEY`'s type.
+
+**Collaboration**
+
+The user reported the dashboard flag. The agent recommended no immediate change if the user is the only member of the Vercel team, with the hardening deferred to before the launch. The user chose to add it to M9 and commit.

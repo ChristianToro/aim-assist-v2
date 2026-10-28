@@ -44,7 +44,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M6 | Done | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
 | M7 | Done | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/claude.js`, migration `003` |
 | M8 | Not started | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
-| M9 | Not started | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* switch Neon Auth's Google provider from the shared keys to your own OAuth client (see the M3 detail). | `ARCHITECTURE.md`, `README.md` |
+| M9 | Not started | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* the steps in [Pre-launch user steps](#pre-launch-user-steps-m9): your own Google OAuth client, and the database credentials stored as Secrets. | `ARCHITECTURE.md`, `README.md` |
 
 ### Dependencies
 
@@ -437,3 +437,22 @@ Steps:
     - *So the content matches. Only the key order differs between a fresh answer and a cached one, which consumers reading by key don't notice.*
   - *Not measured: token usage and cost per call. The responses weren't logged with `usage`.*
 - **For M8's UI:** a fresh answer takes about 12–15 s, so the display needs a visible loading state.
+
+## Pre-launch user steps (M9)
+
+M9 is detailed when it starts. These steps happen outside the repo, and they're recorded here so they aren't lost.
+
+1. **Your own Google OAuth client.** Replace Neon's shared keys, as described in the M3 detail under "Google OAuth, in two stages".
+2. **Store the database credentials as Secrets.**
+   - **Problem** (found 2026-10-28): Vercel flags the Neon integration's variables as "needs attention: looks like a secret, but its value is visible to anyone with access". The integration created them as readable Config values.
+   - **Exposure:** limited to members of the Vercel team. A grep of `dist/` found no connection strings or API keys, and only the two public Neon Auth URLs carry the `VITE_` prefix.
+   - **Real secrets:** `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`, `POSTGRES_URL_NO_SSL`, `POSTGRES_PRISMA_URL`, `POSTGRES_PASSWORD` and `PGPASSWORD`.
+   - **False positives:** the host, user and database names, `NEON_PROJECT_ID`, `NEON_AUTH_BASE_URL` and `VITE_NEON_AUTH_URL` are config, not secrets.
+   - **Fix:** Vercel doesn't let integration variables be switched to Secret in the list. Its documented path:
+     1. Disconnect the Neon resource from the project.
+     2. Rotate the credentials by resetting the database role's password, so the old values stop working.
+     3. Reconnect with **Development deselected** and **Sensitive** enabled. A connection that includes Development can't be Sensitive.
+     4. Redeploy.
+   - **Local development afterwards:** `vercel env pull` no longer provides `DATABASE_URL`. Create a Neon branch for development and put its connection strings in `.env.local` by hand (`DATABASE_URL`, `DATABASE_URL_UNPOOLED`). `npm run db:migrate` then targets that branch, so run it on production separately. Neon Auth state branches with the database, so the dev branch has its own users, and its auth URL may differ: check `NEON_AUTH_BASE_URL` / `VITE_NEON_AUTH_URL` for the branch.
+   - **`ANTHROPIC_API_KEY`:** this was added by hand, so its type was chosen when it was created. Make sure it's a Secret in Production and Preview. Re-creating it as a Secret for Development may also stop `vercel env pull` from writing it, so keep the local copy in `.env.local`.
+   - Sources: [Config and Secret environment variables](https://vercel.com/docs/environment-variables/sensitive-environment-variables), [Production-only Marketplace credentials](https://vercel.com/changelog/secure-marketplace-credentials-with-production-only-access).
