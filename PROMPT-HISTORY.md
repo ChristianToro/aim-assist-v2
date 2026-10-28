@@ -424,3 +424,114 @@ Docs only. The pre-launch and M4 items are recorded as the user reported them an
 **Collaboration**
 
 The user found `main` still showing the two modified files in another terminal. Uncommitted edits sit in the shared working tree, not on a branch, so the user approved committing them on `refactor/UI`, which leaves `main` clean.
+
+Committed as `de1ac72`. The user pushed it.
+
+### Interaction 3 — UI refactor plan (taste-skill), U0 started
+
+**User Prompt**
+
+> Task: the UI will be adjusted using Leonxlnx's taste-skill:
+> https://github.com/Leonxlnx/taste-skill/blob/main/README.md
+>
+> Lay out the steps to integrate this skill.
+>
+> The landing page will change as follows:
+> - The nav bar buttons will be hidden for unauthenticated users.
+> - The start Training button for an unauthenticated users will create a tooltip that instructs users to "continue with Google" to start playing
+> - I have a hero image to use of a simulated game to be included.
+> - the leaderboard will be displayed as a social proof section
+> - the CTA bottom section will provide a button for login, along with a quote "are you ready to step your game up?"
+
+**Agent Outcome**
+
+- Planned in plan mode, after reading the skill's README and `SKILL.md`. The skill:
+  - deals an art direction (`draw.mjs`);
+  - checks pages in headless Chrome at 1440/768/390 (`inspect.mjs`);
+  - wants at least 4 real pictures and at least 8 moving elements;
+  - bans ornaments such as icon-topped cards and eyebrow labels;
+  - can keep a brand palette with `--keep`.
+- The approved plan is now [`PLAN-UI.md`](PLAN-UI.md), with three milestones:
+  - **U0:** skill install and docs.
+  - **U1:** gating logic and the shared `GoogleSignInButton`, with tests.
+  - **U2:** the taste-skill restyle of the landing page and the shell.
+- U0 so far: PLAN-UI.md written, CLAUDE.md updated (the doc list, the workflow on `refactor/UI`, a "UI design" section), and `.taste-skill/` added to `.gitignore`.
+- Waiting on the user before the baseline step:
+  - the plugin install;
+  - the hero image in `src/assets/`.
+
+**Rationale**
+
+- **Gating split from the restyle.** U1 lands the behaviour changes with tests, so U2's diff is design only.
+- **Themes kept.** `--keep palette` preserves the five themes, which also color the canvas targets, while the skill picks the type and composition.
+- **No stock photos.** The user's hero image and HTML UI fragments are the only imagery, and the skill's picture-floor rule is waived.
+
+**Changes**
+
+- New: [`PLAN-UI.md`](PLAN-UI.md).
+- Edited: [`CLAUDE.md`](CLAUDE.md) and [`.gitignore`](.gitignore).
+
+**Verification**
+
+Docs only so far. Node 24 and `/usr/bin/google-chrome` are present, which the skill's scripts need. The baseline `inspect.mjs` run waits for the plugin install.
+
+**Collaboration**
+
+The user chose all four options:
+
+- gate `/play` only, and keep `/leaderboards` and `/settings` reachable by URL;
+- keep the palette and let the skill deal new type;
+- the hero image plus HTML fragments, with no sourced images;
+- the landing page plus the shared shell as the first scope.
+
+### Interaction 4 — Skill installed, hero added, "before" baseline (U0 in review)
+
+**User Prompt**
+
+> skill has been installed (local scope only), and the asset added (using suggested name)
+
+**Agent Outcome**
+
+- The plugin (`taste-skill` 2.1.5) is enabled in `.claude/settings.local.json`, which the user's global git ignore excludes.
+- The hero image is `src/assets/hero-sim.png`: a 1319×1192 PNG of 1.2 MB, a Gridshot screenshot in the default cyan theme.
+- Baseline, following the skill's redesign workflow, on the production build (`vite preview`):
+  - `inspect.mjs --out .taste-skill/before`: 6 FAIL (hairline, outlined-box, few-pictures, focal-point, still-page, headline-lines at 390 px) and 1 WARN (no-footage).
+  - `lint.mjs` on the landing page and shell: 5 FAIL, 2 WARN.
+- PLAN-UI.md now has the U0 verification, and U0 is marked In review.
+
+**Rationale**
+
+The baseline came from the production build, not the dev server: the skill says to inspect what ships, and the current home page makes no `/api` calls, so `vercel dev` wasn't needed.
+
+**Changes**
+
+- [`PLAN-UI.md`](PLAN-UI.md): U0 is In review, with its verification section.
+- `src/assets/hero-sim.png`: added by the user, then replaced (see Interaction 5).
+
+**Verification**
+
+- The baseline screenshots (desktop and mobile) were opened and reviewed.
+- `npm run build` passes, with the entry chunk unchanged at 3.30 kB gzip.
+- Noted for U2:
+  - No image converter is installed, so shrinking the 1.2 MB PNG needs a tool.
+  - The image's cyan matches only the default theme.
+
+### Interaction 5 — WebP hero swapped in; U0 committed
+
+**User Prompt**
+
+> a webp version replaced the previous image. commit U0 with the hero image
+
+**Agent Outcome**
+
+- The PNG is gone. In its place is `src/assets/hero-img.webp`.
+- PLAN-UI.md now names the new file, and U0 is marked Done.
+- U0 was committed on `refactor/UI`.
+- **Wrong image, fixed before the push.**
+  - The first WebP was a different frame: 1174×1061, 18 KB, with no motion trails or cursor.
+  - The user said "The wrong image was converted" and replaced it with the right one: 1319×1192, 38 KB, with motion trails and the cursor.
+  - The commit hadn't been pushed (`git log origin/refactor/UI..HEAD` listed only it), so U0 was amended rather than followed by a fix-up commit.
+
+**Changes**
+
+- New: [`src/assets/hero-img.webp`](src/assets/hero-img.webp), added without the executable bit the file had on disk.

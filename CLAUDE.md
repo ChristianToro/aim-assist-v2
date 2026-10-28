@@ -4,7 +4,8 @@ Browser-based aim trainer (Aimlabs-inspired), portfolio quality. v2 moves the v1
 
 ## Documents
 
-- [PLAN-V2.md](PLAN-V2.md) — **read first.** Milestone tracker, v2 decisions, and current status. Update a milestone's status when it changes.
+- [PLAN-UI.md](PLAN-UI.md) — **read first.** The UI refactor on `refactor/UI` (taste-skill): decisions and milestone tracker. Update a milestone's status when it changes.
+- [PLAN-V2.md](PLAN-V2.md) — the v2.0 milestone tracker (M0–M9, all done) and its decisions.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the v2 system design: layers, `/api` routes, data model, request flows, security and testing. Keep it in step with structural changes.
 - [PLAN-CONVERSION.md](PLAN-CONVERSION.md) — the Firebase → Neon/Vercel feasibility report (schema sketch, endpoint design, gotchas). PLAN-V2.md's Decisions table overrides it where they differ.
 - [PROMPT-HISTORY.md](PROMPT-HISTORY.md) — v2 collaboration log.
@@ -14,7 +15,7 @@ Use the `prompt-history` skill to maintain PROMPT-HISTORY.md — invoke it at th
 
 ## Workflow
 
-Work happens on `release/v2.0` in small milestones from PLAN-V2.md. Each milestone ends at a **review gate**: present the changes and verification results, then wait. Commit only after the user approves, and start the next milestone only when the user says so. Detail a milestone's steps when it starts.
+v2.0 (`release/v2.0`) is merged into `main`. UI work happens on `refactor/UI` in small milestones from PLAN-UI.md. Each milestone ends at a **review gate**: present the changes and verification results, then wait. Commit only after the user approves, and start the next milestone only when the user says so. Detail a milestone's steps when it starts.
 
 ## Stack
 
@@ -48,6 +49,12 @@ Work happens on `release/v2.0` in small milestones from PLAN-V2.md. Each milesto
 - Custom hooks for stateful logic (`useAuth`, `useLeaderboard`, …); pure functions for validation, scoring, and stats so Vitest covers them without mocks.
 - Justify every new dependency in the milestone that adds it.
 - Concise comments for non-obvious logic; match the surrounding code's style.
+
+## UI design
+
+- Restyle with the `taste-skill:design-taste-frontend` skill, drawing with `--keep palette` so the five themes in `src/styles/themes.css` (which also color the canvas) survive.
+- Components use only the semantic theme utilities (`bg-surface`, `text-muted`, `text-accent`, …), never raw colors.
+- The skill's own CSS/JS helpers are ported into Tailwind tokens, not imported; a web font or other new package follows the dependency rule above.
 
 ## Git
 
