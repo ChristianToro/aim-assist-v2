@@ -1,10 +1,6 @@
 import Button from '../Button/Button'
 import { useAuth } from '../../hooks/useAuth'
-import {
-  signInWithGoogle,
-  signOutUser,
-  isUserCancellation,
-} from '../../services/auth'
+import { signInWithGoogle, signOutUser } from '../../services/auth'
 
 // Navbar auth section: Google sign-in when signed out; avatar +
 // sign-out when signed in (per CLAUDE.md, Google is the only provider).
@@ -12,10 +8,11 @@ const AuthControls = () => {
   const { user, isLoading } = useAuth()
 
   const handleSignIn = async () => {
+    // Success navigates away to Google, so only a failure returns here.
     try {
       await signInWithGoogle()
     } catch (error) {
-      if (!isUserCancellation(error)) console.error('Sign-in failed:', error)
+      console.error('Sign-in failed:', error)
     }
   }
 

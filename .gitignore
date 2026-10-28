@@ -12,10 +12,13 @@ dist
 dist-ssr
 *.local
 
-# Local env (Firebase credentials)
+# Local env (database credentials and Neon Auth URLs)
 .env
 .env.*
 !.env.example
+
+# Vercel CLI project link (`vercel link`)
+.vercel
 
 # Editor directories and files
 .vscode/*

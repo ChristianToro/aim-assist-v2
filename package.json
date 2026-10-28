@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/spa-fallback.mjs",
+    "dev:full": "vercel dev",
+    "build": "vite build",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -14,7 +16,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "firebase": "^12.15.0",
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@neondatabase/auth": "0.7.0-beta",
+    "@neondatabase/serverless": "^1.2.0",
+    "jose": "^6.2.13",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1"

@@ -4,7 +4,7 @@ import Card from '../components/Card/Card'
 import Leaderboard from '../components/Leaderboard/Leaderboard'
 import { useAuth } from '../hooks/useAuth'
 import { useLeaderboard } from '../hooks/useLeaderboard'
-import { signInWithGoogle, isUserCancellation } from '../services/auth'
+import { signInWithGoogle } from '../services/auth'
 
 const VIEWS = [
   { id: 'all', label: 'All Time', empty: 'No scores yet — be the first!' },
@@ -26,10 +26,11 @@ const tabClass = (isActive) =>
 
 const SignInPrompt = () => {
   const handleSignIn = async () => {
+    // Success navigates away to Google, so only a failure returns here.
     try {
       await signInWithGoogle()
     } catch (error) {
-      if (!isUserCancellation(error)) console.error('Sign-in failed:', error)
+      console.error('Sign-in failed:', error)
     }
   }
 

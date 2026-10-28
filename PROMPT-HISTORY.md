@@ -1,293 +1,353 @@
-# PROMPT-HISTORY.md
+# Prompt History
 
-A record of the AI-assisted development of this project, across two sessions: a planning session that produced the specification documents, and an implementation session that wrote the code against them.
+This document records meaningful development interactions between the user and
+AI coding agents working on this project. It focuses on requests, outcomes,
+implementation decisions, verification, and human-agent collaboration rather
+than preserving a raw conversation transcript.
 
-Each entry quotes the user prompt verbatim and condenses the response to its outcome and key decisions — full responses ran to thousands of words each and are summarized rather than reproduced. Commit hashes refer to commits now on `main`, merged from the `milestone_sweep` branch.
+Generated code is included verbatim when reasonably concise. Extensive
+implementations are referenced through their canonical repository files.
 
----
+> This file is an engineering collaboration record, not a source of truth for
+> application behavior. The repository itself remains authoritative.
 
-# Session 1 — Planning
-
-_6 July 2026. No code was written; the output of this session is the three planning documents the repo still carries._
-
-## 1. The initial idea
-
-> I want to make a simple webpage--built with css, html, and javascript--that is a sort of "aim-labs" with a leaderboard, SSO google log in, scores stored.
-
-Expanded a single page into a portfolio-scale project: five game modes (Precision, Speed, Tracking, Gridshot, Flick), Google OAuth via Firebase with scores in Firestore, global and personal leaderboards, Canvas gameplay, user profiles, and statistics spanning score, accuracy, reaction time, and combos. Difficulty scaling, particle effects, theme switching, and sound were added as polish, with daily challenges and achievements deferred to a roadmap. The stack at this point was still plain HTML, CSS, and JavaScript alongside Canvas, Firebase Authentication, and Firestore.
-
-## 2. Moving to React
-
-> Would with also work within a react framework?
-
-Recommended migrating off plain HTML/CSS/JS to React with Vite, keeping Canvas, Firebase Auth, and Firestore and adding React Router.
-
-This is where the project's defining split was drawn, and it survived unchanged into the implementation: **React** owns navigation, authentication, leaderboards, profiles, statistics, and settings; **Canvas** owns rendering, target spawning, collision detection, animation, and the game loop — driven by `requestAnimationFrame()` rather than React re-renders. Also sketched the `components/ pages/ hooks/ services/` structure and proposed building in milestones, game engine before backend.
-
-## 3. First CLAUDE.md
-
-> generate a markdown file with all of this information you provided in this session so that I can use it to develop a claude.md file
-
-Produced an initial `claude.md` covering the project overview, stack, folder structure, gameplay mechanics, the React/Canvas split, Firebase integration, statistics, profiles, roadmap, and engineering principles — then suggested a considerably larger specification.
-
-## 4. Expanded specification
-
-> generate the much more comprehensive version
-
-Grew it into a full specification: product vision, technical architecture, coding standards, development philosophy, Firebase schema, UI/UX guidelines, milestones, and Claude-specific coding instructions.
-
-## 5. Project plan
-
-> generate the project plan md
-
-Generated `PROJECT_PLAN.md` — 26 milestones with incremental tasks, a feature checklist, stretch goals, a definition of done, and a portfolio checklist. This became the spine of Session 2.
-
-## 6. Architecture document
-
-> generate the architecture md file
-
-Generated `ARCHITECTURE.md`: layered architecture, the React / Canvas / Firebase responsibility split, folder organization, game engine design, rendering pipeline, data flow, state ownership, performance guidelines, and AI development guidelines. Suggested a further `GAME_DESIGN.md`, which was never written.
-
-## 7. Retargeting to Vite and JavaScript
-
-> I am using Vite and javascript for this project. Adjust and rewrite each markdown file
-
-Rewrote the suite around React, Vite, JavaScript, Canvas, Firebase Auth, and Firestore, stripping out assumptions about Next.js, TypeScript, and server-side rendering. Proposed adding `FIREBASE_SCHEMA.md` and `COMPONENT_MAP.md`, and a full Documentation Suite v2.0.
-
-## 8. Documentation suite scope
-
-> generate documentation suite version 2.0
-
-Scoped the suite at eleven documents — README, CLAUDE, PROJECT_PLAN, ARCHITECTURE, GAME_DESIGN, COMPONENT_MAP, FIREBASE_SCHEMA, API, STYLE_GUIDE, TESTING, CONTRIBUTING — but declined to emit them in one response and recommended producing them individually. In the end only `CLAUDE.md`, `PROJECT_PLAN.md`, and `ARCHITECTURE.md` were written; the remaining eight never materialized, and the project proceeded without them.
-
-## 9. This file's ancestor
-
-> generate a prompt-history.md file based on this sessions prompts and responses
-
-Generated a `PROMPT_HISTORY.md` summarizing the session's prompts, architectural decisions, technology choices, gameplay direction, documentation planning, and development philosophy, with a suggestion to keep it as a living design journal — which is what this file became.
+> Prior history: [PROMPT-HISTORY-2026-Q4.md](PROMPT-HISTORY-2026-Q4.md) (v2 sessions through M5),
+> and [Prototype/V1-PROMPT-HISTORY.md](Prototype/V1-PROMPT-HISTORY.md), the v1 prototype's log.
 
 ---
 
-# Session 2 — Implementation
+## Session: 2026-10-27 (continued)
 
-_The "milestone sweep": Milestones 0–25 built against the plan above._
+**Objective:** Continues the session that began in [PROMPT-HISTORY-2026-Q4.md](PROMPT-HISTORY-2026-Q4.md): the pre-M5 status check, then M5 (data API). The archive was rotated at about 800 lines, mid-session, so numbering continues from Interaction 4.
 
-## 1. Orientation
+### Interaction 4 — M5 approved and committed
 
-> Make sense of this current directory
+**User Prompt**
 
-Explored the repo and reported: a freshly scaffolded Vite + React template (stock demo still in `src/`) sitting under three substantial planning documents — CLAUDE.md (project charter), ARCHITECTURE.md (three-layer React / Canvas Engine / Firebase design), and PROJECT_PLAN.md (26 milestones). Identified the core architectural rule (React never animates gameplay) and flagged what was missing versus the plan: react-router, the Firebase SDK, Tailwind, Prettier, and git initialization.
+> commit M5 and the doc changes
 
-## 2. Tooling gaps
+**Agent Outcome**
 
-> rectify the missing items: react-router, Firebase SDK, tailwind, prettier config
+M5 was marked Done in PLAN-V2 and committed on `release/v2.0`, together with the M5 detail and verification and the history updates. The history file had reached about 800 lines, so it was archived with `git mv` as `PROMPT-HISTORY-2026-Q4.md`, and this file was started in its place. PLAN-V2's reference to the Neon Auth comparison (Interaction 8) now links to the archive.
 
-Installed and wired all four: react-router-dom 7; Firebase SDK with a `src/firebase/config.js` module reading `VITE_*` env vars (plus `.env.example` and gitignore rules); Tailwind CSS v4 via the `@tailwindcss/vite` plugin; Prettier with config, ignore file, and `format`/`format:check` scripts. Verified with a production build.
+**Verification**
 
-## 3. Version control
+Lint, format check, tests and build were last run at the review gate (Interaction 2), and no code has changed since. The signed-in checks of Interaction 3 cover the committed code.
 
-> initialize it
+### Interaction 5 — Milestone 6: client on `/api`, Firebase removed
 
-`git init`, renamed the default branch to `main`, and made the initial commit (`7a0a083`) with node_modules/dist/.env correctly excluded.
+**User Prompt**
 
-## 4. Milestone 1 — App shell
+> pushed, begin execution of M6
 
-> Move on to milestone 1
+**Agent Outcome**
 
-Built the application shell (`a19e8ef`): React Router with a Layout route (Navbar + Outlet + Footer), Home page with hero and mode-preview grid, placeholder Play/Leaderboards/Profile/Settings pages, a themed 404, dark-mode-first Tailwind styling, and removal of the stock Vite demo assets.
+The user pushed M5. M6 was detailed in PLAN-V2 and implemented, and it stops at the review gate (status: In review), uncommitted. The browser now reaches data only through `/api`, via one helper, `apiFetch`. Firebase is gone from the code, config, dependencies and bundle. README's Firebase sections are left for M9, as planned.
 
-## 5. Milestones 2–3 — Design system & canvas
+**Rationale**
 
-> Complete milestones 2 and 3.
+- **One fetch helper with a typed error.** `ApiError.status` lets `Leaderboard.jsx` word a 401 differently from an outage, which replaces the Firestore-code messages. A signed-out authenticated call fails before any request is made.
+- **No uid arguments.** The service functions drop their `uid` and `user` parameters, because the server reads identity from the token. Keeping them would suggest the client chooses whose data it gets. The hooks still key their state by `uid`, so a different account never sees the previous one's result.
+- **`toScoreSubmission` is pure** and tested without mocks. The fetch wrappers are tested by mocking `./api` (or `fetch` and `./auth` for the helper itself), which is the only practical seam for I/O.
+- **`src/utils/dates.js` was deleted.** Its day and week keys existed only for Firestore's equality filters, and `/api` now computes the UTC windows.
 
-- **M2** (`e2e4cc8`): semantic color tokens (`--bg`, `--surface`, `--edge`, `--accent`, …) exposed as Tailwind utilities via `@theme inline` — chosen specifically so future themes are a `:root` variable swap. Button (variants/sizes/Link-mode), Card, and Modal components; all existing UI refactored onto tokens.
-- **M3** (`08cf0c2`): `GameCanvas` component owning the rAF loop, devicePixelRatio-aware resizing via ResizeObserver, delta-time clamping, FPS counter, and a scene contract (`update(dt, size)` / `render(ctx, size)`) proven by a bouncing-target demo scene.
+**Changes**
 
-## 6. Milestone 4 — Game engine
+- New: [`src/services/api.js`](src/services/api.js), with `api.test.js`, `scores.test.js` and `leaderboard.test.js`.
+- Rewritten: `src/services/{users,scores,leaderboard}.js` and `users.test.js`.
+- Edited:
+  - `useUserProfile` and `useLeaderboard`: no uid passed to the services;
+  - `GameArea`: no `user` passed when saving;
+  - `Leaderboard.jsx` and its test: ISO dates and HTTP error messages;
+  - `ProfileCard`: ISO dates;
+  - `Footer`, `SessionHistory`: text and comment;
+  - `vite.config.js`: Firebase chunk removed;
+  - `.env.example`, `.gitignore`, `CLAUDE.md`: Firebase notes removed.
+- Deleted: `src/firebase/config.js`, `firebase.json`, `.firebaserc`, `firestore.rules`, `firestore.indexes.json` and `src/utils/dates{,.test}.js`, plus the `firebase` dependency.
+- [`PLAN-V2.md`](PLAN-V2.md): M6 is In review, and the M6 detail, user steps and verification sections are added.
 
-> renamed our working branch to milestone sweep. move on to milestone 4
+**Verification**
 
-On the renamed `milestone_sweep` branch, moved loop ownership from React into a `GameEngine` class (`7cc20d5`): rAF scheduling, clamped delta time, and a lifecycle API (attach/detach/start/stop/pause/resume/reset) as React's only interface to gameplay. `GameCanvas` slimmed to a DOM bridge; Play gained a working Pause/Resume control.
+- Lint and format check pass. `npm test` passes with 116 tests, up from 109, and `npm run build` succeeds.
+- The JS bundle is 156 kB gzip in total, with no Firebase chunk. A grep found no Firebase, Firestore or `googleapis` strings in `dist/`, and no `@firebase` packages in the lockfile.
+- Under `vercel dev`, `/leaderboards` returns HTML, and the new service and component modules are served as `text/javascript`.
+- **Not run:** the in-browser flow with Google sign-in. It needs the user. The five browser checks are listed in PLAN-V2's M6 verification, alongside the open M4 checks.
 
-## 7. Push confusion
+### Interaction 6 — M6 approved and committed
 
-> not seeing anything committed on the branch
+**User Prompt**
 
-Diagnosed: commits existed locally on `milestone_sweep`, but the branch had never been pushed — GitHub only had `main` through Milestone 3. Confirmed no upstream was set (so a bare `git push` couldn't misfire) and provided the explicit-refspec push command. A follow-up user command failed because the command was split across two shell lines; supplied the one-line fix (`git push --set-upstream origin milestone_sweep`).
+> browser checks pass; commit M6 and the doc changes
 
-## 8. Milestone 5 — Targets
+**Agent Outcome**
 
-> move on to milestone 5
+The user reported that the browser checks pass, which covers M6's five checks: the signed-out boards, the saved match, the entry appearing once per board, the profile stats, and a second match. M6 was marked Done in PLAN-V2, with the user's report recorded, and committed on `release/v2.0`. Firebase is now fully removed from the v2 code.
 
-`Target` class (variable radius, lifespan, grow-in/shrink-out animation, full-radius hit testing so shrinking targets stay fair) and `Spawner` (interval spawning, rejection-sampling overlap prevention, spawn-timer capped at one interval so freed slots refill instantly — Gridshot behavior for free). Plus `math`/`random` utils. Commit `53dc32f`.
+**Verification**
 
-## 9. Milestones 6–10 — Playable game
+The user ran the browser checks. The M4 checks that are still open (reload, Safari or blocked third-party cookies, sign-out) weren't explicitly reported, so PLAN-V2 keeps them open. Lint, format check, tests and build last ran at the review gate (Interaction 5), and no code has changed since.
 
-> Complete milestones 6 through 10
+### Interaction 7 — Milestone 7: AI hardware recommendations
 
-Five commits turning the demo into a complete game:
+**User Prompt**
 
-- **M6 input** (`f01eb2b`): `Input` queues canvas-space clicks consumed during update (not in DOM handlers); `Collision.findHitTarget`; engine owns input and drops stale clicks on start/resume. Fixed a latent engine bug — the frame loop now only reschedules while running, so `stop()` from inside `update` sticks.
-- **M7 scoring** (`9dd5eb0`): `ScoreManager` (combo multiplier +0.1×/hit capped at 2×, accuracy, reaction times) and an event-driven `GameHud` — React never renders per frame.
-- **M8 timer** (`eb486f1`): `Timer` driven by loop delta (engine pause pauses it for free), `GameSession` as one restartable match, `useGameSession` hook owning phase (idle/running/over), start overlay + pause overlay.
-- **M9 results** (`c9f00ca`): `ResultsModal` with final score, accuracy, max combo, and avg/best/worst reaction; completes the loop start → play → results → restart.
-- **M10 particles** (`03c3802`): radial particle bursts (frame-rate-independent drag, life-based fade) and rising floating score text on every hit.
+> pushed, begin execution of M7
 
-## 10. Milestone 11 — Sound (12 deferred)
+**Agent Outcome**
 
-> complete milestones 11, skip 12 as we will adjust themes later.
+The user pushed M6. The `claude-api` skill was consulted first, as PLAN-V2 asks, and M7 was then detailed and built. It stops at the review gate (status: In review), uncommitted.
 
-`AudioManager` (`9dc4b60`) synthesizing every effect with the Web Audio API — hit pop, miss thud, 3-2-1 countdown ticks, descending game-over motif — no audio assets. Lazy AudioContext creation after a user gesture (autoplay-policy safe), mute persisted to localStorage, Sound On/Off toggle in Play. Milestone 12 skipped per instruction.
+`POST /api/insights/hardware` turns the caller's per-mode stats, plus an optional current DPI and polling rate, into a structured recommendation from Claude: a summary, then DPI, sensitivity and polling rate, each with a rationale. It sits on a reusable cache-and-rate-limit runner backed by a new `insights` table (migration `003`), which M8 will reuse.
 
-## 11. Milestones 13–15 — Firebase
+The live parts are blocked on the user. `.env.local` has no `ANTHROPIC_API_KEY` (checked by variable name only), and `003` isn't applied on Neon.
 
-> I believe firebase has been set up by me during the project initialization; credentials are stored in .env. Verify this. complete milestones 13 - 15
+**Rationale**
 
-Verified all six `VITE_FIREBASE_*` credentials present in `.env` (checked presence/length only, values never printed) and git-ignored. Then:
+- **Model and request shape come from the skill, not memory.**
+  - `claude-opus-5-5`, with `thinking` omitted (always on; disabling it returns a 400) and `effort: 'medium'` set explicitly.
+  - Structured outputs with a plain JSON schema, which avoids a `zod` dependency.
+  - `fallbacks: 'default'` for refusals, enabled because the skill makes it the default for this model.
+  - SDK 1.3.0's types confirmed `fallbacks: 'default'` and `json_schema` output, and that the client constructs without a key.
+- **The cache and the rate limit share one table.** The cache key is a sha256 of `{ PROMPT_VERSION, modeStats, setup }`, so an answer is reused until the player plays again, changes their setup, or the prompt changes. A cached answer doesn't count toward the 5-per-day cap and is still served while the player is at the cap. The cap is soft under concurrency, which is enough to bound cost.
+- **Optional current setup.** The game has no DPI or sensitivity settings of its own, so without the player's current values the advice can only be absolute. The schema can't carry numeric bounds, so `parseAdvice` re-checks the DPI range and the polling-rate enum, and an out-of-range answer returns 502 rather than being shown.
+- **Factory plus wiring again** (`structuredOutput.js` / `claude.js`), so the Claude-call handling is tested with a fake client and the SDK's real error classes, without network.
 
-- **M13** (`ead3a87`): config module now warns loudly on missing credentials.
-- **M14** (`09c6cf2`): auth service wrapping all `firebase/auth` access, AuthContext/Provider with session-restore loading state, working Google sign-in in the Navbar, `ProtectedRoute` guarding /profile.
-- **M15** (`5c62d65`): users service (profile doc with incremental aggregates — running average accuracy, highest score, favorite mode via per-mode counts) and scores service (one doc per match, identity denormalized for leaderboards). Match saving became **event-driven** (an `onGameOver` callback with the latest-ref pattern) after the new react-hooks v7 lint rejected setState-in-effect — the lint pushed the design somewhere genuinely better, twice.
+**Changes**
 
-## 12. Billing question
+- New:
+  - `db/migrations/003_insights.sql`;
+  - `api/insights/hardware.js`;
+  - `api/_lib/{insightPolicy,insightRunner,insightStore,structuredOutput,claude,hardwareAdvice}.js`, with tests for every pure or injectable one.
+- Edited:
+  - `api/_lib/scoreStore.js`: `modeStats`;
+  - `api/_lib/db.js`: wires `insightRunner`;
+  - `api/_lib/http.js`: `HttpError` can carry headers, used for `Retry-After`;
+  - `.env.example`: `ANTHROPIC_API_KEY`;
+  - `package.json` and the lockfile: `@anthropic-ai/sdk@^1.3.0`.
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - M7 is In review;
+  - the SDK dependency is justified;
+  - M7 detail, user steps, cost bound and verification are added.
 
-> is a blaze account required for this project to utilize firestore?
+**Verification**
 
-No — the free Spark plan covers everything this project uses (Firestore, Google Auth, Hosting) with generous daily quotas; Blaze is only needed for Cloud Functions, phone auth, etc. Noted Spark's fail-closed behavior (quota errors, never bills) is arguably safer for a portfolio project.
+- Lint, format check and build pass. `npm test` passes with 154 tests, up from 116.
+- PGlite with `001`–`003` passed 15 checks:
+  - `modeStats` shape;
+  - the `003` constraints;
+  - the runner and store end to end: generate, cached repeat, 5 fresh then 429 with `Retry-After`, cached answer while limited, the limit lifting after 24 hours, per-kind and per-player counting, and the cascade on user deletion.
+- The M5 PGlite checks still pass.
+- Under `vercel dev`, the new route returns 401 with no token or a forged one, and 405 for GET.
+- **Not run:** `003` on Neon and any real Claude call. Both wait on the key and the migration.
 
-## 13. Console setup
+### Interaction 8 — M7 live check against Neon and Claude
 
-> how do I then configure the cloud firestore database for this project via the console
+**User Prompt**
 
-Step-by-step console walkthrough: create a Standard database in production mode (region is permanent), publish security rules matching the app's exact data model (public reads; owner-only user writes; validated create-only scores), enable the Google provider, and defer composite indexes to Firestore's one-click error links. Included an end-to-end verification procedure.
+> Key was added, pulled, and I rain the db migrate command. Live check is approved - run it and report back
 
-## 14. Milestones 16–17 — Leaderboards & profile
+**Agent Outcome**
 
-> move on to milestones 16 and 17
+`schema_migrations` listed `001`–`003`, and `ANTHROPIC_API_KEY` was present (checked by length, never printed). A scratch script under `vercel dev` did the following:
 
-- **M16** (`aa42b79`): the key design constraint — Firestore can't combine a `createdAt` range filter with `orderBy(score)` — solved by stamping equality-filterable `day`/`week` keys on each score. Leaderboard service (top-100 all/daily/weekly + personal best), `useLeaderboard` with derived loading state, ranked table component, tabbed Leaderboards page.
-- **M17** (`a04e39c`): shared `StatTile`, `useUserProfile`, `ProfileCard` (avatar, playing-since, aggregate tiles), and a Best Matches section reusing the Leaderboard component. Flagged the three composite indexes the user must create via console links.
+1. Signed up a temporary user and got its JWT.
+2. Posted matches through `POST /api/scores`.
+3. Exercised `POST /api/insights/hardware`, which made two real Claude calls.
+4. Deleted the user.
 
-## 15. Milestones 18–20 — Modes, difficulty, stats
+10 of 11 checks passed as scripted:
 
-> complete milestones 18-20
+- The 422s at 0 and 4 matches, and the 400 on a bad setup.
+- A fresh recommendation in 12.2 s: 800 DPI, 1:1 pointer speed with acceleration off, 1000 Hz. The rationales were grounded in the per-mode numbers.
+- A fresh answer for the 1600 DPI / 500 Hz setup in 15.4 s: keep 1600, raise the polling rate to 1000 Hz.
+- 2 rows saved, and the cleanup was complete.
 
-- **M18** (`3dcd81a`): all modes as **pure configuration** in `modes.js` — Gridshot, Precision, Speed, Tracking (targets gained velocity + edge bouncing), Flick. `GameArea` extracted and remounted per mode via `key`; Home cards read the same data.
-- **M19** (`39e1396`): per-mode difficulty scaling — spawner parameters lerp toward harder values over a ramp — plus the Survival mode built on it: endless, 5-miss limit (expiries count), Lives HUD tile.
-- **M20** (`732a3f8`): SessionHistory table (ephemeral, per browser session, survives mode switches); reaction stats and longest combo were already flowing through ScoreManager.
+The failed check was the cached repeat. The response was served from cache: 762 ms, no new row. The script compared it as a JSON string, though, and Postgres `jsonb` reorders object keys. A PGlite run of the same runner and store confirmed the cached answer deep-equals the fresh one and has the same `generatedAt`.
 
-Notably, no structural changes to the engine/spawner/scoring were needed — the M4–M7 abstractions absorbed everything as config.
+**Rationale**
 
-## 16. Milestones 21–24 — Polish, a11y, perf, tests
+The key-order difference was left in the code, because consumers read the answer by key. If byte-identical fresh and cached answers matter, `save` could return the stored `result`, making both paths come back in `jsonb` order.
 
-> complete milestones 21 - 24
+**Changes**
 
-- **M21 polish** (`2b88b53`): Tailwind `@theme` motion tokens (page fade/slide on navigation, modal pop-in, button press), lazy-loaded routes with a branded LoadingScreen inside Layout, mobile fixes (nav scroll, collapsing wordmark, stacked footer).
-- **M22 accessibility** (`6a9d68e`): universal `:focus-visible` ring, `prefers-reduced-motion` (CSS collapse + gameplay skips decorative particle bursts while keeping score text), `prefers-contrast: more` token overrides, skip link, modal focus management with focus return, labeled canvas.
-- **M23 optimization** (`47d7aa7`): **app shell 796 kB → 8 kB** via Rolldown `advancedChunks` (Firebase and React as independently cached vendor chunks); frame-loop allocation fixes (reused size object, shared frozen empty-clicks array); React.memo on HUD/leaderboard/history.
-- **M24 testing** (`1ca3c5e`): Vitest + jsdom + React Testing Library — **53 tests across 10 files**. Pure game logic tested as plain classes (the architecture's payoff), Firestore service tested with a mocked SDK, plus Button/GameHud component tests.
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - the M7 verification records the live results, the explanation of the failed check, and the 12–15 s latency to plan for in M8's UI;
+  - the open live-check item is replaced.
+- Uncommitted, together with the rest of M7.
 
-## 17. README
+**Verification**
 
-> milestone 12 will be completed at a later date. As for milestone 25, I will be configuring the deployment onto github pages at a later time.
->
-> draft a README file covering key findings from this sweep, along with suggestions for both milestone 12 and 25.
+- As above. Token usage and cost per call weren't captured.
+- The user's `vercel env pull` re-added `.env*` to the end of `.gitignore`, the same line removed in M2. It comes after `!.env.example` and would ignore that file if it were ever untracked. It was flagged to the user, not changed.
 
-Replaced the stock Vite README (`bd5c950`) with a portfolio-facing one: features, architecture summary, setup instructions (including console steps and indexes), the engineering findings above, a 5-step theme plan for M12 (leaning on the token system; canvas palette flagged as the one gotcha), and a GitHub Pages plan for M25 (base path + router basename, the `404.html` SPA fallback, Actions CI with secrets, Firebase authorized domains).
+### Interaction 9 — M7 approved and committed
 
-## 18. This document
+**User Prompt**
 
-> Write a markdown file at the root of this repo titled "PROMPT-HISTORY.md", where all of my prompts and responses are recorded
+> remove the .gitignore line and commit M7
 
-Produced this file.
+**Agent Outcome**
 
-## 19. Repo state check
+The `.env*` line that `vercel env pull` appended was removed, which leaves `.gitignore` identical to the committed version. M7 was marked Done in PLAN-V2 and committed on `release/v2.0`, with the doc updates. The cached-answer key order was left as is: the user didn't ask for the change.
 
-> What is the current state of this repo? provide a quick summary
+**Verification**
 
-Surveyed branches, commits, source tree, and toolchain health. Reported: `milestone_sweep` clean and in sync with its remote, while `origin/main` is stale at Milestone 3 — milestones 4–24 have never reached `main`. Confirmed 24 of 25 milestones committed one-per-commit. Verified the two known gaps are genuinely unimplemented rather than just uncommitted: **Milestone 12 (themes)** has no commit and `src/pages/Settings.jsx` is still an 11-line `PagePlaceholder` — no ThemeProvider, no localStorage persistence, no selector anywhere in `src/`; **Milestone 25 (deployment)** has no `vercel.json` or `firebase.json`. Health check passed clean: `npm test` → 53 tests across 10 files, `npm run lint` → no errors.
+`git check-ignore --no-index -v` shows `.env` and `.env.local` ignored, and `.env.example` matched only by its `!.env.example` exception. Lint, format check, tests and build last ran at the review gate (Interaction 7). Since then only docs have changed, plus `.gitignore` going back to its committed state.
 
-## 20. Architecture review — the React/engine boundary
+### Interaction 10 — Vercel flags the Neon variables as visible secrets
 
-> Is separating the game logic and isolating it from react the appropriate method for this application?
+**User Prompt**
 
-Read `GameEngine`, `GameSession`, `useGameSession`, `GameCanvas`, and `GameArea` and argued yes, on evidence rather than principle:
+> on the vercel dashboard, in environment variables tab, all variables affiliated with postgress, neon auth, and database are labeled as "needs attention" - each have this message flag: POSTGRES_PRISMA_URL looks like a secret, but its value is visible to anyone with access. Consider rotating at the source and saving as Secret.
 
-- **The frame-rate mismatch is real.** `GameSession.js:151` gates `emitHud()` to hits, misses, and changed *displayed* seconds — React re-renders a few times per second instead of 60+.
-- **Canvas gives React nothing to diff.** React's value is declarative DOM reconciliation; there is no DOM inside `<canvas>`. Routing entities through React would pay the reconciler tax for zero benefit — the distinction that makes this right *here* but wrong for a DOM-based target grid.
-- **Testability is the demonstrable payoff.** The five game-logic test files are plain unit tests — no jsdom, no RTL, no `act()` — which only works because those modules never import React.
-- **React 19 semantics would fight it.** StrictMode double-invocation, effect re-runs, and concurrent render replay all threaten simulation state in `useState`; a `ref` is just the same separation with worse ergonomics.
+Follow-up: "yes, add it to M9 and commit".
 
-Praised the seam as a real port rather than a `game/` folder: `GameEngine.js:41` exposes only attach/start/pause/resume/stop, `GameCanvas` is 50 lines of DOM-only work, data flows out one-way via callbacks, and `GameEngine.js:34` + `consumeClicks()` drains input *inside* the frame step so hit resolution is deterministic w.r.t. frame timing.
+**Agent Outcome**
 
-Honest costs flagged: `isPaused`/`isMuted` duplicated across engine and React state (`useGameSession.js:54,69`) — the standard tax of this pattern, growing with UI-visible engine state; engine construction in `useMemo` is the fragile spot (`useMemo` is a hint, not a cache guarantee — hence the eslint-disable and `engineInstance` late-binding), where a lazy `useRef` init would be sturdier; and `reducedMotion` captured once at construction won't follow a mid-session OS change.
+Vercel's current docs were checked:
 
-**Forward-looking note for Milestone 12:** canvas colors are hardcoded at `Target.js:5-7`, `Particle.js:5`, and `FloatingText.js:27`. Themes are the first thing needing to flow *inbound* (React → engine), a path this design hasn't exercised. Recommendation: pass a palette into `createGameSession` at construction and let the existing remount-on-change mechanism handle switches — do **not** call `getComputedStyle` inside `draw()`, which is a per-frame layout read that punches straight through the seam.
+- Environment variables are now either Config (readable) or Secret (write-only).
+- Integration-created variables can't be switched to Secret in place. The documented path is to disconnect, rotate, then reconnect with Development deselected and Sensitive enabled.
 
-## 21. This entry
+From the variable names in `.env.local` (values never printed), the agent split the flagged variables into real secrets (the eight variables that carry the database password) and false positives (host, user and database names, the project id, and the Neon Auth URLs). A fresh build's `dist/` contains no connection strings or API keys.
 
-> append these prompts and your responses to the PROMPT-HISTORY.md file
+**Rationale**
 
-Appended sections 19–21 (`4e20221`).
+- The exposure is limited to members of the Vercel team, not the public. The fix also costs `vercel env pull` its database credentials for local development.
+- So it was recorded as a pre-launch step rather than done now. It pairs with a separate Neon development branch, which also keeps local testing off production data.
 
-## 22. Milestone 12 — Themes
+**Changes**
 
-> now complete milestone 12
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - the M9 row links to a new "Pre-launch user steps (M9)" section;
+  - that section holds the existing own-Google-OAuth-client step, plus the credentials step: which variables are secrets, the four-step fix, the local-development consequences, and `ANTHROPIC_API_KEY`'s type.
 
-Built the deferred theme system (`105d3da`): Dark, Light, Cyberpunk, Terminal, and Aimlabs, selectable from a real Settings page (replacing the placeholder) and persisted to `localStorage`. Three decisions carried the implementation:
+**Collaboration**
 
-- **CSS is the single source of truth for color.** Each theme is a `[data-theme='...']` block in `src/styles/themes.css` redefining the same semantic tokens; `src/styles/themes.js` holds only ids and copy. The alternative — palettes in JavaScript applied via `style.setProperty()` — was rejected because inline styles outrank stylesheet rules and would have silently broken the `prefers-contrast: more` support added in M22. Each theme instead carries its own contrast overrides in a nested media query, since one global override can't suit five palettes.
-- **Themes reach the canvas without breaking the seam.** This was exactly the inbound React → engine path flagged in §20. Themes also define target-ring, particle, and floating-text tokens; `src/game/palette.js` resolves them **once per theme change**, and the session swaps its palette via a new `setPalette()`. Entities take a palette at `draw()` time instead of storing hex values, so a theme switch recolors a match already in progress — particles mid-flight included — with no engine rebuild and no score reset. This improved on §20's own recommendation, which had assumed a remount would be needed.
-- **Attribute-scoped, not `:root`-scoped.** Writing `[data-theme='x']` rather than `:root[data-theme='x']` lets a theme apply to a subtree, which is what makes each picker option render a live miniature of the app *in its own colors*, target rings included, with no hand-maintained swatch list.
+The user reported the dashboard flag. The agent recommended no immediate change if the user is the only member of the Vercel team, with the hardening deferred to before the launch. The user chose to add it to M9 and commit.
 
-Two details beyond the four milestone tasks: an inline script in `index.html` stamps the saved theme before first paint, and `ThemeProvider` writes the attribute synchronously in its setter rather than in an effect — child effects run before parent effects, so a deferred write would let the canvas read the previous theme's variables for one commit.
+### Interaction 11 — Milestone 8: game recommendations and the Profile insights UI
 
-Caught during the build: `peer-checked:` only reaches siblings, so the picker's nested "Active" badge would never have highlighted — replaced the CSS variant with plain JS state. Declined to add `@testing-library/user-event` for the provider tests (not installed; CLAUDE.md forbids unjustified dependencies) and used `fireEvent` from the existing RTL dependency instead.
+**User Prompt**
 
-Verified: 68 tests passing across 14 files (15 new, covering the registry, palette resolution and per-token fallbacks, provider persistence and validation, and the picker), lint and Prettier clean, production build green with all five themes confirmed in the compiled CSS, and a dev-server smoke test confirming the pre-paint script is served ahead of the app bundle.
+> pushed, begin execution of M8
 
-## 23. This entry
+**Agent Outcome**
 
-> append these prompts and results into PROMPT-HISTORY.md
+The original request ("recommend gaming platforms based on their score") was ambiguous, so the agent asked two questions before building. The user chose:
 
-Appended sections 22–23 and refreshed the sweep summary below.
+- game and genre picks (3–5 shooters with their platforms), the recommended option, over PC-vs-console advice;
+- showing both insights on Profile.
 
-_A run of prompts between here and §24 is not recorded — the leaderboard composite indexes, `.firebaserc`, the GitHub Pages walkthrough, Milestone 25 itself, repository secrets, and debugging the deployed 404. Sections 24–25 were requested specifically._
+M8 was then detailed in PLAN-V2 and built. It stops at the review gate (status: In review), uncommitted.
 
-## 24. Choosing a Pages workflow
+- **Server.**
+  - `POST /api/insights/platforms` is added.
+  - M7's route logic moved into a shared `requestInsight`, so each insight kind is just a module: prompt, schema, `buildPrompt`, `parseAdvice`.
+  - The mode reference and the type guards are shared.
+  - The hardware cache key and prompt are unchanged.
+- **Client.**
+  - `ApiError.details`, an insights service, and pure error-message and setup-form helpers.
+  - An on-demand `useInsight` hook.
+  - An `InsightPanel` frame, with `HardwareInsight` and `PlatformInsight` in a new "AI Insights" section on Profile.
 
-> the repo is public. since the source is github actions, which workflow do I use? Jekyll, or static html, or another option?
+**Rationale**
 
-Neither — the answer was to pick nothing. Selecting **GitHub Actions** in the Pages source dropdown *is* the setting; the Jekyll and Static HTML cards beneath it are starter templates for repos that don't already have a workflow, and this one has `.github/workflows/deploy.yml`.
+- **Asked first.** "Platforms" changed the schema and the prompt, and the trainer measures only mouse aim, so titles that suit the player's skills were the better-grounded reading. The decision was the user's.
+- **On-demand, not on mount.** Every fresh answer is a paid Claude call, so the panels wait for a click. A cached answer is labelled as cached, so a player knows to play more matches for a new one.
+- **`parseAdvice` enforces the array rules.** Structured outputs can't constrain array length, so the pick count and uniqueness are checked server-side, and a bad answer becomes a 502, not a broken UI.
 
-Warned against clicking either: Jekyll builds Markdown and would produce nothing usable from a React app, while Static HTML commits a second workflow that uploads a directory **with no build step** — publishing raw `src/` with no bundling and no env vars, then racing `deploy.yml` with whichever finished last winning. A genuinely confusing failure to debug. Noted that `deploy.yml` is that same Static HTML template plus the parts that matter, and that the `workflow_dispatch` trigger built into it allows a manual run without a fresh push.
+**Changes**
 
-## 25. Hardening the Firestore rules
+- New:
+  - server: `api/insights/platforms.js`, `api/_lib/{insightRequest,platformAdvice,modeReference,checks}.js` and `platformAdvice.test.js`;
+  - client: `src/services/insights.js`, `src/hooks/useInsight.js`, `src/utils/{insightErrors,mouseSetup}.js` and `src/components/{InsightPanel,HardwareInsight,PlatformInsight}/`;
+  - tests: `insights.test.js`, `insightErrors.test.js`, `mouseSetup.test.js` and `InsightPanel.test.jsx`.
+- Edited:
+  - `api/insights/hardware.js`, now on `requestInsight`;
+  - `api/_lib/hardwareAdvice.js` and `scoreInput.js`, now using the shared guards and mode reference;
+  - `hardwareAdvice.test.js`: `buildPrompt` takes `{ setup }`;
+  - `src/services/api.js` and its test: `details`;
+  - `src/pages/Profile.jsx`.
+- [`PLAN-V2.md`](PLAN-V2.md): M8 is In review, with its scope, detail and verification.
 
-> yml file is now part of main, and it is deployed.
->
-> this was shared by you during this session: [the §20-era note that the score-write rule validates `uid` but not the score itself] … make those changes
+**Verification**
 
-The rules existed only in the Firebase console, so this began by creating `firestore.rules` and wiring it into `firebase.json` (`55ab277`). Scores became create-only and immutable, with `hasOnly`/`hasAll` pinning the exact ten-field shape, `mode` constrained to the six real labels, ranges on score and accuracy, and `createdAt == request.time` so a score can't be filed under a clock the client chose. Reads on `users` were narrowed from public to owner-only — leaderboards never touch that collection, since identity is denormalized onto each score, and the profile page only loads the signed-in user's own document.
+- Lint, format check and build pass. `npm test` passes with 193 tests, up from 154.
+- No-cost live check under `vercel dev` against Neon with a temporary user (deleted afterwards), 8/8:
+  - the 401 and 422 paths on `platforms`;
+  - the 422 and 400 paths on `hardware` after the refactor;
+  - no `insights` rows written;
+  - cleanup complete.
+- The Profile modules are served under `vercel dev`.
+- **Not run:** a real platforms answer from Claude, and the UI in a browser. Both need the user's sign-in or approval for the API spend.
 
-Reading the data model first corrected two errors in the advice being implemented:
+**Collaboration**
 
-- **`reactionTime` is nullable.** `ScoreManager.summary()` returns `null` for a match with zero hits, so the strict numeric check originally suggested would have rejected legitimate saves.
-- **`day` cannot be matched against `request.time`.** `getDayKey()` uses the player's *local* calendar date while `request.time` is UTC, so the proposed exact comparison would reject anyone playing an evening west of UTC — the user's own timezone included. Bounded to a ±2-day window instead, which still blocks backdating onto an old daily board.
+The user chose the meaning of "gaming platforms" and the scope of the Profile UI.
 
-The score ceiling was also raised from the 100,000 originally floated to 10,000,000: at Survival's hardest the spawner yields roughly 1300 points/second, making 100,000 about eighty seconds of good play and a live risk to real records.
+### Interaction 12 — M8 approved and committed
 
-Flagged three limits rather than implying the work was finished: the rules are **unverified** (the emulator needs Java and a download, neither available in the sandbox), deploying **overwrites** the console rules that were only reconstructed from the README's description, and none of this is real anti-cheat — a signed-in user can still write a *plausible* score, since nothing server-side observed the match. Closing that needs Cloud Functions and therefore the Blaze plan.
+**User Prompt**
 
+> browser checks pass; commit M8 and the doc changes
 
----
+**Agent Outcome**
 
-## Sweep summary
+The user reported that the browser checks pass: both panels generating, the cached repeat, a fresh hardware answer with a setup entered, and the inline invalid-DPI message. These ran signed in, so they include real Claude answers for both kinds. M8 was marked Done in PLAN-V2, with the report recorded, and committed on `release/v2.0`.
 
-| | |
-|---|---|
-| Milestones completed | 0–25 |
-| Commits on `main` | 37, merged over three pull requests |
-| Tests | 72 passing across 15 files |
-| App shell bundle | ~8 kB (vendors split and cached separately) |
-| Recurring theme | Verification before every commit (lint + build, later + tests); the new react-hooks v7 lint rules twice forced event-driven designs that were better than the effect-based first drafts |
+**Verification**
+
+The user ran the browser checks. The agent didn't see the generated answers, so their content isn't recorded here. Lint, format check, tests and build last ran at the review gate (Interaction 11), and no code has changed since.
+
+### Interaction 13 — Milestone 9: ARCHITECTURE.md and the README for v2
+
+**User Prompt**
+
+> pushed, begin execution of M9
+
+**Agent Outcome**
+
+The user pushed M8. M9 was detailed and done, and it stops at the review gate (status: In review), uncommitted.
+
+- **A new root `ARCHITECTURE.md`**, written from the code as built: the three rules, a section per layer, the `/api` routes, the factory-plus-wiring pattern, the data model, the request flows (sign-in, saving a match, leaderboards, AI insights), security, testing and deployment.
+- **The README:**
+  - updated for v2: live demo, stack, setup, scripts, architecture, AI tools and engineering notes;
+  - an honest rewrite of the anti-cheat item;
+  - the Problem and Value sections kept in the user's voice, with typos fixed.
+- **`CLAUDE.md`** now points at the new architecture doc.
+
+**Rationale**
+
+- **Described, not copied.** v1's architecture doc was a pre-build spec that named modules which never existed (`Renderer.js`, `useGame`, a `settings` collection). So the new doc describes what the code does, and its claims were checked against the source files.
+- **Anti-cheat stated as it is.** The README now says what v2 fixed (server validation, identity from the token, `CHECK` constraints) and what it didn't: scores are still computed in the browser. It names the next step, a server-signed match token.
+
+**Changes**
+
+- New: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+- Rewritten: [`README.md`](README.md).
+- Edited:
+  - [`CLAUDE.md`](CLAUDE.md): the document list;
+  - [`PLAN-V2.md`](PLAN-V2.md): M9 is In review, with its detail and verification.
+
+**Verification**
+
+- A link-check script over the five root docs found 0 broken relative links or anchors.
+- The live demo returns 200.
+- The test count, bundle sizes, routes, limits and model id were checked against the repo.
+- Lint, format check, tests (193) and build pass.
+- The pre-launch user steps (own Google OAuth client, credentials stored as Secrets) remain open and are recorded under PLAN-V2's pre-launch section.
+
+### Interaction 14 — M9 approved and committed
+
+**User Prompt**
+
+> commit M9 and the doc changes
+
+**Agent Outcome**
+
+M9 was marked Done in PLAN-V2 and committed on `release/v2.0`, which completes every v2 milestone (M0–M9). Still open, outside the repo: the pre-launch user steps (own Google OAuth client, database credentials stored as Vercel Secrets) and the M4 browser checks the user hasn't reported (reload, Safari or blocked third-party cookies, sign-out).
+
+**Verification**
+
+The docs were committed as reviewed. Lint, format check, tests (193) and build last ran at the review gate (Interaction 13), and nothing has changed since.

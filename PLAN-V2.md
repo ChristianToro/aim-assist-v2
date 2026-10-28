@@ -1,0 +1,545 @@
+# Plan: Aim Assist v2.0
+
+The v2.0 project plan and milestone tracker. [PLAN-CONVERSION.md](PLAN-CONVERSION.md) is the original feasibility report; this file records where v2 departs from it and what state each milestone is in. The v1 plan is archived at [Prototype/V1-PROJECT-PLAN.md](Prototype/V1-PROJECT-PLAN.md).
+
+## Context
+
+This repo is a clone of the v1 Aim Assist prototype: React + Vite + Canvas, Firebase Auth + Firestore, deployed to GitHub Pages. v2.0 rebuilds the platform:
+
+- **Hosting:** GitHub Pages → **Vercel**
+- **Database:** Firestore → **Neon Postgres**
+- **Auth:** Google sign-in stays, but **Firebase is removed entirely**
+- **New AI features:** the Anthropic API, called server-side, will (1) assess a user's scores and recommend hardware adjustments such as mouse DPI, and (2) recommend gaming platforms based on their scores.
+
+Other UI and functionality changes happen later, on separate feature branches.
+
+## Decisions (2026-10-26)
+
+| Decision | Choice | Departs from PLAN-CONVERSION? |
+|---|---|---|
+| Auth | Remove Firebase fully. Google sign-in goes through **Neon Auth**, Neon's managed Better Auth, which stores users in the `neon_auth` schema. `/api` verifies its JWTs. *Revised 2026-10-27:* this replaces self-hosted Better Auth after a comparison ([PROMPT-HISTORY-2026-Q4.md](PROMPT-HISTORY-2026-Q4.md), 2026-10-27, Interaction 8). | **Yes.** PLAN-CONVERSION recommended a hybrid that keeps Firebase Auth. |
+| Existing Firestore data | Reset. The Neon leaderboards start empty. | No. This was one of its two options. |
+| AI features | Built as milestones on `release/v2.0`, after the data API exists | n/a (new scope) |
+| Prototype docs | Archived in `Prototype/` with a `V1-` prefix | n/a |
+| Day boundaries | Daily and weekly boards use UTC | No. It listed UTC as the simplest option. |
+
+Because the data is reset, the uid format can change freely when auth moves, so no user-matching step is needed.
+
+## Workflow
+
+- All work happens on `release/v2.0`.
+- Each milestone is small. It stops for review **before** committing, and the next one starts only after approval.
+- Each milestone is detailed when it starts, not before.
+
+## Milestones
+
+| # | Status | Milestone | Key files |
+|---|---|---|---|
+| M0 | Done | **Branch + docs reorg.** Create `release/v2.0`. Archive the v1 docs to `Prototype/V1-*`. Write the new root `CLAUDE.md`, `PLAN-V2.md` and `PROMPT-HISTORY.md`. Repoint the README links. | `Prototype/`, `CLAUDE.md`, `PLAN-V2.md`, `PROMPT-HISTORY.md`, `README.md` |
+| M1 | Done | **Vercel hosting.** Set `vite.config.js` `base` to `'/'`. Add `vercel.json` with a SPA rewrite for every path except `/api`. Remove `scripts/spa-fallback.mjs` and its build step. Turn `deploy.yml` into a lint-and-test CI workflow. *User:* import the repo into Vercel. | `vite.config.js`, `vercel.json`, `package.json`, `.github/workflows/` |
+| M2 | Done | **Neon + schema.** Add Neon through the Vercel Marketplace (user step). Write `db/migrations/001_init.sql` for the scores table with its CHECK constraints (see PLAN-CONVERSION). Make `/api` work in local dev (`vercel dev`, or a Vite proxy). | `db/migrations/`, `.env.example` |
+| M3 | Done | **Auth server (Neon Auth).** Add `api/_lib/auth.js`, which reads `Authorization: Bearer <jwt>`, verifies it with `jose` against Neon Auth's JWKS (`NEON_AUTH_BASE_URL/.well-known/jwks.json`) and checks the issuer and expiry. The uid is the token's `sub`. Vitest covers it with locally generated keys. Add `GET /api/me`, which returns the verified identity or 401; M5 adds stats. Migration `002` changes `scores.user_id` to `uuid` and adds a foreign key to `neon_auth."user"(id)` with `on delete cascade`. Add the Neon Auth vars to `.env.example`. *User:* in the Neon Console → Auth, add `localhost:3000` as a trusted domain (the Vercel domains are added automatically). Google sign-in uses Neon's shared keys during development, and your own Google OAuth client before the portfolio launch. | `api/_lib/auth.js`, `api/me.js`, `db/migrations/002_*.sql`, `.env.example` |
+| M4 | Done | **Auth client switchover.** Add `@neondatabase/auth` and create the client from `VITE_NEON_AUTH_URL`. Move `services/auth.js` onto it: Google sign-in through `signIn.social`, sign-out, and the session. Move `AuthProvider` too, and keep the `useAuth()` shape by mapping `uid`, `displayName` and `photoURL` from the user's `id`, `name` and `image`, so consumers don't change. Add a `getAuthToken()` helper for the Bearer header that the M6 services send. Remove `getAuth` from `src/firebase/config.js`. Between M4 and M6 the Firestore writes have no Firebase user, so saving scores and profiles doesn't work on the branch; the data is being reset anyway. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx`, `src/firebase/config.js` |
+| M5 | Done | **Data API.** Extend `GET /api/me` with stats derived in SQL, and add `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
+| M6 | Done | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
+| M7 | Done | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/claude.js`, migration `003` |
+| M8 | Done | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
+| M9 | Done | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* the steps in [Pre-launch user steps](#pre-launch-user-steps-m9): your own Google OAuth client, and the database credentials stored as Secrets. | `ARCHITECTURE.md`, `README.md` |
+
+### Dependencies
+
+Each dependency is added only in the milestone that uses it, with a justification:
+
+- `@neondatabase/serverless` (M2): the HTTP Postgres driver. It avoids connection-pool exhaustion in serverless functions.
+- `jose` (M3): verifies Neon Auth's JWTs against its JWKS in `/api`. It's standards-based, has no dependencies, and is what Neon's own backend guide uses.
+- `@neondatabase/auth` (M4): Neon's official Neon Auth client, wrapping a Better Auth client. It's still a beta, so it's pinned exactly at `0.7.0-beta`. It was chosen over `@neondatabase/neon-js`, which adds the Data API client and pulls in `pg`.
+  - **Why not a plain Better Auth client:** after the Google redirect, the SDK exchanges Neon's `neon_auth_session_verifier` URL parameter for the session. That's how Neon handles the callback across domains, and a plain Better Auth client doesn't do it.
+  - **Install cost:** about 200 packages, mostly its unused UI kit (`@neondatabase/auth-ui`, 36 `@radix-ui` packages), which never reach the bundle.
+  - **Bundle cost:** 67 kB gzip in its own `auth-vendor` chunk (Better Auth, zod, and `@supabase/auth-js`, which its shared error helpers depend on).
+  - **Net effect:** +38 kB gzip until M6 removes the 141 kB Firebase chunk; after that, the total is far below v1's.
+
+### Neon Auth notes
+
+- The Vercel integration enabled Neon Auth and injects `NEON_AUTH_BASE_URL` (server) and `VITE_NEON_AUTH_URL` (client). Both are public URLs, not secrets.
+- `neon_auth."user".id` is a `uuid` (checked 2026-10-27), and our role has `REFERENCES` on it. That's why M3 changes `scores.user_id` from `text` to `uuid`.
+- Auth state branches with the database, so each Neon branch has its own users.
+- The auth server runs on a Neon domain, not the app's. M4 has to confirm that sessions persist in Safari (which blocks third-party cookies) and after a reload.
+- **`/api` needs the JWT, not the session token** (seen in M3). Neon Auth issues an Ed25519 JWT from `GET {base}/token` and in the `set-auth-jwt` header of `get-session`. The opaque `token` that sign-up and `session.token` return is rejected by `/api/me`. M4's `getAuthToken()` must return the JWT, so check what the SDK exposes, because Neon's Hono guide reads `session.token`.
+- JWTs last 900 s and are stateless, so a token stays valid for up to 15 minutes after sign-out or user deletion. Writes for a deleted user still fail on the `scores` foreign key.
+- Real tokens carry `aud` equal to the auth origin. The verifier checks `iss` but not `aud` yet. Adding `audience` is a one-line hardening for M4.
+- `@anthropic-ai/sdk` (M7, `^1.3.0`): the official Claude client.
+  - **Why:** it has typed errors (`RateLimitError`, `APIConnectionError`), retries and timeouts built in, and types for the beta parameters M7 uses (`fallbacks`, `output_config.format`). The `claude-api` skill says to call Claude through the SDK, not raw `fetch`.
+  - **Footprint:** server-only, never in the client bundle. About 24 MB installed, with three small dependencies. `zod` is an optional peer that M7 doesn't need: it uses a plain JSON schema.
+
+## M0 detail
+
+1. Create `release/v2.0` from local `main` (`bdcf5f0`). Branching from a local branch sets no upstream, so a bare `git push` can't land on `main`. The user pushes with `git push -u origin release/v2.0:refs/heads/release/v2.0`.
+2. Archive the docs with `git mv`, so history follows the files:
+   - `CLAUDE.md` → `Prototype/V1-CLAUDE.md`
+   - `ARCHITECTURE.md` → `Prototype/V1-ARCHITECTURE.md`
+   - `PROJECT_PLAN.md` → `Prototype/V1-PROJECT-PLAN.md`
+   - `PROMPT-HISTORY.md` → `Prototype/V1-PROMPT-HISTORY.md`
+
+   Each file gets a one-line "archived" banner under its title. A file still named `CLAUDE.md` in a subdirectory would be auto-loaded by Claude Code, which is why the files are renamed and not just moved.
+3. Repoint the three README links (project plan, architecture, prompt history) to `Prototype/`. The full README rewrite waits for M9.
+4. Write a new root `CLAUDE.md` for v2. It covers the stack, the ownership split, the security rules (no secrets in `VITE_` vars, uid from the session only), the milestone workflow, the condensed v1 coding standards, the git rules carried over (with the push refspec now naming `origin`), a doc map and the prompt-history opt-in.
+5. Write a new root `PROMPT-HISTORY.md` with the skill's header, a link back to the v1 history, and the 2026-10-26 session.
+6. Track `PLAN-CONVERSION.md` unchanged. Departures from it live in the Decisions table above.
+7. Stop for review, then make one commit on approval. The commit has no attribution line.
+
+### M0 verification
+
+- `git status` shows the four renames into `Prototype/` plus the new and modified root docs.
+- No root doc or README links to a moved path, and every relative link resolves.
+- `npm run lint` and `npm test` still pass. M0 changes no code, and Prettier ignores `*.md`.
+- `git rev-parse --abbrev-ref release/v2.0@{upstream}` errors with "no upstream configured".
+
+## M1 detail
+
+1. `vite.config.js`: set `base` to `'/'`, since Vercel serves from the domain root. Drop the Pages comment.
+2. `src/App.jsx`: remove `basename={import.meta.env.BASE_URL}` from `BrowserRouter`. With `base: '/'` it is always `/`, which is the router's default.
+3. Add `vercel.json` with one rewrite that sends every path outside `/api` to `/index.html`. Vercel serves files that exist (such as `/assets/*` and `/favicon.svg`) before it applies rewrites, so only client routes reach the rewrite. *Revised in M4:* `vercel dev` has no built files, so this catch-all also swallowed Vite's module requests. See M4 step 9.
+4. Delete `scripts/spa-fallback.mjs` and remove it from the `build` script. The rewrite replaces the `404.html` copy.
+5. Rename `.github/workflows/deploy.yml` to `ci.yml` with `git mv`. It runs on pushes to `main` and `release/**` and on pull requests, with the steps `npm ci`, lint, `format:check`, test and build. The Pages upload, deploy job, Pages permissions and the Firebase secret check are removed, because Vercel now deploys.
+6. Stop for review.
+
+**User steps (outside the repo):**
+
+- **Required:** import the repo into Vercel. The Vite preset is detected automatically (build `npm run build`, output `dist`).
+- **Optional:** set `release/v2.0` as the Vercel production branch, so the stable domain tracks v2 while `main` still holds v1.
+
+**Optional interim Firebase steps.** v2 drops Firebase, but the code still runs on it until M4 (auth) and M6 (data). These steps only keep the deployed v1-era app working until then, and M6 undoes them. Without them, the hosting itself still deploys and can be verified.
+
+- **Copy the six `VITE_FIREBASE_*` values into the Vercel environment variables.** These are public config, not secrets. The page renders on Vercel and the leaderboards load. Without them, `getAuth()` in `src/firebase/config.js` throws on load, so the deployed page is likely blank. The deep-link check below still works, because the rewrite returns `index.html` either way. M6 removes these variables.
+- **Add the Vercel domain (`<project>.vercel.app`) to Firebase Auth → Settings → Authorized domains.** Firebase Google sign-in and score submission then work on that domain; without it, sign-in fails with `auth/unauthorized-domain`. It only works on domains you add (the production domain, and the stable branch alias if you test on it). It's discarded in M4, when Neon Auth takes over sign-in with its own Google OAuth setup and trusted domains.
+
+### M1 verification
+
+- `npm run lint`, `npm run format:check` and `npm test` pass.
+- `npm run build` produces `dist/` with no `404.html`, and asset URLs in `dist/index.html` start with `/assets/`.
+- `npm run preview` serves `/` and a deep link such as `/leaderboards`. (`vite preview` has its own SPA fallback, so this checks the base path but not `vercel.json`.)
+- `vercel.json` is valid JSON, and the rewrite pattern matches client routes but not `/api` or `/api/*`, checked with a regex test.
+- The `vercel.json` rewrite itself is verified only on the user's first Vercel deploy: a hard refresh of `/leaderboards` (or `curl`) must return `index.html` with status 200. *Confirmed 2026-10-27 on `aim-assist-v2.vercel.app`: `/leaderboards` returned `200 text/html`.*
+
+## M2 detail
+
+1. Add `@neondatabase/serverless` to `dependencies`, since the functions import it at runtime.
+2. `db/migrations/001_init.sql` creates the `scores` table from the PLAN-CONVERSION sketch, with its `CHECK` constraints (the same bounds as `firestore.rules`) and indexes for the leaderboard queries:
+   - The sketch's `users` table is dropped. The auth provider's user table holds name and image; after the auth revision, that's Neon Auth's `neon_auth."user"`.
+   - The column is `user_id`. M3's migration changes it to `uuid` to match `neon_auth."user".id`, and adds the foreign key.
+3. `scripts/migrate.js` and `npm run db:migrate`: a small runner that applies `db/migrations/*.sql` in filename order, each file in a transaction, and records it in `schema_migrations` so a rerun skips it.
+   - It connects with the Neon driver's WebSocket `Client`, because a migration file holds several statements.
+   - It prefers `DATABASE_URL_UNPOOLED`, since Neon recommends the direct endpoint for schema changes.
+   - It loads `.env.local` with Node's `--env-file-if-exists`, so no dotenv dependency is needed.
+   - A runner is needed because there's no `psql` here, and every Neon branch has to be migrated the same way.
+4. `api/_lib/db.js`, the shared `neon()` HTTP query function, moves here from M3. `api/health.js` uses it for `GET /api/health`, which runs `select 1` and returns `{ ok, database }` (status 503 when the database is unreachable). It's the smallest endpoint that proves `/api` and Neon work, both locally and once deployed.
+5. Local dev uses `vercel dev`, which runs Vite and the `/api` functions together on one port, just as production does. A Vite proxy would still need `vercel dev` running behind it, so it adds nothing.
+   - Add an `npm run dev:full` script.
+   - The Vercel CLI is installed globally by the user, not added as a devDependency, because it's large and only needed locally.
+6. ESLint: add Node globals for `api/**` and `scripts/**`, which run on the server.
+7. `.env.example`: add a server-only section for `DATABASE_URL` and `DATABASE_URL_UNPOOLED`, with a warning never to give them a `VITE_` prefix.
+8. `.gitignore`: add `.vercel/`, the link folder that `vercel link` writes.
+9. Stop for review.
+
+**User steps:**
+
+- Vercel → Storage (Marketplace) → **Neon** → create a database and connect it to the project for Development, Preview and Production. This injects `DATABASE_URL`, `DATABASE_URL_UNPOOLED` and related variables.
+- Install the CLI (`npm i -g vercel`), then run `vercel link` and `vercel env pull .env.local` in the repo.
+- Optional: enable the `VITE_FIREBASE_*` variables for Development too, so `vercel env pull` brings them and the app renders under `vercel dev`.
+
+### M2 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` and `npm run build` pass.
+- `001_init.sql` applies cleanly in PGlite (in-process Postgres, run in a scratch directory outside the repo). Valid rows insert; an out-of-range mode, score, accuracy or reaction time is rejected.
+- After the user steps:
+  - `npm run db:migrate` applies `001_init.sql`, and a second run reports nothing to apply. *Confirmed 2026-10-27. A rolled-back transaction on Neon also showed every CHECK constraint and index live and a negative score rejected.*
+  - Under `vercel dev`, `curl localhost:3000/api/health` returns `{"ok":true,"database":"up"}`. *Confirmed 2026-10-27 (200 `application/json`).*
+  - After a push, `/api/health` on the Vercel domain returns the same, confirming that the `vercel.json` rewrite leaves `/api` alone. *Confirmed 2026-10-27 on `aim-assist-v2.vercel.app`: 200 `{"ok":true,"database":"up"}`, and unknown `/api` paths return Vercel's 404, not `index.html`.*
+
+## M3 detail
+
+1. Add `jose` to `dependencies`.
+2. `api/_lib/auth.js`:
+   - `createVerifier({ keySet, issuer })` returns a function that takes a `Request` and resolves to `{ uid }`, or throws `AuthError` (status 401).
+   - It reads `Authorization: Bearer <jwt>` and checks the token with `jwtVerify`:
+     - the algorithm must be `EdDSA`, the only one in Neon Auth's JWKS;
+     - the issuer must be the origin of `NEON_AUTH_BASE_URL`, as in Neon's backend guide;
+     - `sub` and `exp` must be present.
+   - Token errors from jose become `AuthError`. A JWKS fetch timeout and other errors propagate as server errors, not as 401.
+   - The exported `verifyRequest` is built once per cold start from a remote JWKS at `NEON_AUTH_BASE_URL/.well-known/jwks.json`. jose caches the keys and refetches when it sees an unknown `kid`.
+3. `api/_lib/auth.test.js` covers the verifier with an Ed25519 key pair generated in the test, with no mocks and no network: a valid token, a missing or non-Bearer header, the wrong issuer, an expired token, the wrong signing key, a missing `sub` or `exp`, and an HS256 token. It lives under `_lib`, so Vercel never deploys it as a function, and it runs in Vitest's `node` environment.
+4. `api/me.js`: `GET /api/me` returns `{ uid }` with `Cache-Control: private, no-store`, or 401 `{ error: 'Unauthorized' }`. M5 adds stats.
+5. `db/migrations/002_scores_user_fk.sql` changes `scores.user_id` from `text` to `uuid` (the table is empty) and adds a foreign key to `neon_auth."user"(id)` with `on delete cascade`.
+6. `.env.example`: add `NEON_AUTH_BASE_URL` and `VITE_NEON_AUTH_URL`, both public URLs that the Neon integration sets.
+7. Stop for review.
+
+**User steps:**
+
+- **Trusted domains (before M4).** In the Neon Console → Auth → Domains, add `http://localhost:3000` for `vercel dev`, and also `http://localhost:5173` if sign-in is tested under plain `npm run dev`.
+  - The Vercel integration already adds the production domain, the team and branch aliases, and one entry per deployment. As of 2026-10-27 the list holds `aim-assist-v2.vercel.app`, `aim-assist-v2-christian-toro.vercel.app`, `aim-assist-v2-git-release-v20-christian-toro.vercel.app` and four per-deploy URLs.
+  - The per-deploy entries accumulate, and old ones can be pruned.
+- **Google OAuth, in two stages.** The credentials live in the Neon Console, so switching changes no code and needs no redeploy.
+  - *Development (M4 onward):* Neon's shared keys, already offered under Auth → OAuth providers → Google. The Google consent screen then shows Neon's name and logo.
+  - *Before the portfolio launch:* your own client, so the consent screen shows "Aim Assist":
+    1. In Google Cloud Console → APIs & Services → OAuth consent screen, choose External, set the app name to "Aim Assist", add a support email, and keep only the basic scopes (`openid`, `email`, `profile`), which need no Google verification.
+    2. Go to Credentials → Create OAuth client ID → Web application, and use the redirect URI that Neon's Google "configure" dialog shows.
+    3. Paste the client ID and secret into Neon's Google configuration in place of the shared keys.
+
+**Risk:** the foreign key makes `neon_auth."user"` a dependency of our schema. If a future Neon Auth internal migration drops or rebuilds that table, it would fail on the foreign key. If that ever happens, removing the constraint is a one-line migration.
+
+### M3 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (including the new verifier tests) and `npm run build` pass.
+- `002_scores_user_fk.sql` applies in PGlite on top of `001` and a stub `neon_auth."user"`:
+  - a non-uuid `user_id` is rejected;
+  - an unknown user is rejected by the foreign key;
+  - deleting a user cascades to their scores.
+- Under `vercel dev`, `GET /api/me` returns 401 with no token, a malformed token or a forged token.
+- With the user's approval, against Neon:
+  - `npm run db:migrate` applies `002`. *Confirmed 2026-10-27: the user ran it. `user_id` is `uuid`, `scores_user_id_fkey` references `neon_auth."user"(id) ON DELETE CASCADE`, and a rerun reports nothing to apply.*
+  - a real Neon Auth token from a temporary email/password test user, deleted afterwards, returns 200 `{ uid }` from `/api/me` and confirms the token's `iss`, `aud` and `alg`. *Confirmed 2026-10-27 under `vercel dev`:*
+    - *The real JWT returned 200 with the user's uid. The same token with `sub` altered returned 401, and the opaque session token from sign-up also returned 401.*
+    - *Token facts: `alg` is `EdDSA` with the JWKS `kid`; `iss` and `aud` are both the auth URL's origin; the lifetime is 900 s.*
+    - *Deleting the test user cascaded to `session` and `account`, leaving 0 users.*
+- Deployed, *confirmed 2026-10-27 on `aim-assist-v2.vercel.app`*:
+  - `/api/me` returned 401 with no token, a malformed token and a forged token, with `Cache-Control: private, no-store`. That rules out a missing `NEON_AUTH_BASE_URL` (it would give 500) and shows the remote JWKS fetch works.
+  - A real token reaching 200 on Vercel is first exercised by M4's sign-in.
+
+## M4 detail
+
+1. Add `@neondatabase/auth@0.7.0-beta`, pinned exactly.
+2. `src/services/auth.js`:
+   - Build `BetterAuthReactAdapter()(VITE_NEON_AUTH_URL)` directly rather than through `createAuthClient()`. For this adapter, `createAuthClient()` returns only the Better Auth client, which has no `getJWTToken()` (found in the SDK source).
+   - Exports:
+     - `signInWithGoogle()`: a full-page redirect through `signIn.social`. `callbackURL` is the current absolute URL, because a relative one would resolve against the auth origin.
+     - `signOutUser()`.
+     - `useAuthSession`: the SDK's `useSession` hook.
+     - `getAuthToken()`: `adapter.getJWTToken(false)`. The SDK copies the `set-auth-jwt` header into `session.token`, so this returns the JWT that `/api` needs.
+3. `src/utils/authUser.js` holds `toAppUser()`, a pure mapping from `{ id, name, image }` to `{ uid, displayName, photoURL }`, with Vitest tests.
+4. `AuthProvider` builds `{ user, isLoading }` from `useAuthSession()` and `toAppUser`. The `ensureUserDocument` call is removed, since it can't write to Firestore without a Firebase user and M6 deletes it.
+5. `AuthControls` and `Leaderboards`: drop `isUserCancellation`, which was a popup-only concept; a redirect has no popup to close.
+6. `src/firebase/config.js`: remove `getAuth` and `GoogleAuthProvider`. Firestore stays until M6.
+7. `api/_lib/verifier.js` and `auth.js`: also check `aud`, which equals the Neon Auth origin (the hardening noted in M3), with a test for the wrong audience.
+8. `vite.config.js`: put the SDK in its own `auth-vendor` chunk, so app changes don't invalidate it in caches.
+9. **`vercel.json` fix (found by the user running `npm run dev:full`).**
+   - **Symptom:** Vite failed with "Failed to parse source for import analysis… index.html".
+   - **Cause:** under `vercel dev` there are no built files, so M1's catch-all rewrite sent everything to `/index.html`, including `/src/main.jsx`, `/@vite/client` and `/favicon.svg`. Vite then received module requests for `index.html`.
+   - **Fix:** the rewrite is now `/((?!api(?:/|$)|@)[^.]*)`. It applies only to paths without a file extension, and skips `/api` and Vite's `/@…` paths. App routes never contain a dot.
+   - **Production bonus:** a missing file such as an old `/assets/*.js` after a deploy now returns 404, where it used to return `index.html` with a 200, which surfaced as a confusing MIME-type error.
+   - **Verification gap:** M1's and M2's `vercel dev` checks only requested `/api/health` and HTML pages, never a module, which is why this wasn't caught earlier.
+10. Stop for review.
+
+**Known gap until M6:** Profile stats and score saving still go through Firestore, which no longer sees a signed-in user. They fail on this branch until M6 moves them to `/api`.
+
+### M4 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (87 tests) and `npm run build` pass. The entry chunk is 3.3 kB gzip, and `auth-vendor` is 67 kB gzip.
+- `vercel.json` rewrite:
+  - `path-to-regexp@6.1.0` matches as intended in 18 cases: app routes and `/apiary` are rewritten; `/api*`, `/@vite/client`, `/@id/…`, `/src/main.jsx`, `/favicon.svg`, `/assets/*.js` and `/node_modules/.vite/deps/*` pass through.
+  - Under `vercel dev`, modules are served as `text/javascript` (including `/src/services/auth.js` and the pre-bundled Neon Auth SDK), pages as HTML, `/api/health` as 200 and `/api/me` as 401.
+  - *Confirmed 2026-10-27 on `aim-assist-v2.vercel.app` (the M4 build, which preloads `auth-vendor`):*
+    - *`/`, `/leaderboards`, `/profile` and `/no-such-page` return 200 HTML.*
+    - *The real entry chunk returns 200 JavaScript, and `/favicon.svg` is served as `image/svg+xml`.*
+    - *A missing `/assets/index-OLDHASH.js` and `/missing.png` now return 404.*
+    - *`/api/health` returns 200, `/api/me` 401 and `/api/nope` 404.*
+- SDK smoke test in Node against the live Neon Auth instance:
+  - `signIn.social`, `signOut`, `useSession` and `getJWTToken` exist.
+  - `getJWTToken(false)` returns `null` when signed out.
+  - A Google sign-in for a trusted callback (`localhost:3000`) returns Neon's `/sign-in/social/init` URL.
+  - An untrusted callback is rejected with 403.
+- *2026-10-27: the user reported that "sign-in works locally" under `npm run dev:full`, which covers check 1. Checks 2–6 (reload, Safari or blocked third-party cookies, sign-out, `/profile`, and a browser JWT reaching `/api/me`) weren't reported and remain open. Check 3 matters most before launch.*
+- **Browser checks (user):** on `vercel dev`, or on the Vercel deploy after a push.
+  1. "Continue with Google" goes to Google (Neon branding with the shared keys), returns to the same page, and the avatar appears.
+  2. Reload: still signed in.
+  3. Same in Safari, or in Chrome with third-party cookies blocked.
+  4. "Sign out", then reload: signed out.
+  5. `/profile` opens while signed in. Its stats error until M6 is expected.
+  6. In the DevTools console, signed in: `fetch('/api/me', { headers: { Authorization: 'Bearer ' + await (await import('/src/services/auth.js')).getAuthToken() } }).then((r) => r.json())` returns your `{ uid }`. This works under `vercel dev` only, because production bundles don't serve `/src`.
+
+## M5 detail
+
+1. `api/_lib/http.js` holds the response helpers shared by every route:
+   - `json()` sends `Cache-Control: private, no-store` on every response. Public boards aren't CDN-cached either, so a score shows up the moment it's saved.
+   - `readJson()` turns a malformed body into a 400.
+   - `handle(handler)` maps an `AuthError` to 401 `{ error: 'Unauthorized' }` and an `HttpError` (built with `badRequest()`) to its status and details. Anything else propagates, so Vercel answers 500.
+2. `api/_lib/scoreInput.js` holds `parseScoreSubmission(body)`, a pure validator. It returns `{ score }` with only the four known fields, or `{ invalid: [field, …] }` listing every bad field.
+   - The bounds match `001_init.sql`'s CHECKs. The mode allowlist is built from `src/game/modes.js`, so the client and server lists can't drift; the SQL CHECK stays as the backstop.
+   - Unknown keys, a `uid` included, are dropped. `reactionTime` must be present, either `null` or an integer.
+3. `api/_lib/leaderboardView.js` holds `VIEWS` and `periodStart(view, now)`, which is pure. It returns UTC midnight for `daily`, Monday 00:00 UTC for `weekly`, and `null` otherwise.
+4. `api/_lib/scoreStore.js` holds `createScoreStore(sql)`, which owns every query. `db.js` wires it to Neon as `scoreStore`. The same pattern as `verifier.js` / `auth.js` lets a check script run the real queries on PGlite.
+   - `insert` returns `{ id, createdAt }`.
+   - `profileStats(uid)` derives `gamesPlayed`, `highestScore`, `averageAccuracy` and `favoriteMode` (`mode() within group`) from `scores`, plus the account's `createdAt` from `neon_auth."user"`. It returns zeros and a `null` mode for a player with no matches, and `null` for an unknown user.
+   - `topScores(since)` keeps each player's best score in the window (`DISTINCT ON (user_id)`), ranks the top 100, and breaks ties in favour of the earlier score.
+   - `personalBests(uid)` returns the caller's own top 10, with several entries per player allowed.
+   - Entries come back in the shape `Leaderboard.jsx` renders: `{ id, uid, displayName, photoURL, mode, score, accuracy, reactionTime, createdAt }`. Name and avatar are joined from `neon_auth."user"`, and the email is never selected.
+5. Routes:
+   - `GET /api/me` returns `{ uid, gamesPlayed, highestScore, averageAccuracy, favoriteMode, createdAt }`, the flat shape `getUserProfile` returned, so M6 changes no consumer. A valid token whose user was deleted gets 401.
+   - `POST /api/scores` checks the token, then validates the body (400 `{ error, invalid }`), then inserts, and returns 201 `{ id, createdAt }`. A foreign-key violation (`23503`: the token outlived its user) becomes 401.
+   - `GET /api/leaderboard?view=all|daily|weekly|personal` (default `all`) returns `{ entries }`. Only `personal` needs a token; an unknown view returns 400 with the valid list.
+6. Vitest tests for `scoreInput`, `leaderboardView` and `http` run in the `node` environment with no mocks.
+7. Stop for review.
+
+**Behaviour changes from v1:**
+
+- Public boards now show one entry per player; in v1 one player could fill the daily top 100.
+- Names and avatars come live from Neon Auth, so a renamed Google account updates its old entries. In v1 they were copied onto each score.
+- Daily and weekly boards use UTC days; in v1 they used the player's local day keys.
+
+**Known gap:** `POST /api/scores` has sanity bounds but no rate limit, as in v1. A signed-in user can post many plausible scores. M7 builds per-user rate limiting for the AI endpoints, and the same table could cover score submissions later.
+
+### M5 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (109 tests, up from 87) and `npm run build` pass.
+- `scoreStore` on PGlite, with `001` and `002` applied on a stub `neon_auth."user"` that has the live columns, passes 12 checks:
+  - The all-time, weekly and daily boards each keep one best entry per player, and the UTC windows exclude last week's and yesterday's scores.
+  - Tied scores rank the earlier one first.
+  - The personal board lists several of the player's own matches.
+  - Entries have the client's shape and no email.
+  - Stats are right for a player with matches, zeros and `null` for one with none, and `null` for an unknown user.
+  - `insert` returns `{ id, createdAt }`, and an unknown user is rejected with SQLSTATE `23503`.
+- Under `vercel dev` against Neon (scores table empty):
+  - `/api/leaderboard` with no view, `daily` and `weekly` return 200 `{"entries":[]}`, so the windowed query runs on Neon through the real driver.
+  - `?view=bogus` returns 400. `?view=personal`, `/api/me` and `POST /api/scores` without a token or with a forged one return 401.
+  - `GET /api/scores` returns 405.
+  - Every M5 response carries `private, no-store`.
+- Signed-in paths, *confirmed 2026-10-28 (UTC) under `vercel dev` against Neon*, with a temporary email/password user and its JWT from `{base}/token`. All 22 checks passed:
+  - *A new user's `/api/me` showed zero stats, a `null` favourite mode and the account's `createdAt`, and the personal board was empty.*
+  - *A body with a bad mode and a negative score got 400 `{"error":"Invalid score","invalid":["mode","score"]}`. Malformed JSON got 400, and no token got 401.*
+  - *Three valid posts got 201 `{ id, createdAt }`. The `uid` in one body was ignored: 3 rows were saved under the token's uid, and 0 under the body's.*
+  - *`/api/me` then showed 3 games, a high score of 3100, 80 average accuracy and Precision as the favourite mode. The personal board listed 3100, 2500, 1800 with the client's entry shape and no email.*
+  - *Signed out, the all, daily and weekly boards each held exactly one entry for the player: its best score, 3100.*
+  - *After the user was deleted by exact id and email, the still-valid JWT got 401 from `/api/me` (no user row) and from `POST /api/scores` (foreign-key violation).*
+  - *Cleanup left 0 test users, 0 of their sessions and 0 scores.*
+
+## M6 detail
+
+1. `src/services/api.js` (new) is the only place the browser calls `/api`:
+   - `apiFetch(path, { method, body, auth })` sends `body` as JSON. With `auth`, it adds `Authorization: Bearer <getAuthToken()>`. When signed out it throws a 401 `ApiError` without making a request.
+   - A non-2xx response becomes `ApiError { status, message }`, with the message taken from the server's `{ error }`. A network failure stays fetch's `TypeError`.
+2. The services keep their export names but are now `fetch` wrappers:
+   - `users.js`: `getUserProfile()` reads `GET /api/me`. `ensureUserDocument` and `recordMatchOnProfile` are deleted, because the server derives the stats.
+   - `scores.js`: `saveMatchResult({ mode, summary })` posts `toScoreSubmission(mode, summary)`, a pure function giving `{ mode, score, accuracy, reactionTime }`.
+   - `leaderboard.js`: `getTopScores(period)` and `getPersonalBestScores()` unwrap `{ entries }`.
+   - The `uid` and `user` arguments are gone, since identity comes from the token. The hooks still key their results by `uid`, and `GameArea` stops passing `user`.
+3. UI:
+   - `Leaderboard.jsx` and `ProfileCard.jsx` format the API's ISO `createdAt` strings. `ProfileCard`'s "Playing since" is now the Neon Auth account's creation date.
+   - `Leaderboard.jsx`'s Firestore errors (missing index, rules) are replaced by HTTP ones: a 401 asks you to sign in again, and a 5xx or network failure reads as an outage. Everything else gets the generic message.
+   - `Footer.jsx` reads "Built with React, Canvas, Neon & Vercel".
+4. Removed:
+   - the `firebase` dependency and `src/firebase/`;
+   - `firebase.json`, `.firebaserc`, `firestore.rules` and `firestore.indexes.json`;
+   - `src/utils/dates.js` and its test (the Firestore day/week keys, which the UTC windows in `/api` replace);
+   - the vite `firebase` chunk and its `chunkSizeWarningLimit`, since no chunk comes near the default 500 kB;
+   - the `VITE_FIREBASE_*` block in `.env.example`, and CLAUDE.md's "until M6" note.
+5. Tests:
+   - `users.test.js` is rewritten.
+   - New tests: `api.test.js` (stubbed `fetch` and a stubbed token), `scores.test.js` and `leaderboard.test.js`.
+   - `Leaderboard.test.jsx` now covers the HTTP error messages and ISO dates.
+   - README's Firebase sections wait for M9.
+6. Stop for review.
+
+**User steps:**
+
+- Vercel → Settings → Environment Variables: delete the six `VITE_FIREBASE_*` variables. Nothing reads them now.
+- Keep the Firebase project for as long as v1 on `main` uses it.
+
+### M6 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (116 tests, up from 109) and `npm run build` pass.
+- Bundle:
+  - The 141 kB gzip `firebase` chunk is gone. All JS is now 156 kB gzip, of which `react-vendor` is 72 kB and `auth-vendor` 67 kB.
+  - The entry chunk is still 3.3 kB gzip.
+  - `dist/` has no Firebase, Firestore or `googleapis` strings, and `package-lock.json` has no `@firebase` packages.
+- The server routes the client now calls were checked end to end with a real JWT in M5.
+- Under `vercel dev`, `/leaderboards` returns HTML, the new client modules (`/src/services/api.js`, `leaderboard.js`, `Leaderboard.jsx`) are served as `text/javascript`, and `/api/leaderboard` returns 200 JSON.
+- *2026-10-28: the user reported "browser checks pass". That covers the five M6 checks below. Whether the M4 checks run in the same pass (reload, Safari or blocked third-party cookies, sign-out) wasn't stated, so they stay open under M4.*
+- **Browser checks (user):** under `npm run dev:full`, then on the Vercel deploy after a push. The open M4 checks (reload, Safari or blocked third-party cookies, sign-out) can run in the same pass.
+  1. Signed out, `/leaderboards`: All Time, Today and This Week load, and Personal Best shows the sign-in prompt.
+  2. Signed in, finish a match: the results say "Saved to your profile."
+  3. The score appears once on All Time, Today and This Week, and on Personal Best.
+  4. `/profile`: the stat tiles, "Playing since" and Best Matches reflect the match.
+  5. Play a lower-scoring match: the public boards still show one entry for you, Personal Best lists both, and Games Played is 2.
+
+## M7 detail
+
+Model facts come from the `claude-api` skill (cached 2026-10-06), checked against SDK 1.3.0's types:
+
+- **Model:** `claude-opus-5-5`, the skill's default.
+- **Thinking:** always on for this model. The request omits `thinking`; `{ type: 'disabled' }` would return a 400.
+- **Effort:** `output_config.effort` is the depth control, and its default is `medium`.
+- **Structured outputs:** `output_config.format: { type: 'json_schema', schema }`. The schema can't carry `minimum`/`maximum`, so numeric bounds are checked after parsing.
+- **Refusals:** `fallbacks: 'default'` with the `server-side-fallback-2026-07-01` beta re-runs a refused request on a fallback model chosen by refusal category, inside the same call.
+
+Steps:
+
+1. `db/migrations/003_insights.sql` adds `insights`, with one row per generated recommendation:
+   - columns: `user_id` (foreign key to `neon_auth."user"`, cascading on delete), `kind` (`'hardware' | 'platforms'`, the latter for M8), `input_hash` (sha256 hex), `result jsonb`, `model` and `created_at`;
+   - an index on `(user_id, kind, created_at desc)`.
+2. `api/_lib/insightPolicy.js` (pure):
+   - `DAILY_LIMIT = 5` fresh answers per player and kind in a rolling 24 hours, and `MIN_MATCHES = 5`.
+   - `inputHash(inputs)`, a sha256 of key-sorted JSON.
+   - `windowStart` and `retryAfterSeconds`.
+3. `api/_lib/insightRunner.js`: `createInsightRunner(store)` holds the policy that M8 reuses:
+   - If the inputs hash the same as the player's latest answer, that answer is returned (`cached: true`) without calling Claude and without counting against the limit.
+   - Otherwise a player at the limit gets 429 with `Retry-After`.
+   - Otherwise it calls `generate()`, saves the result, and returns `{ recommendation, model, generatedAt, cached }`.
+   - The cap is soft: two simultaneous requests can both pass the check.
+4. `api/_lib/insightStore.js` (`latest`, `countSince`, `save`) and `scoreStore.modeStats(uid)`. `modeStats` returns per-mode matches, best and average score, average accuracy and average reaction time, rounded, as numbers, in a stable order.
+5. `api/_lib/structuredOutput.js`: `createStructuredCaller(client)` makes one `client.beta.messages.create` call with the settings above and resolves to `{ data, model }`.
+   - A `refusal` (even after the fallback), a `max_tokens` stop or unparseable text becomes 502.
+   - An overload, rate limit or lost connection becomes 503 with `Retry-After: 30`.
+   - Other API errors (a bad key or a bad request) are our bug and surface as 500.
+   - `api/_lib/claude.js` wires it to `new Anthropic({ maxRetries: 1, timeout: 60_000 })`, which reads `ANTHROPIC_API_KEY`.
+6. `api/_lib/hardwareAdvice.js` (pure):
+   - `parseSetup(body)` reads the optional `{ setup: { dpi, pollingRateHz } }`, with DPI an integer from 100 to 32,000 and polling rate one of 125 to 8,000 Hz.
+   - `SYSTEM_PROMPT` describes every game mode from `src/game/modes.js`, and explains that "sensitivity" means OS pointer speed in a browser game.
+   - `ADVICE_SCHEMA` has `summary`, `dpi`, `sensitivity` and `pollingRateHz`, each with a rationale.
+   - `buildPrompt(modeStats, setup)` and `parseAdvice(data)`.
+   - `PROMPT_VERSION` is part of the cache key, so changing the prompt regenerates cached answers.
+7. `POST /api/insights/hardware` checks the token, then the setup (400), then the match count (422 `{ needed, played }`), then runs the runner, and returns 200 with the recommendation.
+8. `.env.example` gets `ANTHROPIC_API_KEY` in the server-only section.
+9. Tests (all without network): `insightPolicy`, `insightRunner` (in-memory store), `structuredOutput` (a fake client, SDK error classes) and `hardwareAdvice`.
+10. Stop for review.
+
+**Cost bound:** a fresh answer is one non-streaming Opus 5.5 call, with a system prompt and stats of about 1k input tokens and a short JSON answer plus thinking at `medium`. That's a few cents per call. Each player is capped at 5 fresh answers per day, and repeats with unchanged stats are free.
+
+**User steps:**
+
+- Add `ANTHROPIC_API_KEY` in Vercel → Settings → Environment Variables for Production, Preview and Development. Then run `vercel env pull .env.local` locally.
+- Apply `003`: `npm run db:migrate` (or approve Claude running it).
+
+### M7 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (154 tests, up from 116) and `npm run build` pass. The SDK isn't in `dist/`.
+- PGlite, with `001` to `003` applied on a stub `neon_auth."user"`, passes 15 checks:
+  - `modeStats` returns one row per mode, as rounded numbers with nulls handled, for the caller only.
+  - `003` rejects an unknown kind, a non-hex hash and an unknown user.
+  - Runner and store, end to end:
+    - a first answer is generated and saved, and `jsonb` round-trips as an object;
+    - the same inputs in any key order reuse it;
+    - 5 fresh answers are allowed, and the 6th gets 429 with a `Retry-After` of about 24 hours;
+    - the latest answer is still served while the player is at the limit;
+    - the limit lifts after 24 hours;
+    - kinds and players are counted separately;
+    - deleting the user cascades to their insights.
+  - The 12 M5 checks still pass.
+- Under `vercel dev`, `POST /api/insights/hardware` returns 401 with no token or a forged one, and `GET` returns 405. So the function bundles and imports the SDK without a key.
+- *2026-10-28: the user added `ANTHROPIC_API_KEY` in Vercel, pulled it, and applied `003` (`schema_migrations` lists `001` to `003`).*
+- Live check, *2026-10-28 under `vercel dev` against Neon and the Claude API*, with a temporary email/password user that was deleted afterwards. 10 of 11 checks passed as scripted:
+  - *0 matches and 4 matches got 422 `{ needed: 5, played }`, and `{ setup: { dpi: 50 } }` got 400 naming `setup.dpi`.*
+  - *With 6 matches and no setup, a fresh 200 took 12.2 s. `model` was `claude-opus-5-5` (no fallback), with DPI 800, pointer speed 1:1 with acceleration off, and 1000 Hz. Each rationale quoted the player's numbers, for example "59.9% in Flick (625 ms average reaction against a 0.9 s expiry)", and the summary warned that 1–2 matches per mode are early indicators.*
+  - *With `{ dpi: 1600, pollingRateHz: 500 }`, a fresh 200 took 15.4 s. It kept 1600 DPI, citing the high Precision and Gridshot accuracy, and recommended going from 500 to 1000 Hz.*
+  - *Exactly 2 `insights` rows were saved. The repeat added none.*
+  - *Cleanup left 0 test users, insights and scores.*
+  - *The scripted cached-repeat check failed:*
+    - *The repeat returned in 762 ms without calling Claude, but the script compared the recommendation as a JSON string. `jsonb` doesn't keep key order: it returned `dpi` before `summary`.*
+    - *PGlite, running the same runner and store, confirmed the cached answer deep-equals the fresh one and has the same `generatedAt`.*
+    - *So the content matches. Only the key order differs between a fresh answer and a cached one, which consumers reading by key don't notice.*
+  - *Not measured: token usage and cost per call. The responses weren't logged with `usage`.*
+- **For M8's UI:** a fresh answer takes about 12–15 s, so the display needs a visible loading state.
+
+## M8 detail
+
+**Scope** (the user's choices, 2026-10-28):
+
+- "Gaming platforms" means **games and genres**: 3 to 5 shooter titles that suit the player's aim profile, each with the platforms it's on. This was chosen over recommending PC vs console, since every player here aims with a mouse.
+- The Profile page shows **both** insights, hardware and platforms.
+
+Steps:
+
+1. **Server: the shared parts are factored out of M7.**
+   - `api/_lib/insightRequest.js`: `requestInsight({ uid, kind, advice, context })` holds the steps after authentication. It loads `modeStats`, requires 5 matches (422), and runs the M7 runner around one Claude call validated by the kind's `parseAdvice`. Its `advice` argument is a kind's module.
+   - `api/_lib/modeReference.js` holds the per-mode prompt text from M7, unchanged.
+   - `api/_lib/checks.js` holds the type guards that `scoreInput`, `hardwareAdvice` and `platformAdvice` share.
+   - `hardware.js` now calls `requestInsight`. Its cache key is still `{ version, modeStats, setup }` and its system prompt is byte-identical, so `PROMPT_VERSION` stays 1.
+2. **`api/_lib/platformAdvice.js`.**
+   - `SYSTEM_PROMPT` maps the modes to aiming skills and asks for released, actively played games only, each with a fit that cites the player's numbers.
+   - `ADVICE_SCHEMA` is `{ summary, picks: [{ title, genre, platforms[], fit }], avoidForNow }`. The platforms enum is PC, PlayStation, Xbox, Nintendo Switch and Mobile.
+   - `parseAdvice` enforces what the schema can't: 3–5 picks, distinct titles ignoring case, and at least one known platform per pick with no repeats.
+3. **`POST /api/insights/platforms`** takes no body. It uses its own cache and daily limit (`kind: 'platforms'`).
+4. **Client.**
+   - `ApiError` now carries the error body as `details`.
+   - `services/insights.js` has `getHardwareInsight(setup)` and `getPlatformInsight()`.
+   - Pure helpers: `utils/insightErrors.js` turns a 422, 429 (with the wait formatted as "in about 3 hours"), 401, 502, 503 or network failure into a message. `utils/mouseSetup.js` turns the form fields into `setup`, leaving blanks out and rejecting an out-of-range DPI.
+   - The `useInsight(request)` hook runs on demand, never on mount, since each fresh answer costs a Claude call. It keeps the last answer through a reload or a failure, and only the latest of overlapping requests lands.
+5. **UI.**
+   - `InsightPanel` is the shared frame: title, inputs, button, a loading line ("Asking Claude. This can take 15 seconds."), the error, the answer, and a "Generated …" line that says when the answer is cached.
+   - `HardwareInsight` has optional DPI and polling-rate inputs. `PlatformInsight` lists the picks and the "Hold off on" line.
+   - `Profile.jsx` gains an "AI Insights" section with the two panels side by side from `md` up.
+   - Polished UI comes later, on feature branches.
+6. Stop for review.
+
+### M8 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (193 tests, up from 154) and `npm run build` pass. `Profile` is 3.2 kB gzip, and the entry chunk is unchanged at 3.3 kB.
+- New tests:
+  - `platformAdvice`: a closed schema, including nested objects, and every rejection rule.
+  - `insightErrors` and `mouseSetup`.
+  - `services/insights`.
+  - `ApiError` details.
+  - `InsightPanel`: the button, the loading state, the answer, the cached note, and an error shown with the previous answer kept.
+- No-cost live check under `vercel dev` against Neon, with a temporary user (deleted afterwards). Every path that stops before Claude passed, 8 checks:
+  - `platforms` with no token returns 401;
+  - with no body and 0 matches, 422;
+  - with 3 matches, 422 with `played: 3`;
+  - `hardware` (after the refactor) with 3 matches returns 422, and with a bad polling rate, 400;
+  - no `insights` rows were written;
+  - cleanup was complete.
+- The `/profile` page and the new client modules are served under `vercel dev`, and `GET /api/insights/platforms` returns 405.
+- *2026-10-28: the user reported "browser checks pass", which covers the four Profile checks below. They ran signed in with Google, so they include real platforms and hardware answers from Claude.*
+- **Browser checks (user):**
+  - a real platforms recommendation (a Claude call);
+  - the Profile UI in a browser, signed in with Google and with 5 or more matches:
+    1. "Get recommendation" on each panel shows the loading line, then the answer.
+    2. A second click gives the same answer instantly, marked cached.
+    3. Entering a DPI and polling rate in the mouse panel gives a fresh hardware answer.
+    4. An invalid DPI (for example 50) shows the inline message without a request.
+
+## M9 detail
+
+1. **`ARCHITECTURE.md`** (new, at the root) describes the system as built rather than as first specified.
+   - **Why a rewrite:** v1's spec named modules that never existed, such as `Renderer.js`.
+   - **Overview:** a diagram and three rules: React never animates gameplay, the browser never touches data directly, and identity comes only from a verified token.
+   - **Layer 1, React:** the folders, the services and `ApiError`, and data fetching.
+   - **Layer 2, the canvas engine:** the modules, the scene contract and the React boundary, all unchanged from v1.
+   - **Layer 3, the server:** the routes, the factory-plus-wiring pattern in `api/_lib/`, and the data model with derived stats.
+   - **Request flows:** sign-in and identity, saving a match, leaderboards, and AI insights with their status codes.
+   - Plus sections on security, testing, and deployment and local development.
+2. **`README.md`.** The Problem and Value sections stay in the user's words, with three run-together-word typos fixed.
+   - **Rewritten:** the intro, the live demo (`aim-assist-v2.vercel.app`), a v2 paragraph under Project Plan, Features (derived stats, one entry per player, UTC days, AI insights), the stack table, AI Tools Used (with v2 prompt-history links), the Architecture diagram and its second rule, Getting Started and Scripts.
+   - **Getting Started:** the Vercel, Neon Marketplace, `ANTHROPIC_API_KEY`, `vercel env pull`, `db:migrate`, trusted-domain and `dev:full` setup.
+   - **Anti-cheat ("server-authoritative scoring"):** rewritten. The server now validates bounds and ownership, but scores are still computed client-side. The fix is a server-signed match token, and with a server in place it's a feature to build, no longer a hosting limitation.
+   - **Removed:** "AI-powered recommendations" (shipped) from the next-features list, which also had two bullets run together.
+   - **Engineering notes:** Postgres versus Firestore, validation in two places, structured AI output, injected dependencies, and current bundle numbers.
+3. **`CLAUDE.md`:** the document list adds `ARCHITECTURE.md`, and the line pointing at `V1-ARCHITECTURE.md` for the engine design goes.
+4. Stop for review.
+
+### M9 verification
+
+- A script checked every relative link and in-page anchor in `README.md`, `ARCHITECTURE.md`, `CLAUDE.md`, `PLAN-V2.md` and `PROMPT-HISTORY.md`: 0 broken. The live demo URL returns 200.
+- The figures in the docs were checked against the repo:
+  - 193 tests;
+  - the bundle: 3.3 kB entry, 72 kB `react-vendor` and 67 kB `auth-vendor` (gzip), with Firebase's 141 kB chunk gone;
+  - the routes and their auth;
+  - the table columns, the insight limits (5 matches, 5 per day) and the model id.
+- `npm run lint`, `npm run format:check`, `npm test` and `npm run build` pass. Only docs changed.
+- **Still open, user steps outside the repo:** the two pre-launch steps below. M9's doc work doesn't depend on them.
+
+## Pre-launch user steps (M9)
+
+M9 is detailed when it starts. These steps happen outside the repo, and they're recorded here so they aren't lost.
+
+1. **Your own Google OAuth client.** Replace Neon's shared keys, as described in the M3 detail under "Google OAuth, in two stages".
+2. **Store the database credentials as Secrets.**
+   - **Problem** (found 2026-10-28): Vercel flags the Neon integration's variables as "needs attention: looks like a secret, but its value is visible to anyone with access". The integration created them as readable Config values.
+   - **Exposure:** limited to members of the Vercel team. A grep of `dist/` found no connection strings or API keys, and only the two public Neon Auth URLs carry the `VITE_` prefix.
+   - **Real secrets:** `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`, `POSTGRES_URL_NO_SSL`, `POSTGRES_PRISMA_URL`, `POSTGRES_PASSWORD` and `PGPASSWORD`.
+   - **False positives:** the host, user and database names, `NEON_PROJECT_ID`, `NEON_AUTH_BASE_URL` and `VITE_NEON_AUTH_URL` are config, not secrets.
+   - **Fix:** Vercel doesn't let integration variables be switched to Secret in the list. Its documented path:
+     1. Disconnect the Neon resource from the project.
+     2. Rotate the credentials by resetting the database role's password, so the old values stop working.
+     3. Reconnect with **Development deselected** and **Sensitive** enabled. A connection that includes Development can't be Sensitive.
+     4. Redeploy.
+   - **Local development afterwards:** `vercel env pull` no longer provides `DATABASE_URL`. Create a Neon branch for development and put its connection strings in `.env.local` by hand (`DATABASE_URL`, `DATABASE_URL_UNPOOLED`). `npm run db:migrate` then targets that branch, so run it on production separately. Neon Auth state branches with the database, so the dev branch has its own users, and its auth URL may differ: check `NEON_AUTH_BASE_URL` / `VITE_NEON_AUTH_URL` for the branch.
+   - **`ANTHROPIC_API_KEY`:** this was added by hand, so its type was chosen when it was created. Make sure it's a Secret in Production and Preview. Re-creating it as a Secret for Development may also stop `vercel env pull` from writing it, so keep the local copy in `.env.local`.
+   - Sources: [Config and Secret environment variables](https://vercel.com/docs/environment-variables/sensitive-environment-variables), [Production-only Marketplace credentials](https://vercel.com/changelog/secure-marketplace-credentials-with-production-only-access).

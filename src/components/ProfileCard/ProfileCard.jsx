@@ -1,16 +1,17 @@
 import Card from '../Card/Card'
 import StatTile from '../StatTile/StatTile'
 
+// createdAt is the account's ISO timestamp from /api/me.
 const memberSince = (createdAt) =>
-  createdAt?.toDate
-    ? createdAt.toDate().toLocaleDateString(undefined, {
+  createdAt
+    ? new Date(createdAt).toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'long',
       })
     : null
 
-// Player dashboard: identity from Firebase Auth, aggregates from the
-// Firestore profile document (written after each match).
+// Player dashboard: identity from the Neon Auth session, aggregates
+// derived by /api/me from the player's scores.
 const ProfileCard = ({ user, profile }) => {
   const joined = memberSince(profile?.createdAt)
 
