@@ -689,4 +689,24 @@ The narrowed rewrite behaves as intended in production. The deployment is the M4
 
 - [`PLAN-V2.md`](PLAN-V2.md) — the production results are recorded under M4's rewrite verification. Uncommitted.
 
+---
+
+## Session: 2026-10-27
+
+**Objective:** Resume v2.0 with a status check of the repo against PLAN-V2.md before M5 (data API).
+
+### Interaction 1 — SITREP before M5
+
+**User Prompt**
+
+> /prompt-history /sitrep
+
+**Agent Outcome**
+
+Read-only status report. `release/v2.0` is clean and level with `origin/release/v2.0`; the PLAN-V2 note from the previous session's Interaction 18 was committed as `906b5eb`. M0–M4 are Done in PLAN-V2 and match the code: `api/` holds only `health.js` and `me.js` (identity only, no stats), and migrations `001`–`002` exist. M5 (data API) is next and not started. `src/services/scores.js`, `leaderboard.js` and `users.js` still import Firebase, so score saving and Profile stats stay broken on the branch until M6, as planned. M4 browser checks 2–6 (reload, Safari/third-party cookies, sign-out, `/profile`, browser JWT → `/api/me`) are still unreported.
+
+**Verification**
+
+Git state, PLAN-V2.md, `api/me.js` and a Firebase grep of `src/services/` were inspected. Tests were not run.
+
 
