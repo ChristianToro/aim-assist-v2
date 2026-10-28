@@ -6,20 +6,22 @@ const BAD_REQUEST = 400
 // neither the browser nor Vercel's CDN may cache it.
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
 
-// An expected client error; `details` are merged into the JSON body.
+// An expected failure; `details` are merged into the JSON body and
+// `headers` (e.g. Retry-After) are added to the response.
 export class HttpError extends Error {
-  constructor(status, message, details = {}) {
+  constructor(status, message, details = {}, headers = {}) {
     super(message)
     this.status = status
     this.details = details
+    this.headers = headers
   }
 }
 
 export const badRequest = (message, details) =>
   new HttpError(BAD_REQUEST, message, details)
 
-export const json = (body, { status = 200 } = {}) =>
-  Response.json(body, { status, headers: NO_STORE })
+export const json = (body, { status = 200, headers = {} } = {}) =>
+  Response.json(body, { status, headers: { ...headers, ...NO_STORE } })
 
 export const readJson = async (request) => {
   try {
@@ -44,7 +46,7 @@ export const handle = (handler) => async (request) => {
     if (error instanceof HttpError) {
       return json(
         { error: error.message, ...error.details },
-        { status: error.status }
+        { status: error.status, headers: error.headers }
       )
     }
     throw error

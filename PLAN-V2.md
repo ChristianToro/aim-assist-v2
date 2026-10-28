@@ -42,7 +42,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M4 | Done | **Auth client switchover.** Add `@neondatabase/auth` and create the client from `VITE_NEON_AUTH_URL`. Move `services/auth.js` onto it: Google sign-in through `signIn.social`, sign-out, and the session. Move `AuthProvider` too, and keep the `useAuth()` shape by mapping `uid`, `displayName` and `photoURL` from the user's `id`, `name` and `image`, so consumers don't change. Add a `getAuthToken()` helper for the Bearer header that the M6 services send. Remove `getAuth` from `src/firebase/config.js`. Between M4 and M6 the Firestore writes have no Firebase user, so saving scores and profiles doesn't work on the branch; the data is being reset anyway. | `src/services/auth.js`, `src/contexts/AuthProvider.jsx`, `src/firebase/config.js` |
 | M5 | Done | **Data API.** Extend `GET /api/me` with stats derived in SQL, and add `POST /api/scores` (validated, uid taken from the session) and `GET /api/leaderboard?view=all\|daily\|weekly\|personal` (`DISTINCT ON`, UTC days). Write validation and stats logic as pure functions with Vitest tests. | `api/me.js`, `api/scores.js`, `api/leaderboard.js`, `api/_lib/` |
 | M6 | Done | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
-| M7 | Not started | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/anthropic.js`, migration |
+| M7 | Done | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/claude.js`, migration `003` |
 | M8 | Not started | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
 | M9 | Not started | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* switch Neon Auth's Google provider from the shared keys to your own OAuth client (see the M3 detail). | `ARCHITECTURE.md`, `README.md` |
 
@@ -67,7 +67,9 @@ Each dependency is added only in the milestone that uses it, with a justificatio
 - **`/api` needs the JWT, not the session token** (seen in M3). Neon Auth issues an Ed25519 JWT from `GET {base}/token` and in the `set-auth-jwt` header of `get-session`. The opaque `token` that sign-up and `session.token` return is rejected by `/api/me`. M4's `getAuthToken()` must return the JWT, so check what the SDK exposes, because Neon's Hono guide reads `session.token`.
 - JWTs last 900 s and are stateless, so a token stays valid for up to 15 minutes after sign-out or user deletion. Writes for a deleted user still fail on the `scores` foreign key.
 - Real tokens carry `aud` equal to the auth origin. The verifier checks `iss` but not `aud` yet. Adding `audience` is a one-line hardening for M4.
-- `@anthropic-ai/sdk` (M7): the official client for the AI features. Before M7, check the `claude-api` skill for the current model ids and structured-output support.
+- `@anthropic-ai/sdk` (M7, `^1.3.0`): the official Claude client.
+  - **Why:** it has typed errors (`RateLimitError`, `APIConnectionError`), retries and timeouts built in, and types for the beta parameters M7 uses (`fallbacks`, `output_config.format`). The `claude-api` skill says to call Claude through the SDK, not raw `fetch`.
+  - **Footprint:** server-only, never in the client bundle. About 24 MB installed, with three small dependencies. `zod` is an optional peer that M7 doesn't need: it uses a plain JSON schema.
 
 ## M0 detail
 
@@ -357,3 +359,81 @@ Each dependency is added only in the milestone that uses it, with a justificatio
   3. The score appears once on All Time, Today and This Week, and on Personal Best.
   4. `/profile`: the stat tiles, "Playing since" and Best Matches reflect the match.
   5. Play a lower-scoring match: the public boards still show one entry for you, Personal Best lists both, and Games Played is 2.
+
+## M7 detail
+
+Model facts come from the `claude-api` skill (cached 2026-10-06), checked against SDK 1.3.0's types:
+
+- **Model:** `claude-opus-5-5`, the skill's default.
+- **Thinking:** always on for this model. The request omits `thinking`; `{ type: 'disabled' }` would return a 400.
+- **Effort:** `output_config.effort` is the depth control, and its default is `medium`.
+- **Structured outputs:** `output_config.format: { type: 'json_schema', schema }`. The schema can't carry `minimum`/`maximum`, so numeric bounds are checked after parsing.
+- **Refusals:** `fallbacks: 'default'` with the `server-side-fallback-2026-07-01` beta re-runs a refused request on a fallback model chosen by refusal category, inside the same call.
+
+Steps:
+
+1. `db/migrations/003_insights.sql` adds `insights`, with one row per generated recommendation:
+   - columns: `user_id` (foreign key to `neon_auth."user"`, cascading on delete), `kind` (`'hardware' | 'platforms'`, the latter for M8), `input_hash` (sha256 hex), `result jsonb`, `model` and `created_at`;
+   - an index on `(user_id, kind, created_at desc)`.
+2. `api/_lib/insightPolicy.js` (pure):
+   - `DAILY_LIMIT = 5` fresh answers per player and kind in a rolling 24 hours, and `MIN_MATCHES = 5`.
+   - `inputHash(inputs)`, a sha256 of key-sorted JSON.
+   - `windowStart` and `retryAfterSeconds`.
+3. `api/_lib/insightRunner.js`: `createInsightRunner(store)` holds the policy that M8 reuses:
+   - If the inputs hash the same as the player's latest answer, that answer is returned (`cached: true`) without calling Claude and without counting against the limit.
+   - Otherwise a player at the limit gets 429 with `Retry-After`.
+   - Otherwise it calls `generate()`, saves the result, and returns `{ recommendation, model, generatedAt, cached }`.
+   - The cap is soft: two simultaneous requests can both pass the check.
+4. `api/_lib/insightStore.js` (`latest`, `countSince`, `save`) and `scoreStore.modeStats(uid)`. `modeStats` returns per-mode matches, best and average score, average accuracy and average reaction time, rounded, as numbers, in a stable order.
+5. `api/_lib/structuredOutput.js`: `createStructuredCaller(client)` makes one `client.beta.messages.create` call with the settings above and resolves to `{ data, model }`.
+   - A `refusal` (even after the fallback), a `max_tokens` stop or unparseable text becomes 502.
+   - An overload, rate limit or lost connection becomes 503 with `Retry-After: 30`.
+   - Other API errors (a bad key or a bad request) are our bug and surface as 500.
+   - `api/_lib/claude.js` wires it to `new Anthropic({ maxRetries: 1, timeout: 60_000 })`, which reads `ANTHROPIC_API_KEY`.
+6. `api/_lib/hardwareAdvice.js` (pure):
+   - `parseSetup(body)` reads the optional `{ setup: { dpi, pollingRateHz } }`, with DPI an integer from 100 to 32,000 and polling rate one of 125 to 8,000 Hz.
+   - `SYSTEM_PROMPT` describes every game mode from `src/game/modes.js`, and explains that "sensitivity" means OS pointer speed in a browser game.
+   - `ADVICE_SCHEMA` has `summary`, `dpi`, `sensitivity` and `pollingRateHz`, each with a rationale.
+   - `buildPrompt(modeStats, setup)` and `parseAdvice(data)`.
+   - `PROMPT_VERSION` is part of the cache key, so changing the prompt regenerates cached answers.
+7. `POST /api/insights/hardware` checks the token, then the setup (400), then the match count (422 `{ needed, played }`), then runs the runner, and returns 200 with the recommendation.
+8. `.env.example` gets `ANTHROPIC_API_KEY` in the server-only section.
+9. Tests (all without network): `insightPolicy`, `insightRunner` (in-memory store), `structuredOutput` (a fake client, SDK error classes) and `hardwareAdvice`.
+10. Stop for review.
+
+**Cost bound:** a fresh answer is one non-streaming Opus 5.5 call, with a system prompt and stats of about 1k input tokens and a short JSON answer plus thinking at `medium`. That's a few cents per call. Each player is capped at 5 fresh answers per day, and repeats with unchanged stats are free.
+
+**User steps:**
+
+- Add `ANTHROPIC_API_KEY` in Vercel → Settings → Environment Variables for Production, Preview and Development. Then run `vercel env pull .env.local` locally.
+- Apply `003`: `npm run db:migrate` (or approve Claude running it).
+
+### M7 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (154 tests, up from 116) and `npm run build` pass. The SDK isn't in `dist/`.
+- PGlite, with `001` to `003` applied on a stub `neon_auth."user"`, passes 15 checks:
+  - `modeStats` returns one row per mode, as rounded numbers with nulls handled, for the caller only.
+  - `003` rejects an unknown kind, a non-hex hash and an unknown user.
+  - Runner and store, end to end:
+    - a first answer is generated and saved, and `jsonb` round-trips as an object;
+    - the same inputs in any key order reuse it;
+    - 5 fresh answers are allowed, and the 6th gets 429 with a `Retry-After` of about 24 hours;
+    - the latest answer is still served while the player is at the limit;
+    - the limit lifts after 24 hours;
+    - kinds and players are counted separately;
+    - deleting the user cascades to their insights.
+  - The 12 M5 checks still pass.
+- Under `vercel dev`, `POST /api/insights/hardware` returns 401 with no token or a forged one, and `GET` returns 405. So the function bundles and imports the SDK without a key.
+- *2026-10-28: the user added `ANTHROPIC_API_KEY` in Vercel, pulled it, and applied `003` (`schema_migrations` lists `001` to `003`).*
+- Live check, *2026-10-28 under `vercel dev` against Neon and the Claude API*, with a temporary email/password user that was deleted afterwards. 10 of 11 checks passed as scripted:
+  - *0 matches and 4 matches got 422 `{ needed: 5, played }`, and `{ setup: { dpi: 50 } }` got 400 naming `setup.dpi`.*
+  - *With 6 matches and no setup, a fresh 200 took 12.2 s. `model` was `claude-opus-5-5` (no fallback), with DPI 800, pointer speed 1:1 with acceleration off, and 1000 Hz. Each rationale quoted the player's numbers, for example "59.9% in Flick (625 ms average reaction against a 0.9 s expiry)", and the summary warned that 1–2 matches per mode are early indicators.*
+  - *With `{ dpi: 1600, pollingRateHz: 500 }`, a fresh 200 took 15.4 s. It kept 1600 DPI, citing the high Precision and Gridshot accuracy, and recommended going from 500 to 1000 Hz.*
+  - *Exactly 2 `insights` rows were saved. The repeat added none.*
+  - *Cleanup left 0 test users, insights and scores.*
+  - *The scripted cached-repeat check failed:*
+    - *The repeat returned in 762 ms without calling Claude, but the script compared the recommendation as a JSON string. `jsonb` doesn't keep key order: it returned `dpi` before `summary`.*
+    - *PGlite, running the same runner and store, confirmed the cached answer deep-equals the fresh one and has the same `generatedAt`.*
+    - *So the content matches. Only the key order differs between a fresh answer and a cached one, which consumers reading by key don't notice.*
+  - *Not measured: token usage and cost per call. The responses weren't logged with `usage`.*
+- **For M8's UI:** a fresh answer takes about 12–15 s, so the display needs a visible loading state.

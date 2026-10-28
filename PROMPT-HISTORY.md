@@ -86,3 +86,110 @@ The user reported that the browser checks pass, which covers M6's five checks: t
 **Verification**
 
 The user ran the browser checks. The M4 checks that are still open (reload, Safari or blocked third-party cookies, sign-out) weren't explicitly reported, so PLAN-V2 keeps them open. Lint, format check, tests and build last ran at the review gate (Interaction 5), and no code has changed since.
+
+### Interaction 7 — Milestone 7: AI hardware recommendations
+
+**User Prompt**
+
+> pushed, begin execution of M7
+
+**Agent Outcome**
+
+The user pushed M6. The `claude-api` skill was consulted first, as PLAN-V2 asks, and M7 was then detailed and built. It stops at the review gate (status: In review), uncommitted.
+
+`POST /api/insights/hardware` turns the caller's per-mode stats, plus an optional current DPI and polling rate, into a structured recommendation from Claude: a summary, then DPI, sensitivity and polling rate, each with a rationale. It sits on a reusable cache-and-rate-limit runner backed by a new `insights` table (migration `003`), which M8 will reuse.
+
+The live parts are blocked on the user. `.env.local` has no `ANTHROPIC_API_KEY` (checked by variable name only), and `003` isn't applied on Neon.
+
+**Rationale**
+
+- **Model and request shape come from the skill, not memory.**
+  - `claude-opus-5-5`, with `thinking` omitted (always on; disabling it returns a 400) and `effort: 'medium'` set explicitly.
+  - Structured outputs with a plain JSON schema, which avoids a `zod` dependency.
+  - `fallbacks: 'default'` for refusals, enabled because the skill makes it the default for this model.
+  - SDK 1.3.0's types confirmed `fallbacks: 'default'` and `json_schema` output, and that the client constructs without a key.
+- **The cache and the rate limit share one table.** The cache key is a sha256 of `{ PROMPT_VERSION, modeStats, setup }`, so an answer is reused until the player plays again, changes their setup, or the prompt changes. A cached answer doesn't count toward the 5-per-day cap and is still served while the player is at the cap. The cap is soft under concurrency, which is enough to bound cost.
+- **Optional current setup.** The game has no DPI or sensitivity settings of its own, so without the player's current values the advice can only be absolute. The schema can't carry numeric bounds, so `parseAdvice` re-checks the DPI range and the polling-rate enum, and an out-of-range answer returns 502 rather than being shown.
+- **Factory plus wiring again** (`structuredOutput.js` / `claude.js`), so the Claude-call handling is tested with a fake client and the SDK's real error classes, without network.
+
+**Changes**
+
+- New:
+  - `db/migrations/003_insights.sql`;
+  - `api/insights/hardware.js`;
+  - `api/_lib/{insightPolicy,insightRunner,insightStore,structuredOutput,claude,hardwareAdvice}.js`, with tests for every pure or injectable one.
+- Edited:
+  - `api/_lib/scoreStore.js`: `modeStats`;
+  - `api/_lib/db.js`: wires `insightRunner`;
+  - `api/_lib/http.js`: `HttpError` can carry headers, used for `Retry-After`;
+  - `.env.example`: `ANTHROPIC_API_KEY`;
+  - `package.json` and the lockfile: `@anthropic-ai/sdk@^1.3.0`.
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - M7 is In review;
+  - the SDK dependency is justified;
+  - M7 detail, user steps, cost bound and verification are added.
+
+**Verification**
+
+- Lint, format check and build pass. `npm test` passes with 154 tests, up from 116.
+- PGlite with `001`–`003` passed 15 checks:
+  - `modeStats` shape;
+  - the `003` constraints;
+  - the runner and store end to end: generate, cached repeat, 5 fresh then 429 with `Retry-After`, cached answer while limited, the limit lifting after 24 hours, per-kind and per-player counting, and the cascade on user deletion.
+- The M5 PGlite checks still pass.
+- Under `vercel dev`, the new route returns 401 with no token or a forged one, and 405 for GET.
+- **Not run:** `003` on Neon and any real Claude call. Both wait on the key and the migration.
+
+### Interaction 8 — M7 live check against Neon and Claude
+
+**User Prompt**
+
+> Key was added, pulled, and I rain the db migrate command. Live check is approved - run it and report back
+
+**Agent Outcome**
+
+`schema_migrations` listed `001`–`003`, and `ANTHROPIC_API_KEY` was present (checked by length, never printed). A scratch script under `vercel dev` did the following:
+
+1. Signed up a temporary user and got its JWT.
+2. Posted matches through `POST /api/scores`.
+3. Exercised `POST /api/insights/hardware`, which made two real Claude calls.
+4. Deleted the user.
+
+10 of 11 checks passed as scripted:
+
+- The 422s at 0 and 4 matches, and the 400 on a bad setup.
+- A fresh recommendation in 12.2 s: 800 DPI, 1:1 pointer speed with acceleration off, 1000 Hz. The rationales were grounded in the per-mode numbers.
+- A fresh answer for the 1600 DPI / 500 Hz setup in 15.4 s: keep 1600, raise the polling rate to 1000 Hz.
+- 2 rows saved, and the cleanup was complete.
+
+The failed check was the cached repeat. The response was served from cache: 762 ms, no new row. The script compared it as a JSON string, though, and Postgres `jsonb` reorders object keys. A PGlite run of the same runner and store confirmed the cached answer deep-equals the fresh one and has the same `generatedAt`.
+
+**Rationale**
+
+The key-order difference was left in the code, because consumers read the answer by key. If byte-identical fresh and cached answers matter, `save` could return the stored `result`, making both paths come back in `jsonb` order.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - the M7 verification records the live results, the explanation of the failed check, and the 12–15 s latency to plan for in M8's UI;
+  - the open live-check item is replaced.
+- Uncommitted, together with the rest of M7.
+
+**Verification**
+
+- As above. Token usage and cost per call weren't captured.
+- The user's `vercel env pull` re-added `.env*` to the end of `.gitignore`, the same line removed in M2. It comes after `!.env.example` and would ignore that file if it were ever untracked. It was flagged to the user, not changed.
+
+### Interaction 9 — M7 approved and committed
+
+**User Prompt**
+
+> remove the .gitignore line and commit M7
+
+**Agent Outcome**
+
+The `.env*` line that `vercel env pull` appended was removed, which leaves `.gitignore` identical to the committed version. M7 was marked Done in PLAN-V2 and committed on `release/v2.0`, with the doc updates. The cached-answer key order was left as is: the user didn't ask for the change.
+
+**Verification**
+
+`git check-ignore --no-index -v` shows `.env` and `.env.local` ignored, and `.env.example` matched only by its `!.env.example` exception. Lint, format check, tests and build last ran at the review gate (Interaction 7). Since then only docs have changed, plus `.gitignore` going back to its committed state.

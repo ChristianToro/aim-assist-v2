@@ -37,6 +37,22 @@ export const createScoreStore = (sql) => ({
     return row ?? null
   },
 
+  // Per-mode aggregates for the AI insights, rounded so they read cleanly
+  // in a prompt (and come back as numbers: the driver returns numeric as
+  // a string). Ordered by mode so the same data always hashes the same.
+  modeStats: (uid) => sql`
+    select
+      mode,
+      count(*)::int                              as matches,
+      max(score)                                 as "bestScore",
+      round(avg(score))::int                     as "averageScore",
+      round(avg(accuracy)::numeric, 1)::float8   as "averageAccuracy",
+      round(avg(reaction_time))::int             as "averageReactionMs"
+    from scores
+    where user_id = ${uid}
+    group by mode
+    order by mode`,
+
   // Each player's best score since `since` (null: all time), one entry per
   // player. Ties rank the score that was set first higher.
   topScores: (since) => sql`
