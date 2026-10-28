@@ -23,7 +23,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Match local dev: npm 10 (Node 22) rejects the npm 11 lockfile.
+          node-version: 24
           cache: npm
 
       - run: npm ci

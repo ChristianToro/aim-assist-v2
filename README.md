@@ -84,7 +84,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design.
 
 ## Getting Started
 
-You need Node 22 and a [Vercel](https://vercel.com) account. Neon and Neon Auth come through Vercel's Marketplace.
+You need Node 24 and a [Vercel](https://vercel.com) account. Neon and Neon Auth come through Vercel's Marketplace.
 
 ```bash
 npm install
