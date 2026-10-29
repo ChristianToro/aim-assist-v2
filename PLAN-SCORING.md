@@ -68,7 +68,7 @@ What this buys, honestly stated:
 | S0 | Done | **Plan + docs.** This plan, the two open choices settled, CLAUDE.md's document list and workflow updated for this branch. | `PLAN-SCORING.md`, `CLAUDE.md` |
 | S1 | Done | **Shared scoring and the event log (client only).** `src/game/scoring.js` (`targetValueAt`, `scoreEvents`) with tests. `GameSession` records the event log and its summary comes from `scoreEvents`; a test plays a scripted session and checks the log reproduces its live score. `readJson` gains a byte limit. No API change yet, so the app keeps working. | `src/game/scoring.js`, `GameSession.js`, `ScoreManager.js`, `api/_lib/http.js` |
 | S2 | Done | **Plausibility checks.** `api/_lib/matchCheck.js`, pure, with tests per rule and per mode (a real log passes; a 9,999,999 log, a too-fast log, a too-early submit and a non-ascending log each fail by name). Calibrate the thresholds against logs from the user's own matches under `npm run dev:full`. | `api/_lib/matchCheck.js`, `api/_lib/matchCheck.test.js` |
-| S3 | Planned | **Matches table and `POST /api/matches`.** Migration `004_matches.sql` (`matches`, `scores.match_id`, `CHECK`s), `matchStore` with the issue limit, the route, and `services/matches.js`. Unused by the client until S4. | `db/migrations/004_matches.sql`, `api/matches.js`, `api/_lib/matchStore.js` |
+| S3 | Done | **Matches table and `POST /api/matches`.** Migration `004_matches.sql` (`matches`, `scores.match_id`, `CHECK`s), `matchStore` with the issue limit, the route, and `services/matches.js`. Unused by the client until S4. | `db/migrations/004_matches.sql`, `api/matches.js`, `api/_lib/matchStore.js` |
 | S4 | Planned | **`POST /api/scores` on matches.** Body `{ matchId, events }`. In one transaction: claim the match (owner, mode, unexpired, unsubmitted), run `matchCheck`, insert the computed figures with `match_id`. `scoreInput.js` becomes the body shape check. `GameArea` requests the match on Start and posts the log; the save status covers a missing or rejected ticket. | `api/scores.js`, `api/_lib/scoreInput.js`, `GameArea.jsx`, `services/scores.js` |
 | S5 | Planned | **Legacy data and docs.** The read-only report of legacy rows that fail the new bounds (`scripts/`). ARCHITECTURE.md (routes, data model, the score flow, Security's "Scores are still computed in the browser"), README's next-features list, and an audit-response note. | `scripts/`, `ARCHITECTURE.md`, `README.md` |
 
@@ -162,6 +162,51 @@ What this buys, honestly stated:
     - game time ahead of the wall clock
 - `difficulty.test.js` (4 tests): the ramp's progress and clamping, the ramped settings, and an `Infinity` base passing through unchanged.
 - The randomized engine-log tests (`matchCheck` and `GameSession`) passed on 15 of 15 reruns.
+
+## S3 detail
+
+1. **`db/migrations/004_matches.sql`:**
+   - **`matches`:** a uuid `id` (`gen_random_uuid()`), `user_id` (cascades with the user), `mode`, `started_at` (`now()`), `expires_at` and `submitted_at`.
+   - **`CHECK`s:** the mode is one of the six labels; `expires_at > started_at`; a submit falls between `started_at` and `expires_at`.
+   - **Index:** `(user_id, started_at desc)`, for the issue limit.
+   - **`scores.match_id uuid unique`**, plus a composite key `(match_id, user_id, mode)` that references `matches (id, user_id, mode)`.
+
+   **Changed from the Decisions table:** the plan had `match_id references matches`. The composite key also makes the database refuse a score whose player or mode differs from its match's, which backs S4's claim. A null `match_id`, on the legacy rows, isn't checked.
+2. **`api/_lib/matchPolicy.js`** (pure):
+   - `ISSUE_LIMIT` (20) and `ISSUE_WINDOW_MS` (10 min).
+   - `matchTtlSeconds(mode)`: the duration + 30 min, or 2 h for Survival.
+   - `parseMatchRequest(body)`: `{ mode: <label> }` → the mode's configuration, or `{ invalid: ['mode'] }`.
+
+   Modes are stored as labels, like `scores`, so S4 can insert the match's own mode.
+3. **`api/_lib/rateLimit.js`** (pure): `windowStart` and `retryAfterSeconds`, with the window as a parameter. They were moved out of `insightPolicy.js`, which now calls them with its 24 h window, so the insight limit and the match limit share one set of arithmetic.
+4. **`api/_lib/matchStore.js`:** `countSince(uid, since)` and `issue(uid, mode, ttlSeconds)`. `issue` sets `expires_at` from the database's own `now()`, so S4 measures elapsed time on the same clock. It's wired in `db.js` as `matchStore`.
+5. **`api/_lib/matchIssue.js`:** `issueMatch(store, { uid, mode, now })`.
+   - It counts the window first, and over the limit it throws a 429 `{ limit, retryAfterSeconds }` with `Retry-After`.
+   - The cap is soft, like the insight one: simultaneous requests can both pass.
+   - Expired, unsubmitted rows aren't deleted. They're small, and at most 20 per player per 10 minutes. A cleanup could come later.
+6. **`api/matches.js`:** `POST /api/matches` runs auth → `parseMatchRequest` → `issueMatch`, and returns 201 `{ matchId, startedAt, expiresAt }`. A foreign-key violation means a deleted user, and returns 401, as in `scores.js`.
+7. **`src/services/matches.js`:** `startMatch(modeLabel)`. Nothing calls it until S4.
+8. **ARCHITECTURE.md:** the route, the store, the policy modules, and the `matches` / `scores.match_id` data model.
+
+**For S4:**
+- `scores` now has two foreign keys, so `api/scores.js`'s "23503 means a deleted user" mapping has to check `error.constraint` (`scores_user_id_fkey`) once inserts carry a `match_id`.
+- **Migration:** the user applied `004` to Neon with `npm run db:migrate` before committing S3. It's additive, so the deployed client keeps working: it never touches `matches`, and its score inserts leave `match_id` null.
+
+### S3 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (62 files, 360 tests) and `npm run build` pass.
+- New unit tests:
+  - `matchPolicy.test.js`: lifetimes; every label accepted; ids, unknown modes and non-objects rejected; a `uid` in the body ignored.
+  - `matchIssue.test.js` (in-memory store): it issues under the label with the TTL, allows the 20th match, refuses the 21st with `Retry-After: 60`, and counts only the window.
+  - `rateLimit.test.js`.
+  - `services/matches.test.js`.
+- **PGlite** (in a scratch directory, not a project dependency) ran migrations `001`–`004` on a stub `neon_auth."user"`, and 18 checks passed:
+  - **Store:** `issue` returns a uuid and `expiresAt = startedAt + ttl`; `countSince` counts per player and returns the oldest start.
+  - **Constraints rejected:** an unknown mode, a zero lifetime and a submit after expiry (`23514`); an unknown user (`23503`, which the route answers with a 401).
+  - **Scores:** a score in another mode, by another player, or for a match never issued fails the composite key (`23503`). A score tied to its own match inserts; a second one for the same match fails `unique` (`23505`); a legacy score without a match still inserts.
+  - **Limit:** through the real store, the 21st match in 10 minutes gets a 429, and another player is unaffected.
+  - **Deletion:** deleting a user removes their matches and scores without a key error.
+- **Not run:** the route itself under `npm run dev:full`, which needs `004` applied to Neon. Its first real use is in S4's manual checks.
 
 ## Verification (every gate)
 

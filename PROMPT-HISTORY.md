@@ -689,3 +689,50 @@ The user chose the faked session over driving their own signed-in Chrome.
 
 - S2 is marked Done in PLAN-SCORING.md and committed on `hotfix/server-checked-scoring` with this session's history.
 - **Next:** S3, the `matches` table and `POST /api/matches`, when the user says so.
+
+### Interaction 7 — S3: matches table and `POST /api/matches`; stopped at the review gate
+
+**User Prompt**
+
+> execute S3
+
+**Agent Outcome**
+
+- **`004_matches.sql`:** the `matches` table (uuid id, user, mode, `started_at`, `expires_at`, `submitted_at`, with `CHECK`s) and `scores.match_id`.
+  - **Deviation from the plan:** a composite foreign key `(match_id, user_id, mode)` → `matches`, in place of a plain `match_id` reference. The database itself then refuses a score whose player or mode differs from its match's.
+- **New modules:**
+  - `matchPolicy.js`: the limit, ticket lifetimes and the body parser.
+  - `rateLimit.js`: the window arithmetic, extracted from `insightPolicy.js`, which now uses it.
+  - `matchStore.js`, wired in `db.js`.
+  - `matchIssue.js`: the 20-per-10-minutes limit, a 429 with `Retry-After`.
+  - The route `api/matches.js`, and `services/matches.js` (`startMatch`), which nothing calls yet.
+- **Docs:** ARCHITECTURE.md has the route, the store and the data model. PLAN-SCORING.md has S3 at Review, with two notes for S4:
+  - `scores.js` must check the constraint name once scores carry a `match_id`.
+  - `004` must be applied to Neon before S4 deploys.
+
+**Rationale**
+
+- Elapsed time is computed from the database's clock at both issue and submit, so there's no Vercel/Neon clock skew.
+- Modes are stored as labels, like `scores`, so S4 inserts the match's own mode and the composite key holds.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (360 tests) and `npm run build` pass.
+- PGlite, in a scratch directory, ran migrations `001`–`004` on a stub `neon_auth."user"`. 18 checks passed: the `CHECK`s; the composite key rejecting another mode, another player or an unknown match; `unique` rejecting a second score for one match; a legacy null `match_id` still inserting; the 21st issue refused; deleting a user cascading cleanly.
+- Not run: the route under `npm run dev:full`, which needs `004` applied to Neon.
+
+**Collaboration**
+
+- Stopped at the review gate; nothing is committed. The migration hasn't been applied to Neon; that's the user's step.
+
+### Interaction 8 — S3 approved and committed; `004` applied to Neon
+
+**User Prompt**
+
+> 004 applied, commit S3
+
+**Agent Outcome**
+
+- The user applied `004_matches.sql` to Neon. PLAN-SCORING.md records it, and marks S3 Done.
+- S3 is committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S4, which moves `POST /api/scores` onto matches and has the client request a match on Start, when the user says so.

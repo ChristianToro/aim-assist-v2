@@ -75,6 +75,7 @@ Every `.js` file directly under `api/` is a Vercel Function, and its path is its
 |---|---|---|
 | `GET /api/health` | none | `select 1` against Neon: 200, or 503 if the database is down. |
 | `GET /api/me` | required | The caller's uid and profile stats, derived in SQL on each request. |
+| `POST /api/matches` | required | Issues a match when a signed-in player presses Start: `{ mode }` in, 201 `{ matchId, startedAt, expiresAt }` out. At most 20 per player in any 10 minutes (429 with `Retry-After`). Not called by the client until S4 of PLAN-SCORING.md. |
 | `POST /api/scores` | required | Validates and stores one finished match. Returns 201. |
 | `GET /api/leaderboard?view=all\|daily\|weekly\|personal` | `personal` only | The top 100 (one best entry per player), or the caller's own top 10. |
 | `POST /api/insights/hardware` | required | DPI, sensitivity and polling-rate advice from Claude. The body may carry the current `{ setup }`. |
@@ -89,10 +90,10 @@ Modules that touch the outside world are split into a pure factory and a small w
 | Factory | Wiring | Dependency |
 |---|---|---|
 | `verifier.js`: `createVerifier({ keySet, issuer, audience })` | `auth.js`: Neon Auth's remote JWKS | `jose` |
-| `scoreStore.js`, `insightStore.js`: queries over a tagged-template `sql` | `db.js`: Neon's HTTP driver | `@neondatabase/serverless` |
+| `scoreStore.js`, `matchStore.js`, `insightStore.js`: queries over a tagged-template `sql` | `db.js`: Neon's HTTP driver | `@neondatabase/serverless` |
 | `structuredOutput.js`: `createStructuredCaller(client)` | `claude.js`: `new Anthropic()` | `@anthropic-ai/sdk` |
 
-The rest are pure functions with unit tests: request validation (`scoreInput.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`).
+The rest are pure functions with unit tests: request validation (`scoreInput.js`, `matchPolicy.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`, `rateLimit.js`, and `matchPolicy.js`'s ticket lifetimes), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`). `matchIssue.js` applies the match issue limit around the store it's given, and its tests use an in-memory store.
 
 ### Data model (`db/migrations/`)
 
@@ -100,6 +101,8 @@ Plain SQL. `npm run db:migrate` applies the files in order, each in its own tran
 
 - **`neon_auth."user"`** is owned by Neon Auth. The app reads only `id`, `name`, `image` and `"createdAt"`; it never selects the email.
 - **`scores`** has one row per finished match: `user_id` (a foreign key to `neon_auth."user"`, deleted with the user), `mode`, `score`, `accuracy`, `reaction_time` and `created_at`. `CHECK` constraints repeat the handler's validation bounds as a second line of defence. Indexes support the all-time board, per-player bests and time windows.
+- **`matches`** has one row per match a signed-in player started: a uuid `id`, `user_id` (deleted with the user), `mode`, `started_at` (the database's clock), `expires_at` (the duration plus 30 minutes, or 2 hours for Survival) and `submitted_at`. `CHECK`s keep `expires_at` after `started_at`, and any submit inside that window.
+- **`scores.match_id`** names the match a score was computed from. It's `unique`, so a match can be redeemed only once. A composite foreign key `(match_id, user_id, mode)` makes the database refuse a score whose player or mode differs from its match's. It's null for the rows saved before matches existed, which the key doesn't check.
 - **`insights`** has one row per generated AI answer: `user_id`, `kind`, `input_hash`, `result jsonb`, `model` and `created_at`. It serves as both the cache and the rate limit.
 
 Profile stats (games played, best score, average accuracy, favourite mode) are never stored. `GET /api/me` derives them with `count`, `max`, `avg` and `mode() within group`, so two matches saved at the same moment can't lose an update.
