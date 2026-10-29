@@ -80,6 +80,7 @@ Every `.js` file directly under `api/` is a Vercel Function, and its path is its
 | `GET /api/leaderboard?view=all\|daily\|weekly\|personal` | `personal` only | The top 100 (one best entry per player), or the caller's own top 10. |
 | `POST /api/insights/hardware` | required | DPI, sensitivity and polling-rate advice from Claude. The body may carry the current `{ setup }`. |
 | `POST /api/insights/platforms` | required | 3–5 shooter games, with their platforms, that suit the caller's aim. |
+| `GET /api/insights/hardware`, `GET /api/insights/platforms` | required | The caller's 10 latest answers of that kind, newest first, as `{ entries }`. A database read, with no Claude call and no limit. |
 
 Every response is JSON with `Cache-Control: private, no-store`, so a saved score shows up immediately. `handle()` in `http.js` maps an `AuthError` to 401 and an `HttpError` to its own status and details; anything else is a bug or an outage, and Vercel answers 500.
 
@@ -93,7 +94,7 @@ Modules that touch the outside world are split into a pure factory and a small w
 | `scoreStore.js`, `matchStore.js`, `insightStore.js`: queries over a tagged-template `sql` | `db.js`: Neon's HTTP driver | `@neondatabase/serverless` |
 | `structuredOutput.js`: `createStructuredCaller(client)` | `claude.js`: `new Anthropic()` | `@anthropic-ai/sdk` |
 
-The rest are pure functions with unit tests: request validation (`scoreInput.js`, `matchPolicy.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`, `rateLimit.js`, and `matchPolicy.js`'s ticket lifetimes), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`). `matchIssue.js` (the issue limit) and `matchSubmit.js` (redeeming a match) run around the stores they're given, and their tests use in-memory ones.
+The rest are pure functions with unit tests: request validation (`scoreInput.js`, `matchPolicy.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`, `rateLimit.js`, and `matchPolicy.js`'s ticket lifetimes), the insight history's response shape (`insightHistory.js`), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`). `matchIssue.js` (the issue limit) and `matchSubmit.js` (redeeming a match) run around the stores they're given, and their tests use in-memory ones.
 
 ### Data model (`db/migrations/`)
 
@@ -103,7 +104,7 @@ Plain SQL. `npm run db:migrate` applies the files in order, each in its own tran
 - **`scores`** has one row per finished match: `user_id` (a foreign key to `neon_auth."user"`, deleted with the user), `mode`, `score`, `accuracy`, `reaction_time` and `created_at`. `CHECK` constraints repeat the handler's validation bounds as a second line of defence. Indexes support the all-time board, per-player bests and time windows.
 - **`matches`** has one row per match a signed-in player started: a uuid `id`, `user_id` (deleted with the user), `mode`, `started_at` (the database's clock), `expires_at` (the duration plus 30 minutes, or 2 hours for Survival) and `submitted_at`. `CHECK`s keep `expires_at` after `started_at`, and any submit inside that window.
 - **`scores.match_id`** names the match a score was computed from. It's `unique`, so a match can be redeemed only once. A composite foreign key `(match_id, user_id, mode)` makes the database refuse a score whose player or mode differs from its match's. It's null for the rows saved before matches existed, which the key doesn't check.
-- **`insights`** has one row per generated AI answer: `user_id`, `kind`, `input_hash`, `result jsonb`, `model` and `created_at`. It serves as both the cache and the rate limit.
+- **`insights`** has one row per generated AI answer: `user_id`, `kind`, `input_hash`, `result jsonb`, `context jsonb`, `model` and `created_at`. It serves as the cache, the rate limit and the player's history. `context` is the request's own input (`{ setup }` for hardware, `{}` for platforms), so a past answer can say what it was for. It's null for rows saved before migration `005`, which kept only the hash.
 
 Profile stats (games played, best score, average accuracy, favourite mode) are never stored. `GET /api/me` derives them with `count`, `max`, `avg` and `mode() within group`, so two matches saved at the same moment can't lose an update.
 
@@ -145,7 +146,9 @@ The profile stats and the leaderboards pick the match up on their next read.
 2. Hash `{ PROMPT_VERSION, modeStats, ...context }`. If the hash matches the player's latest answer of this kind, return that answer as `cached` without calling Claude.
 3. Otherwise, a player who already has 5 fresh answers in the last 24 hours gets 429 with `Retry-After`.
 4. Otherwise, make one `claude-opus-5-5` call with structured output (a JSON schema) and `effort: 'medium'`. The `fallbacks: 'default'` option makes the API retry a refused request on a fallback model within the same call.
-5. Check the answer against what the schema can't express (the DPI range, the pick count, no repeated titles), store it, and return it.
+5. Check the answer against what the schema can't express (the DPI range, the pick count, no repeated titles), store it with the request's `context`, and return it.
+
+Every answer, fresh or cached, comes back in the history's entry shape, `{ id, recommendation, context, model, generatedAt }`, plus `cached`. `GET` returns the 10 latest entries, and each stored answer goes back through its kind's check on the way out. A row saved in a shape an older prompt version produced is left out rather than sent to a UI that can't render it.
 
 | Outcome | Status |
 |---|---|

@@ -1,7 +1,21 @@
 import { verifyRequest } from '../_lib/auth.js'
 import * as hardwareAdvice from '../_lib/hardwareAdvice.js'
 import { badRequest, handle, json, readJson } from '../_lib/http.js'
-import { requestInsight } from '../_lib/insightRequest.js'
+import { listInsights, requestInsight } from '../_lib/insightRequest.js'
+
+const KIND = 'hardware'
+
+/*
+ * GET /api/insights/hardware: the caller's past mouse-settings answers,
+ * { entries: [{ id, recommendation, context, model, generatedAt }] },
+ * newest first. Free to call (a database read, no Claude).
+ */
+export const GET = handle(async (request) => {
+  const { uid } = await verifyRequest(request)
+  return json({
+    entries: await listInsights({ uid, kind: KIND, advice: hardwareAdvice }),
+  })
+})
 
 /*
  * POST /api/insights/hardware, body { setup?: { dpi?, pollingRateHz? } }.
@@ -18,7 +32,7 @@ export const POST = handle(async (request) => {
   return json(
     await requestInsight({
       uid,
-      kind: 'hardware',
+      kind: KIND,
       advice: hardwareAdvice,
       context: { setup },
     })

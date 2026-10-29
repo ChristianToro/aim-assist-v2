@@ -72,3 +72,38 @@ The user made both scope calls, each the recommended option: **latest on load pl
 **Agent Outcome**
 
 - I0 is marked Done and committed on `improvement/insights`. Nothing is pushed, and I1 waits for the user.
+
+### Interaction 3 — Server: store the inputs, list the history (I1)
+
+**User Prompt**
+
+> Pulled main, execute I1
+
+**Agent Outcome**
+
+- **Migration `005_insight_context.sql`:** `insights.context jsonb`, nullable, with a `CHECK` that it's an object.
+- **`GET /api/insights/hardware` and `GET /api/insights/platforms`:** these return `{ entries: [{ id, recommendation, context, model, generatedAt }] }`, the caller's 10 latest, newest first. They sit beside the existing `POST`s.
+- **New `api/_lib/insightHistory.js`:** pure functions. `toEntry` is the one response shape, and `POST` now returns it plus `cached`. `historyEntries` drops rows that the kind's `parseAdvice` rejects.
+- **Store and runner:** `insightStore` gains `history` and saves `context`. The runner takes `context`. `requestInsight` gains `listInsights`.
+- **Client:** unchanged. The `POST` response is a superset of what `useInsight` reads.
+- **Docs:** ARCHITECTURE.md covers the routes, the `_lib` list, the data model and the insights flow. PLAN-INSIGHTS.md has the I1 detail and verification.
+
+**Rationale**
+
+- `id` is cast to text, because a Postgres bigint isn't JSON-safe in every driver.
+- A cached answer returns the stored row's `context`, not the request's, so `POST` and `GET` describe the same row identically. Equal hashes mean the two contexts are equal anyway.
+
+**Attempted Approach / Resolution**
+
+A tiebreak was first written as `order by created_at desc, id desc`. In Postgres, a bare name in `ORDER BY` resolves to the output alias first, which here is `id::text`, so ties would have sorted '99' above '100'. It's now `insights.id desc`, with a comment. A PGlite check over ids 19–118 fails without the qualifier and passes with it.
+
+**Changes**
+
+- New: [`db/migrations/005_insight_context.sql`](db/migrations/005_insight_context.sql), [`api/_lib/insightHistory.js`](api/_lib/insightHistory.js) and its test.
+- Changed: [`api/_lib/insightStore.js`](api/_lib/insightStore.js), [`insightRunner.js`](api/_lib/insightRunner.js) and its test, [`insightRequest.js`](api/_lib/insightRequest.js), [`db.js`](api/_lib/db.js), [`api/insights/hardware.js`](api/insights/hardware.js), [`platforms.js`](api/insights/platforms.js), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`PLAN-INSIGHTS.md`](PLAN-INSIGHTS.md).
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (409 tests, up from 401) and `npm run build` pass.
+- PGlite, 15 checks with the real store (scratchpad `check-i1.mjs`).
+- Not run: the routes against Neon (`005` is unapplied). Approved and committed at the user's "commit I1".

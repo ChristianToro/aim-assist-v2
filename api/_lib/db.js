@@ -13,4 +13,6 @@ export const scoreStore = createScoreStore(sql)
 
 export const matchStore = createMatchStore(sql)
 
-export const insightRunner = createInsightRunner(createInsightStore(sql))
+export const insightStore = createInsightStore(sql)
+
+export const insightRunner = createInsightRunner(insightStore)

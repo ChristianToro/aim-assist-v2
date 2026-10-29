@@ -44,7 +44,7 @@ Every recommendation Claude generates is already saved: `insights` has one row p
 | # | Status | Milestone | Key files |
 |---|---|---|---|
 | I0 | Done | **Plan + docs.** This plan with the two choices settled. CLAUDE.md's document list and workflow point at it. The prompt history is rotated (854 lines). | `PLAN-INSIGHTS.md`, `CLAUDE.md`, `PROMPT-HISTORY.md` |
-| I1 | Planned | **Server: store the inputs, list the history.** Migration `005_insight_context.sql`. `insightStore` gains `history(uid, kind, limit)` and saves `context`. The runner returns `id` and `context`. `requestInsight` passes `context` to the store. Each insight route adds a `GET`, and a pure `historyEntries(rows, parseAdvice)` drops rows that don't parse. Tests: the runner with its in-memory store, `historyEntries`, and a throwaway PGlite check of the migration and the query. ARCHITECTURE.md's routes and data model. | `db/migrations/005_insight_context.sql`, `api/_lib/insightStore.js`, `api/_lib/insightRunner.js`, `api/_lib/insightRequest.js`, `api/insights/*.js` |
+| I1 | Done | **Server: store the inputs, list the history.** Migration `005_insight_context.sql`. `insightStore` gains `history(uid, kind, limit)` and saves `context`. The runner returns `id` and `context`. `requestInsight` passes `context` to the store. Each insight route adds a `GET`, and a pure `historyEntries(rows, parseAdvice)` drops rows that don't parse. Tests: the runner with its in-memory store, `historyEntries`, and a throwaway PGlite check of the migration and the query. ARCHITECTURE.md's routes and data model. | `db/migrations/005_insight_context.sql`, `api/_lib/insightStore.js`, `api/_lib/insightRunner.js`, `api/_lib/insightRequest.js`, `api/insights/*.js` |
 | I2 | Planned | **Client: open on the latest answer, pick older ones.** `services/insights.js` list calls, a read hook for the history, `InsightPanel`'s picker and "Generated …" footer for a saved entry, and `HardwareInsight`'s setup line. A fresh answer goes to the top of the list. Tests for the service, the hook, the panel and Profile. ARCHITECTURE.md's data-fetching paragraph. | `src/services/insights.js`, `src/hooks/`, `src/components/InsightPanel/`, `src/components/HardwareInsight/`, `src/components/PlatformInsight/` |
 | I3 | Planned | **Final pass.** Run against Neon with `005` applied: the user checks the page and supplies screenshots, then the taste-skill app-screen checks follow (`lint.mjs`). README's features list, and the PR body. | `README.md`, `ARCHITECTURE.md` |
 
@@ -53,6 +53,31 @@ Every recommendation Claude generates is already saved: `insights` has one row p
 1. Write this plan, with the two scope choices settled by the user.
 2. `CLAUDE.md`: the document list leads with PLAN-INSIGHTS.md, and PLAN-SCORING.md is marked done and merged. The workflow paragraph names `improvement/insights`.
 3. Rotate `PROMPT-HISTORY.md` (854 lines, past the ~800 cap) to `PROMPT-HISTORY-2026-Q4-03.md`, and open this session in a fresh file.
+
+## I1 detail
+
+1. `db/migrations/005_insight_context.sql`: `insights.context jsonb`, nullable, with a `CHECK` that it's an object.
+2. `insightStore.js`:
+   - `save` stores `context` and returns `id`.
+   - `latest` reads `id` and `context`.
+   - The new `history(uid, kind, limit)` reads the player's rows newest first.
+   - `id` is sent as text, since a bigint isn't JSON-safe in every driver.
+   - Ties on `created_at` break by `insights.id`. A bare `id` there would sort by the text alias.
+3. `insightHistory.js` (new, pure): `HISTORY_LIMIT`, `toEntry(row)` (the one response shape for `POST` and `GET`), and `historyEntries(rows, parseAdvice)`.
+4. `insightRunner.js` takes `context`, saves it, and returns `toEntry(...)` plus `cached`. `requestInsight` passes `context`. `listInsights` reads the history through the kind's `parseAdvice`.
+5. A `GET` on `api/insights/hardware.js` and `platforms.js`. `db.js` exports `insightStore`.
+6. Tests: the runner's in-memory store gains `id` and `context`, and `insightHistory.test.js` is new. ARCHITECTURE.md covers the routes, `_lib` modules, data model and AI-insights flow.
+
+### I1 verification (2026-10-29)
+
+- `npm run lint`, `npm run format:check`, `npm test` and `npm run build` pass.
+- PGlite (`003`, a legacy row, then `005`, all against the real `insightStore`), 15 checks:
+  - The legacy row keeps a null `context`.
+  - `history` returns only the caller's rows of that kind, newest first, at most 10, with no hash or `user_id`.
+  - The `CHECK` refuses a non-object `context`.
+  - The runner's cached answer is the same row as its fresh one, with the same `id` and `context`.
+  - Ties order by the numeric id across 99 → 100. The check fails if the `insights.` qualifier is removed.
+- Not run: the routes against Neon. `005` isn't applied there yet; that's the user's step in I3.
 
 ## Verification
 

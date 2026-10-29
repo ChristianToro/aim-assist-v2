@@ -1,6 +1,7 @@
 import { askClaudeForJson } from './claude.js'
-import { insightRunner, scoreStore } from './db.js'
+import { insightRunner, insightStore, scoreStore } from './db.js'
 import { HttpError } from './http.js'
+import { HISTORY_LIMIT, historyEntries } from './insightHistory.js'
 import { MIN_MATCHES } from './insightPolicy.js'
 
 const UNPROCESSABLE = 422
@@ -48,6 +49,15 @@ export const requestInsight = async ({ uid, kind, advice, context = {} }) => {
     uid,
     kind,
     inputs: { version: advice.PROMPT_VERSION, modeStats, ...context },
+    context,
     generate,
   })
 }
+
+// The caller's recent answers of a kind that `advice` can still parse,
+// newest first. A read only: no stats, no Claude call, no limit.
+export const listInsights = async ({ uid, kind, advice }) =>
+  historyEntries(
+    await insightStore.history(uid, kind, HISTORY_LIMIT),
+    advice.parseAdvice
+  )
