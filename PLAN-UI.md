@@ -57,7 +57,7 @@ The first target is the landing page:
 | U3 | Done | **App style + Settings.** Record the "before" `inspect.mjs --app` baseline of the four app screens (Play and Profile by the agreed signed-in method). Deal the app style (`--keep palette,type`) for the user to choose. Port its tokens into `src/index.css` (panels, small labels, tabs, controls). Restyle Settings: the theme picker and the system-preference notes, laid out as a settings screen (app-screens §8). | `src/index.css`, `Settings.jsx`, `ThemePicker` |
 | U4 | Done | **Leaderboards.** The view tabs as app tabs, the `Leaderboard` table to the app's table rules (figures right-aligned in tabular numerals, the player's own row marked, quiet dividers), and the Personal Best sign-in prompt. Every state: loading, empty per view, error and signed out. | `Leaderboards.jsx`, `Leaderboard` |
 | U5 | Done | **Profile.** Settle the signed-in check first. Then `ProfileCard` and `StatTile`, the two AI insight panels (`InsightPanel`, `HardwareInsight` and `PlatformInsight`, including their loading, empty and error states), and Best Matches through U4's table. The screen's one question decides what's biggest. | `Profile.jsx`, `ProfileCard`, `StatTile`, `InsightPanel`, `HardwareInsight`, `PlatformInsight` |
-| U6 | Planned | **Play.** The mode picker, the match controls, the HUD, the idle and paused overlays on the canvas, `ResultsModal` (its save status included) and the session history. No engine changes. `Modal`'s backdrop blur and large shadow go, per the house rules. | `Play.jsx`, `ModePicker`, `GameArea`, `GameHud`, `Modal`, `ResultsModal`, `SessionHistory` |
+| U6 | Done | **Play.** The mode picker, the match controls, the HUD, the idle and paused overlays on the canvas, `ResultsModal` (its save status included) and the session history. No engine changes. `Modal`'s backdrop blur and large shadow go, per the house rules. | `Play.jsx`, `ModePicker`, `GameArea`, `GameHud`, `Modal`, `ResultsModal`, `SessionHistory` |
 | U7 | Planned | **NotFound, shared states and the final pass.** NotFound in the landing direction. `LoadingScreen` and `LoadingSpinner` matched to the app style. Remove `PagePlaceholder`, which nothing imports. Then a whole-app pass: all five themes, reduced motion, increased contrast, the bundle against U2's numbers, the Vercel preview, and ARCHITECTURE.md and README.md updated. | `NotFound.jsx`, `LoadingScreen`, `LoadingSpinner`, `PagePlaceholder/`, docs |
 
 ## U0 detail
@@ -534,6 +534,100 @@ The *Data terminal* sheet applies, with its `detail` pattern: the page header is
   2. The landing page at 390, signed in: the hero still fits the first screen.
   3. With 6 or more matches: Best matches shows 5 rows and half of a sixth, scrolls under its header, and the line by the heading counts them. *(The user had 5 matches at the screenshots, so this needs one more match.)*
 - *2026-10-29, user report: all three browser checks passed: the phone nav, the landing hero at 390 signed in, and Best matches scrolling past five.*
+
+## U6 detail
+
+The *Data terminal* sheet applies. Play is a working screen whose biggest block is the canvas. The engine in `src/game/` doesn't change.
+
+1. **Notes** (§2.1–2.2):
+   - **Inventory:**
+     - Six modes. Each has a label, a description and config: duration or miss limit, target count and lifespan.
+     - The live HUD: time or lives, score, accuracy, combo × multiplier, hits, misses. It updates on each hit, miss or tick, never per frame.
+     - The end-of-match summary.
+     - This session's matches, in React state.
+   - **The one question:** "How is this match going, and how did it end?"
+2. **A shared `Tabs` component** (new): underline tabs on a rule, with the selection line under the chosen label. They **wrap** rather than scroll, so six modes at 390px can't hide one off-screen (the U5 nav lesson). Leaderboards moves onto it, and it replaces `ModePicker`, which is deleted.
+3. **The HUD on `StatStrip`:** the strip now sizes its columns from its item count (four: 2 then 4 across; six: 3 then 6). `StatTile` is deleted.
+   - **Before the first snapshot,** the HUD shows the mode's starting values (the full time or lives, 0 score, dashes) instead of nothing. Today the canvas jumps down when a match starts and the HUD appears.
+4. **The canvas and its overlays:**
+   - A plain surface frame.
+   - The idle and paused overlays lose their backdrop blur (banned glass) for an opaque-enough scrim.
+   - The idle overlay names the mode and the round in words.
+   - **A new `solid` button** (ink fill, page-colour text: white on dark themes, near-black on Light) is the screen's one primary: Start match, and Play again.
+5. **`Modal` and `ResultsModal`:**
+   - **Modal:** square, with no backdrop blur and no resting shadow (a 1px edge on the scrim instead), and the title at the app's title size.
+   - **ResultsModal:**
+     - The final score is the dialog's lead figure, at 32px in ink, no longer 48px in the accent.
+     - The stats are a key-value list in sentence case.
+     - The save status loses its em dash, and the actions are right-aligned.
+6. **`SessionHistory`:**
+   - U4's table rules, with formatted figures and secondary columns folded on phones.
+   - **An empty session keeps its heading and frame** with one sentence, instead of disappearing.
+7. **Gate:**
+   - Lint, format check, tests and build.
+   - `lint.mjs --app` at 0 FAIL over Play and its components (the baseline flagged `micro-label` in `SessionHistory` and `StatTile`, and `glass`/`shadow` in `GameArea` and `Modal`).
+   - **The user's signed-in screenshots** at 1440, 768 and 390 in Dark and Light: idle, mid-match, and the results dialog.
+8. Stop for review.
+
+### As built
+
+- **`Tabs`** (new): `role="tablist"` with the selection line, `aria-controls` and ids for the panel. It wraps (`flex-wrap`), with the rule as the row's own bottom border. Leaderboards and Play use it, and `ModePicker` is deleted.
+- **`StatStrip`:** the columns come from the item count (four: 2 then 4; six: 3 then 6).
+- **`GameHud`:**
+  - Takes `mode`. Before the first snapshot it shows the round's time or lives, a score of 0, hits and misses at 0, and dashes for accuracy and combo.
+  - Figures are formatted ("1,200", "12 s" with a grey unit).
+  - `StatTile` is deleted.
+- **`GameArea`:**
+  - A plain surface frame for the canvas. `Card`'s `p-5` had beaten `p-0` here too.
+  - Overlays use a `bg-bg/85` scrim with no blur. The idle overlay shows the mode's name, the round in words and its scoring hint, then **Start match**. The paused overlay shows **Resume**.
+  - The canvas label loses its em dash.
+- **`Button`:** a new **`solid`** variant (`bg-heading text-bg`): the app screens' one primary.
+- **`Modal`:** square, a `bg-black/70` scrim with no blur, a 1px edge and no shadow, and the title at the app's title size.
+- **`ResultsModal`:**
+  - "Final score" at the new 32px `text-answer` size in ink.
+  - A `dl` of sentence-case rows: Accuracy, Hits / misses, Max combo, Average, Best and Worst reaction, with a grey dash when there's none.
+  - The save status is plain text, and Close and Play again sit on the right.
+- **`ReactionTime`** (new) and **`styles/table.js`** (new): the grey-unit reaction time and the data-table class lists, shared by the leaderboard and the session history.
+- **`SessionHistory`:**
+  - A "This session" heading with a count ("2 matches, newest first").
+  - U4's table rules, with the secondary columns folded under the mode on phones.
+  - **Empty:** the frame stays with one sentence, where it used to disappear.
+- **A bug fixed in both tables, found on this gate's screenshots:**
+  - **Symptom:** in the empty, error and loading states, a phone-width board squeezed the Player column to 41px ("Playe").
+  - **Cause:** the message row's `colSpan={7}` made the fixed-layout table count seven columns while only three were visible.
+  - **Fix:** the sentence now sits below the table, inside the same frame. At 390px the Player column measures 206px again.
+  - **Why nobody saw it in U4:** U4's state screenshots were at 1440, where all seven columns show.
+- **Tests:** 277, up from 270:
+  - new: `Tabs` (2), `ResultsModal` (3), `SessionHistory` (2);
+  - `GameHud` rewritten (3), now covering the pre-match values.
+
+### U6 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (277) and `npm run build` pass. **Bundle:** entry chunk 3.58 kB gzip (3.45 before: `Button`'s new variant and the shared table classes), `Play` 7.10 kB (7.40 before), CSS 8.29 kB gzip.
+- `lint.mjs --app` over Play, `Tabs`, `StatStrip`, `GameHud`, `GameArea`, `Modal`, `ResultsModal`, `ReactionTime`, `SessionHistory` and `Button`: **0 FAIL, 0 WARN.** The baseline's `micro-label` (`SessionHistory`, `StatTile`), `glass` (`GameArea`, `Modal`) and `shadow` (`Modal`) are gone.
+- **Headless Chrome, signed out,** on the production build: Leaderboards' shared tabs carry the accent line at 390 and 1440, and the board's columns measure Rank 56, Player 206 and Score 96px at 390 in the error state.
+- **Signed-in screenshots, taken by the agent with a faked session** (the user's choice, 2026-10-29). This replaces U5's "user screenshots" method for U6.
+  - **How:** a scratchpad script on the skill's CDP helper intercepts the Neon Auth SDK's one session call (`GET …/neondb/auth/get-session`).
+    - It answers with a stand-in player in Better Auth's `{ session, user }` shape: a well-formed unsigned JWT in `session.token`, which `getJWTToken()` reads, and CORS headers echoed for the credentialed request.
+    - It answers `POST /api/scores` with a 201, so no match reaches the database.
+    - No credentials, no repo code, and no real data are involved.
+  - **Driving the page:** targets are found by the theme's `--target-inner` colour in the canvas pixels and clicked with real CDP mouse events. Each run plays a full 30-second Gridshot round and a Survival round.
+  - **Coverage:** Dark and Light, at 1440, 768 and 390, through idle, mid-match, paused, results and the session table. All six runs reached the results (two saves each, answered locally) with no console errors.
+- **Critique of those screenshots, and the fixes (round 1):**
+  1. **Dialog focus ring:** the results dialog showed a 2px accent frame. The global `:focus-visible` rule was unlayered, so it beat the dialog's `outline-none`. It now sits in `@layer base`, where utilities can opt out.
+  2. **"When" column:** it wrapped "12:33 AM" onto two lines. Now `w-24` and `nowrap`. Table headers are `nowrap` too, after "Max combo" wrapped at 768; that column is now 14%.
+  3. **Stale HUD:** after a match was closed, the HUD still showed its final figures (Lives 0) under the Start match overlay. Between matches it now shows the next round's starting values.
+  4. **Phone shift:** at 390 the controls row wrapped once Pause and Restart appeared, pushing the HUD and canvas down at match start. On phones the controls now take their own `min-h-9` line. **Measured:** the canvas top is the same idle and running at 390 (536px), 768 (357px) and 1440 (360px).
+  5. **Em dash:** the Gridshot hint lost its em dash ("…, and a miss resets it.").
+- **Critique (§2.7) after the fixes:**
+  - **The biggest block is the canvas,** with the HUD directly above it, and Score reads right after the limit.
+  - **The figures agree:**
+    - The HUD's final score matches the dialog and the session row (7,670 in the final run's Light 1440).
+    - Accuracy matches: 55% in the HUD, 55.3% in the dialog and the row.
+    - Hits and misses match: 73 / 59.
+  - **Colour:** only the tab and nav accent lines and the targets themselves.
+  - **Phone:** the six mode tabs wrap to a second row with nothing off-screen, the HUD folds 3 by 2, and the session rows fold their figures under the mode.
+- *2026-10-29, user report: the browser checks passed: a real match on the user's account saved ("Saved to your profile."), and the phone controls row held still at match start.*
 
 ## Verification (every gate)
 

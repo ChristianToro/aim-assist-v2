@@ -10,28 +10,41 @@ const hud = {
   hits: 20,
   misses: 1,
 }
+const TIMED = { duration: 30, missLimit: undefined }
+const ENDLESS = { duration: Infinity, missLimit: 5 }
+
+// The value shown under a label.
+const figure = (label) =>
+  screen.getByText(label, { selector: 'dt' }).nextElementSibling
 
 describe('GameHud', () => {
-  it('renders nothing before the first snapshot', () => {
-    const { container } = render(<GameHud hud={null} />)
-    expect(container).toBeEmptyDOMElement()
+  it("shows the round's starting values before the first snapshot", () => {
+    const { rerender } = render(<GameHud hud={null} mode={TIMED} />)
+    expect(figure('Time')).toHaveTextContent('30 s')
+    expect(figure('Score')).toHaveTextContent('0')
+    expect(figure('Accuracy')).toHaveTextContent('None yet')
+
+    rerender(<GameHud hud={null} mode={ENDLESS} />)
+    expect(figure('Lives')).toHaveTextContent('5')
   })
 
-  it('renders the core stat tiles', () => {
-    render(<GameHud hud={hud} />)
-    expect(screen.getByText('1200')).toBeInTheDocument()
-    expect(screen.getByText('95%')).toBeInTheDocument()
-    expect(screen.getByText('3×1.3')).toBeInTheDocument()
-    expect(screen.getByText('20')).toBeInTheDocument()
+  it('renders the live figures', () => {
+    render(<GameHud hud={hud} mode={TIMED} />)
+    expect(figure('Score')).toHaveTextContent('1,200')
+    expect(figure('Accuracy')).toHaveTextContent('95%')
+    expect(figure('Combo')).toHaveTextContent('3×1.3')
+    expect(figure('Hits')).toHaveTextContent('20')
   })
 
   it('shows Time for countdown modes and Lives for miss-limited modes', () => {
-    const { rerender } = render(<GameHud hud={{ ...hud, timeRemaining: 12 }} />)
-    expect(screen.getByText('12s')).toBeInTheDocument()
+    const { rerender } = render(
+      <GameHud hud={{ ...hud, timeRemaining: 12 }} mode={TIMED} />
+    )
+    expect(figure('Time')).toHaveTextContent('12 s')
     expect(screen.queryByText('Lives')).not.toBeInTheDocument()
 
-    rerender(<GameHud hud={{ ...hud, lives: 4 }} />)
-    expect(screen.getByText('Lives')).toBeInTheDocument()
+    rerender(<GameHud hud={{ ...hud, lives: 4 }} mode={ENDLESS} />)
+    expect(figure('Lives')).toHaveTextContent('4')
     expect(screen.queryByText('Time')).not.toBeInTheDocument()
   })
 })

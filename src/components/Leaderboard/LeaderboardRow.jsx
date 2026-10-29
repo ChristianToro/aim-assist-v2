@@ -1,29 +1,10 @@
+import ReactionTime from '../ReactionTime/ReactionTime'
+import { CELL, FROM_LG, FROM_SM, ROW } from '../../styles/table'
 import {
   formatAccuracy,
   formatDay,
-  formatReactionMs,
   formatScore,
 } from '../../utils/leaderboardFormat'
-
-// Columns that fold into the player cell's second line on narrow screens.
-const FROM_SM = 'hidden sm:table-cell'
-const FROM_LG = 'hidden lg:table-cell'
-// The first and last columns sit 16px in from the frame, the rest 12px apart.
-export const EDGE_PADDING = 'px-3 first:pl-4 last:pr-4'
-const CELL = `py-2.5 ${EDGE_PADDING}`
-
-const MISSING = <span className="text-muted">—</span>
-
-const Reaction = ({ ms }) => {
-  const value = formatReactionMs(ms)
-  if (value === null) return MISSING
-  return (
-    <>
-      {value}
-      <span className="text-muted"> ms</span>
-    </>
-  )
-}
 
 const Avatar = ({ entry }) =>
   entry.photoURL ? (
@@ -62,7 +43,7 @@ const Player = ({ entry, isYou }) => (
  * row's identity and the Player column goes.
  */
 const LeaderboardRow = ({ entry, rank, isYou, personal = false }) => (
-  <tr className="border-t border-edge">
+  <tr className={ROW}>
     <td className={`${CELL} text-muted tabular-nums`}>{rank}</td>
     <td className={CELL}>
       {personal ? (
@@ -78,7 +59,7 @@ const LeaderboardRow = ({ entry, rank, isYou, personal = false }) => (
         {!personal && <span className="sm:hidden">{entry.mode}</span>}
         <span className="sm:hidden">{formatAccuracy(entry.accuracy)}</span>
         <span>
-          <Reaction ms={entry.reactionTime} />
+          <ReactionTime ms={entry.reactionTime} />
         </span>
         <span>{formatDay(entry.createdAt)}</span>
       </p>
@@ -99,7 +80,7 @@ const LeaderboardRow = ({ entry, rank, isYou, personal = false }) => (
     <td
       className={`${CELL} ${FROM_LG} text-right whitespace-nowrap text-body tabular-nums`}
     >
-      <Reaction ms={entry.reactionTime} />
+      <ReactionTime ms={entry.reactionTime} />
     </td>
     <td
       className={`${CELL} ${FROM_LG} text-right whitespace-nowrap text-muted tabular-nums`}
@@ -119,7 +100,7 @@ const SKELETON_FIGURES = [
 
 // A placeholder row at the real row's size: flat bars, no shimmer.
 export const SkeletonRow = ({ personal = false }) => (
-  <tr aria-hidden="true" className="border-t border-edge">
+  <tr aria-hidden="true" className={ROW}>
     <td className={CELL}>
       <span className="block h-3 w-4 bg-edge" />
     </td>

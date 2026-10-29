@@ -1,19 +1,19 @@
 import Modal from '../Modal/Modal'
 import Button from '../Button/Button'
-
-const formatMs = (ms) => (ms === null ? '—' : `${ms} ms`)
+import ReactionTime from '../ReactionTime/ReactionTime'
+import { formatAccuracy, formatScore } from '../../utils/leaderboardFormat'
 
 const SAVE_STATUS_TEXT = {
   'signed-out': 'Sign in to save scores and rank on the leaderboards.',
   saving: 'Saving score…',
   saved: 'Saved to your profile.',
-  error: "Couldn't save this score — check your connection.",
+  error: "Couldn't save this score. Check your connection.",
 }
 
-const Row = ({ label, value }) => (
-  <div className="flex items-center justify-between border-b border-edge py-2 text-sm last:border-b-0">
-    <span className="text-muted">{label}</span>
-    <span className="font-medium text-heading tabular-nums">{value}</span>
+const Row = ({ label, children }) => (
+  <div className="flex items-center justify-between border-t border-edge py-2 text-ui">
+    <dt className="text-muted">{label}</dt>
+    <dd className="font-medium text-heading tabular-nums">{children}</dd>
   </div>
 )
 
@@ -30,35 +30,42 @@ const ResultsModal = ({
 
   return (
     <Modal open={open} onClose={onClose} title={title}>
-      <p className="text-center">
-        <span className="text-5xl font-semibold text-accent tabular-nums">
-          {summary.score}
+      <p>
+        <span className="block text-meta text-muted">Final score</span>
+        <span className="text-answer font-medium text-heading tabular-nums">
+          {formatScore(summary.score)}
         </span>
-        <span className="mt-1 block text-sm text-muted">Final Score</span>
       </p>
 
-      <div className="mt-6">
-        <Row label="Accuracy" value={`${summary.accuracy.toFixed(1)}%`} />
-        <Row
-          label="Hits / Misses"
-          value={`${summary.hits} / ${summary.misses}`}
-        />
-        <Row label="Max Combo" value={`${summary.maxCombo}×`} />
-        <Row label="Avg Reaction" value={formatMs(summary.averageReactionMs)} />
-        <Row label="Best Reaction" value={formatMs(summary.bestReactionMs)} />
-        <Row label="Worst Reaction" value={formatMs(summary.worstReactionMs)} />
-      </div>
+      <dl className="mt-4">
+        <Row label="Accuracy">{formatAccuracy(summary.accuracy)}</Row>
+        <Row label="Hits / misses">
+          {summary.hits} / {summary.misses}
+        </Row>
+        <Row label="Max combo">{summary.maxCombo}×</Row>
+        <Row label="Average reaction">
+          <ReactionTime ms={summary.averageReactionMs} />
+        </Row>
+        <Row label="Best reaction">
+          <ReactionTime ms={summary.bestReactionMs} />
+        </Row>
+        <Row label="Worst reaction">
+          <ReactionTime ms={summary.worstReactionMs} />
+        </Row>
+      </dl>
 
       {saveStatus && (
-        <p className="mt-4 text-center text-xs text-muted" role="status">
+        <p className="mt-4 text-meta text-muted" role="status">
           {SAVE_STATUS_TEXT[saveStatus]}
         </p>
       )}
 
-      <div className="mt-6 flex justify-center gap-3">
-        <Button onClick={onRestart}>Play Again</Button>
-        <Button variant="secondary" onClick={onClose}>
+      <div className="mt-6 flex justify-end gap-3">
+        <Button variant="ghost" size="sm" onClick={onClose}>
           Close
+        </Button>
+        <Button variant="solid" size="sm" onClick={onRestart}>
+          Play again
         </Button>
       </div>
     </Modal>

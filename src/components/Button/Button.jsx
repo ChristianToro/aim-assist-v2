@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom'
 
 // Flat fills only: surfaces step in tone rather than drawing outlines.
-// `inverse` is for buttons sitting on an accent-coloured field.
+// `inverse` is for buttons sitting on an accent-coloured field. `solid` is
+// an app screen's one primary: ink fill, page-colour text (white on the
+// dark themes, near-black on Light), keeping the accent for selection.
 const variants = {
   primary: 'bg-accent-strong text-on-accent hover:bg-accent',
+  solid: 'bg-heading text-bg hover:bg-body',
   secondary: 'bg-surface text-heading hover:bg-raised',
   ghost: 'text-muted hover:bg-surface hover:text-heading',
   inverse: 'bg-bg text-heading hover:bg-surface',

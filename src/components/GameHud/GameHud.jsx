@@ -1,29 +1,52 @@
 import { memo } from 'react'
-import StatTile from '../StatTile/StatTile'
+import StatStrip from '../StatStrip/StatStrip'
+import { formatScore } from '../../utils/leaderboardFormat'
 
-// Live match statistics. Re-renders only when the scene pushes a new
-// snapshot (hit, miss, or timer tick) — never per animation frame.
-const GameHud = ({ hud }) => {
-  if (!hud) return null
+// A figure with its unit as a smaller grey suffix ("12 s").
+const withUnit = (value, unit) => (
+  <>
+    {value}
+    <span className="text-meta text-muted"> {unit}</span>
+  </>
+)
 
-  return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-      {hud.timeRemaining !== undefined && (
-        <StatTile label="Time" value={`${hud.timeRemaining}s`} accent />
-      )}
-      {hud.lives !== undefined && (
-        <StatTile label="Lives" value={hud.lives} accent />
-      )}
-      <StatTile label="Score" value={hud.score} accent />
-      <StatTile label="Accuracy" value={`${hud.accuracy.toFixed(0)}%`} />
-      <StatTile
-        label="Combo"
-        value={`${hud.combo}×${hud.multiplier.toFixed(1)}`}
-      />
-      <StatTile label="Hits" value={hud.hits} />
-      <StatTile label="Misses" value={hud.misses} />
-    </div>
-  )
+// The round's limit: time left on the clock, or lives left before the
+// miss limit ends it.
+const limitItem = (hud, mode) => {
+  if (hud?.timeRemaining !== undefined) {
+    return { label: 'Time', value: withUnit(hud.timeRemaining, 's') }
+  }
+  if (hud?.lives !== undefined) return { label: 'Lives', value: hud.lives }
+  if (!hud && Number.isFinite(mode.duration)) {
+    return { label: 'Time', value: withUnit(mode.duration, 's') }
+  }
+  return { label: 'Lives', value: mode.missLimit }
 }
+
+/*
+ * Live match statistics. Re-renders only when the scene pushes a new
+ * snapshot (hit, miss, or timer tick) — never per animation frame.
+ * Before the first snapshot it shows the round's starting values, so the
+ * strip is already in place and the canvas below never shifts as a match
+ * begins. Accuracy and combo have no value until the first shot.
+ */
+const GameHud = ({ hud, mode }) => (
+  <StatStrip
+    items={[
+      limitItem(hud, mode),
+      { label: 'Score', value: formatScore(hud?.score ?? 0) },
+      {
+        label: 'Accuracy',
+        value: hud ? `${hud.accuracy.toFixed(0)}%` : null,
+      },
+      {
+        label: 'Combo',
+        value: hud ? `${hud.combo}×${hud.multiplier.toFixed(1)}` : null,
+      },
+      { label: 'Hits', value: String(hud?.hits ?? 0) },
+      { label: 'Misses', value: String(hud?.misses ?? 0) },
+    ]}
+  />
+)
 
 export default memo(GameHud)

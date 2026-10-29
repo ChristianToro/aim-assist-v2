@@ -26,8 +26,10 @@ const Modal = ({ open, onClose, title, children }) => {
   if (!open) return null
 
   return (
+    // An opaque-enough scrim sets the dialog apart; no blur, and the
+    // dialog itself is an edge and a tone step, not a shadow.
     <div
-      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/70 p-4"
       onClick={onClose}
       role="presentation"
     >
@@ -37,11 +39,11 @@ const Modal = ({ open, onClose, title, children }) => {
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="w-full max-w-md animate-scale-in rounded-xl border border-edge bg-raised p-6 shadow-2xl outline-none"
+        className="w-full max-w-md animate-scale-in border border-edge bg-raised p-6 outline-none"
         onClick={(event) => event.stopPropagation()}
       >
         {title && (
-          <h2 className="text-xl font-semibold tracking-tight text-heading">
+          <h2 className="text-title font-medium tracking-tight text-heading">
             {title}
           </h2>
         )}

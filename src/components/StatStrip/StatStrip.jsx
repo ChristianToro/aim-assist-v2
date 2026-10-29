@@ -23,8 +23,15 @@ const Value = ({ value, isLoading }) => {
   return value
 }
 
+// Columns by item count, phone then desktop, so no row is left with an
+// orphan cell: four figures go 2 by 2, six go 3 by 2.
+const COLUMNS = {
+  4: 'grid-cols-2 sm:grid-cols-4',
+  6: 'grid-cols-3 sm:grid-cols-6',
+}
+
 const StatStrip = ({ items, isLoading = false }) => (
-  <dl className="grid grid-cols-2 gap-px bg-edge sm:grid-cols-4">
+  <dl className={`grid gap-px bg-edge ${COLUMNS[items.length]}`}>
     {items.map(({ label, value }) => (
       <div key={label} className="bg-surface px-4 py-3">
         <dt className="text-meta text-muted">{label}</dt>

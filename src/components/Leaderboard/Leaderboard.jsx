@@ -1,11 +1,11 @@
 import { memo, useRef } from 'react'
-import LeaderboardRow, { EDGE_PADDING, SkeletonRow } from './LeaderboardRow'
+import LeaderboardRow, { SkeletonRow } from './LeaderboardRow'
+import { HEAD, NUMERIC_HEAD, ROW } from '../../styles/table'
 import { useRowCap } from '../../hooks/useRowCap'
 import { boardSummary } from '../../utils/leaderboardFormat'
 
 const UNAUTHORIZED = 401
 const SERVER_ERROR = 500
-const COLUMNS = 7
 const SKELETON_ROWS = 5
 
 // A failed query and an empty result are very different problems, so they
@@ -20,9 +20,6 @@ const errorMessage = (error) => {
   }
   return 'Something went wrong loading the leaderboard. See the browser console for details.'
 }
-
-const HEAD = `sticky top-0 bg-surface py-2 font-normal ${EDGE_PADDING}`
-const NUMERIC_HEAD = `${HEAD} text-right`
 
 /*
  * Headers stay up in every state, so an empty or failed board keeps its
@@ -68,36 +65,22 @@ const Header = ({ personal }) => (
   </thead>
 )
 
-// One sentence across the whole table, for the empty and failed states.
-const MessageRow = ({ columns, children, ...props }) => (
-  <tr className="border-t border-edge">
-    <td colSpan={columns} className="px-4 py-6 text-ui text-muted">
-      <div {...props}>{children}</div>
-    </td>
-  </tr>
+/*
+ * One sentence under the header, for the empty and failed states. It sits
+ * below the table, not in a spanning row: with columns hidden on phones, a
+ * colSpan wider than the visible columns makes the fixed layout add
+ * phantom ones and squeeze the real columns.
+ */
+const Message = ({ children, ...props }) => (
+  <div className={`${ROW} px-4 py-6 text-ui text-muted`} {...props}>
+    {children}
+  </div>
 )
 
-const Body = ({
-  entries,
-  isLoading,
-  error,
-  emptyMessage,
-  uid,
-  onRetry,
-  personal,
-}) => {
-  // A personal board has no Player column.
-  const columns = personal ? COLUMNS - 1 : COLUMNS
-
-  if (isLoading) {
-    return Array.from({ length: SKELETON_ROWS }, (_, i) => (
-      <SkeletonRow key={i} personal={personal} />
-    ))
-  }
-
+const StateMessage = ({ entries, isLoading, error, emptyMessage, onRetry }) => {
   if (error) {
     return (
-      <MessageRow columns={columns} role="alert">
+      <Message role="alert">
         {errorMessage(error)}
         {onRetry && (
           <button
@@ -108,13 +91,22 @@ const Body = ({
             Retry
           </button>
         )}
-      </MessageRow>
+      </Message>
     )
   }
+  if (!isLoading && entries.length === 0)
+    return <Message>{emptyMessage}</Message>
+  return null
+}
 
-  if (entries.length === 0) {
-    return <MessageRow columns={columns}>{emptyMessage}</MessageRow>
+// The rows: placeholders while loading, the entries once they land.
+const Body = ({ entries, isLoading, error, uid, personal }) => {
+  if (isLoading) {
+    return Array.from({ length: SKELETON_ROWS }, (_, i) => (
+      <SkeletonRow key={i} personal={personal} />
+    ))
   }
+  if (error) return null
 
   return entries.map((entry, index) => (
     <LeaderboardRow
@@ -192,13 +184,18 @@ const Leaderboard = ({
             entries={entries}
             isLoading={isLoading}
             error={error}
-            emptyMessage={emptyMessage}
             uid={highlightUid}
-            onRetry={onRetry}
             personal={personal}
           />
         </tbody>
       </table>
+      <StateMessage
+        entries={entries}
+        isLoading={isLoading}
+        error={error}
+        emptyMessage={emptyMessage}
+        onRetry={onRetry}
+      />
     </div>
   )
 }

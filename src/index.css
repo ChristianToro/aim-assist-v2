@@ -10,8 +10,9 @@
 @import './styles/themes.css';
 
 /* Type: Unbounded for display (always uppercase), Onest for text. Five
-   size steps cover the landing page, and five app steps (title down to
-   meta) cover the screens players work in; nothing else sets a font size. */
+   size steps cover the landing page, and six app steps (a dialog's answer
+   figure down to meta) cover the screens players work in; nothing else
+   sets a font size. */
 @theme {
   --font-sans: 'Onest', system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Unbounded', 'Onest', system-ui, sans-serif;
@@ -30,6 +31,8 @@
      size. Onest is loaded at 400/500, so app titles use 500. */
   --text-title: clamp(1.375rem, 1.2rem + 0.5vw, 1.625rem);
   --text-title--line-height: 1.2;
+  --text-answer: 2rem;
+  --text-answer--line-height: 1.1;
   --text-figure: 1.25rem;
   --text-figure--line-height: 1.4;
   --text-label: 1rem;
@@ -211,10 +214,14 @@ body {
   }
 }
 
-/* Visible keyboard focus everywhere (buttons opt into their own ring). */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+/* Visible keyboard focus everywhere (buttons opt into their own ring). In
+   the base layer, so a utility can still opt an element out: the dialog,
+   which takes focus only to hold it inside, sets outline-none. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 /* Respect OS-level reduced-motion: collapse UI animations/transitions.

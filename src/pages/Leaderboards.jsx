@@ -3,6 +3,7 @@ import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import GoogleSignInButton from '../components/GoogleSignInButton/GoogleSignInButton'
 import Leaderboard from '../components/Leaderboard/Leaderboard'
+import Tabs from '../components/Tabs/Tabs'
 import { useAuth } from '../hooks/useAuth'
 import { useLeaderboard } from '../hooks/useLeaderboard'
 
@@ -33,15 +34,6 @@ const VIEWS = [
     empty: 'Play a match to set your first record.',
   },
 ]
-
-// Underline tabs on one rule; the chosen label carries the accent line,
-// drawn over the rule's last pixel row.
-const tabClass = (isActive) =>
-  `relative border-b py-2 text-ui font-medium whitespace-nowrap transition-colors ${
-    isActive
-      ? 'border-accent text-heading'
-      : 'border-transparent text-muted hover:text-heading'
-  }`
 
 const SignInPrompt = () => (
   <Card className="flex flex-wrap items-center justify-between gap-4">
@@ -77,32 +69,15 @@ const Leaderboards = () => {
         )}
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Leaderboard period"
-        className="relative mt-6 flex gap-6 overflow-x-auto"
-      >
-        {/* The rule sits inside the scroller, so the scroller can't clip the
-            selected tab's line where the two overlap. */}
-        <span
-          aria-hidden="true"
-          className="absolute inset-x-0 bottom-0 h-px bg-edge"
-        />
-        {VIEWS.map(({ id, label }) => (
-          <button
-            key={id}
-            id={tabId(id)}
-            type="button"
-            role="tab"
-            aria-selected={view === id}
-            aria-controls={panelId}
-            className={tabClass(view === id)}
-            onClick={() => setView(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        items={VIEWS}
+        selectedId={view}
+        onSelect={setView}
+        label="Leaderboard period"
+        panelId={panelId}
+        tabId={tabId}
+        className="mt-6"
+      />
 
       <div
         id={panelId}

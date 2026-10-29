@@ -286,3 +286,103 @@ The user found the phone nav bug in their own screenshots, which headless runs c
 - The user reported that U5's browser checks passed: the phone nav, the landing hero at 390 signed in, and Best matches scrolling past five.
 - U5 is marked Done in PLAN-UI.md and committed on `refactor/UI` with Interactions 7–9.
 - U6 (Play) is next.
+
+### Interaction 10 — U6: Play built
+
+**User Prompt**
+
+> all commits pushed, the working tree is clean. Execute U6
+
+**Agent Outcome**
+
+Play is restyled in the *Data terminal* app style, with no engine changes.
+- **Tabs:** a shared `Tabs` component (underline tabs that wrap instead of scrolling) replaces `ModePicker` and Leaderboards' own tab row.
+- **HUD:** it runs on `StatStrip` and shows the round's starting values before the first snapshot, so the canvas no longer shifts as a match starts.
+- **Canvas:**
+  - The overlays lose their blur, and the idle overlay names the round in words.
+  - A new `solid` button (ink fill) is the screen's one primary: Start match, Resume, Play again.
+- **Results dialog:** it leads with a 32px final score and lists the stats as sentence-case rows.
+- **Session history:** it uses U4's table rules and keeps its frame when empty.
+
+The full record is in [PLAN-UI.md](PLAN-UI.md#u6-detail).
+
+**Rationale**
+
+- **Wrapping tabs:** six mode names don't fit across 390px, and a sideways scroller hid the U5 nav's last link.
+- **Shared modules:** `ReactionTime` and `styles/table.js` give the leaderboard and the session history one definition for their cells, folding and reaction times.
+
+**Attempted Approach / Resolution**
+
+- **Symptom:** a 390px headless check of Leaderboards (after the move to `Tabs`) showed the Player header clipped to "Playe" in the error state.
+- **Cause:** the message row's `colSpan={7}` gave the fixed-layout table seven columns while only three were visible. The bug dated from U4, whose state screenshots were all at 1440.
+- **Fix:** the empty and error sentences now sit below the table in both tables, which restores the column at 206px.
+
+**Changes**
+
+- New:
+  - [`src/components/Tabs/Tabs.jsx`](src/components/Tabs/Tabs.jsx), [`src/components/ReactionTime/ReactionTime.jsx`](src/components/ReactionTime/ReactionTime.jsx) and [`src/styles/table.js`](src/styles/table.js);
+  - tests for `Tabs`, `ResultsModal` and `SessionHistory`.
+- Deleted: `src/components/ModePicker/` and `src/components/StatTile/`.
+- Edited:
+  - `Play.jsx`, `Leaderboards.jsx`, `GameArea.jsx`, `GameHud.jsx` and its test, `StatStrip.jsx`, `Modal.jsx`, `ResultsModal.jsx`, `SessionHistory.jsx`, `Leaderboard.jsx`, `LeaderboardRow.jsx` and `Button.jsx`;
+  - `index.css` (`text-answer`), `README.md` (test count) and `PLAN-UI.md`.
+
+**Verification**
+
+- Lint, format check, tests (277, up from 270) and build pass.
+- `lint.mjs --app`: 0 FAIL, 0 WARN.
+- **Headless Chrome on Leaderboards, signed out:** the tabs carry the accent line, and the board's column widths are right at 390.
+- **Not yet done:** the user's signed-in screenshots of Play.
+
+### Interaction 11 — U6 screenshots taken with a faked session; four fixes
+
+**User Prompt**
+
+> use a faked session in headless chrome
+
+**Agent Outcome**
+
+- **The agent now takes the signed-in screenshots,** replacing the user-screenshot method for U6. It runs headless Chrome on the production build and intercepts two kinds of request:
+  - **Session:** the Neon Auth SDK's one session call (`get-session`) returns a stand-in player. The SDK reads `session.token` for the JWT that `/api` calls send.
+  - **Score saves:** `POST /api/scores` gets a local 201.
+  - **Effect:** no credentials, no repo code, and nothing reaches the database.
+- **Driving the page:** targets are found by their colour in the canvas pixels and clicked with real mouse events. Dark and Light at 1440, 768 and 390, through idle, mid-match, paused, results and the session table: six runs, all clean.
+- **Fixes from the screenshots:**
+  - **Dialog ring:** the unlayered global `:focus-visible` framed the results dialog; it moved to `@layer base`.
+  - **Stale HUD:** between matches the HUD showed the last match; it now shows the next round's starting values.
+  - **Phone shift:** at 390 the controls row wrapped when Pause and Restart appeared, shifting the canvas; the controls now take their own line.
+  - **Wrapping text:** the "When" and "Max combo" cells wrapped; they're now `nowrap`.
+  - **Copy:** one em dash left the Gridshot hint.
+
+**Attempted Approach / Resolution**
+
+- **First try:** the fake session was rejected, and the page redirected home.
+- **Cause:** a credentialed CORS preflight can't accept `Access-Control-Allow-Headers: *`.
+- **Fix:** echoing the requested headers back signed the page in.
+
+**Changes**
+
+- Edited: `index.css`, `GameArea.jsx`, `SessionHistory.jsx`, `styles/table.js` and `PLAN-UI.md`.
+- The scripts live in the agent's scratchpad, not the repo.
+
+**Verification**
+
+- Lint, tests (277) and build pass.
+- **The canvas's top edge,** measured idle and running, is unchanged at 390, 768 and 1440.
+- The six-run screenshot set was retaken on the final build.
+
+**Collaboration**
+
+The user chose the faked session over driving their own signed-in Chrome.
+
+### Interaction 12 — U6 approved and committed
+
+**User Prompt**
+
+> browser checks passed. commit U6
+
+**Agent Outcome**
+
+- The user reported that U6's browser checks passed on their real account: a match saved, and the phone controls row held still at match start.
+- U6 is marked Done in PLAN-UI.md and committed on `refactor/UI` with Interactions 10–12.
+- U7 (NotFound, shared states and the final pass) is next.

@@ -1,70 +1,125 @@
-import { memo } from 'react'
-import Card from '../Card/Card'
+import { memo, useId } from 'react'
+import ReactionTime from '../ReactionTime/ReactionTime'
+import {
+  CELL,
+  FROM_LG,
+  FROM_SM,
+  HEAD,
+  NUMERIC_HEAD,
+  ROW,
+} from '../../styles/table'
+import { formatAccuracy, formatScore } from '../../utils/leaderboardFormat'
 
-const formatMs = (ms) => (ms == null ? '—' : `${ms} ms`)
+const formatTime = (date) =>
+  date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+const MatchRow = ({ match }) => (
+  <tr className={ROW}>
+    <td className={CELL}>
+      <span className="text-heading">{match.mode}</span>
+      <p className="mt-0.5 flex flex-wrap gap-x-3 text-meta text-muted tabular-nums lg:hidden">
+        <span className="sm:hidden">{formatAccuracy(match.accuracy)}</span>
+        <span className="sm:hidden">{match.maxCombo}× combo</span>
+        <span>
+          <ReactionTime ms={match.averageReactionMs} /> average
+        </span>
+      </p>
+    </td>
+    <td className={`${CELL} text-right font-medium text-heading tabular-nums`}>
+      {formatScore(match.score)}
+    </td>
+    <td className={`${CELL} ${FROM_SM} text-right text-body tabular-nums`}>
+      {formatAccuracy(match.accuracy)}
+    </td>
+    <td className={`${CELL} ${FROM_SM} text-right text-body tabular-nums`}>
+      {match.maxCombo}×
+    </td>
+    <td
+      className={`${CELL} ${FROM_LG} text-right whitespace-nowrap text-body tabular-nums`}
+    >
+      <ReactionTime ms={match.averageReactionMs} />
+    </td>
+    <td
+      className={`${CELL} ${FROM_LG} text-right whitespace-nowrap text-body tabular-nums`}
+    >
+      <ReactionTime ms={match.bestReactionMs} />
+    </td>
+    <td
+      className={`${CELL} text-right whitespace-nowrap text-muted tabular-nums`}
+    >
+      {formatTime(match.finishedAt)}
+    </td>
+  </tr>
+)
 
 /*
  * Matches played this browser session (kept in React state, newest
  * first — this is deliberately ephemeral; persistent history lives in
- * Neon via the Profile page).
+ * Neon via the Profile page). Before the first match the section keeps
+ * its heading and frame, with one line saying what will land there.
  */
 const SessionHistory = ({ matches }) => {
-  if (matches.length === 0) return null
+  const headingId = useId()
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-heading">This Session</h2>
-      <Card className="mt-4 overflow-x-auto p-0">
-        <table className="w-full text-left text-sm">
+    <section aria-labelledby={headingId}>
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 id={headingId} className="text-label font-medium text-heading">
+          This session
+        </h2>
+        {matches.length > 0 && (
+          <p className="text-meta text-muted">
+            {matches.length} match{matches.length === 1 ? '' : 'es'}, newest
+            first
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 bg-surface">
+        <table className="w-full table-fixed text-left text-ui">
           <thead>
-            <tr className="border-b border-edge text-xs tracking-wide text-muted uppercase">
-              <th className="px-4 py-3 font-medium">Mode</th>
-              <th className="px-4 py-3 text-right font-medium">Score</th>
-              <th className="px-4 py-3 text-right font-medium">Accuracy</th>
-              <th className="px-4 py-3 text-right font-medium">Max Combo</th>
-              <th className="hidden px-4 py-3 text-right font-medium sm:table-cell">
-                Avg Reaction
+            <tr className="text-meta text-muted">
+              <th scope="col" className={HEAD}>
+                Mode
               </th>
-              <th className="hidden px-4 py-3 text-right font-medium sm:table-cell">
-                Best Reaction
+              <th scope="col" className={`${NUMERIC_HEAD} w-24 sm:w-[12%]`}>
+                Score
               </th>
-              <th className="px-4 py-3 text-right font-medium">When</th>
+              <th scope="col" className={`${NUMERIC_HEAD} ${FROM_SM} w-[12%]`}>
+                Accuracy
+              </th>
+              <th scope="col" className={`${NUMERIC_HEAD} ${FROM_SM} w-[14%]`}>
+                Max combo
+              </th>
+              <th scope="col" className={`${NUMERIC_HEAD} ${FROM_LG} w-[14%]`}>
+                Avg reaction
+              </th>
+              <th scope="col" className={`${NUMERIC_HEAD} ${FROM_LG} w-[14%]`}>
+                Best reaction
+              </th>
+              <th scope="col" className={`${NUMERIC_HEAD} w-24`}>
+                When
+              </th>
             </tr>
           </thead>
           <tbody>
             {matches.map((match, index) => (
-              <tr
+              <MatchRow
                 key={`${match.finishedAt.getTime()}-${index}`}
-                className="border-b border-edge last:border-b-0"
-              >
-                <td className="px-4 py-3 text-body">{match.mode}</td>
-                <td className="px-4 py-3 text-right font-semibold text-heading tabular-nums">
-                  {match.score}
-                </td>
-                <td className="px-4 py-3 text-right text-body tabular-nums">
-                  {match.accuracy.toFixed(1)}%
-                </td>
-                <td className="px-4 py-3 text-right text-body tabular-nums">
-                  {match.maxCombo}×
-                </td>
-                <td className="hidden px-4 py-3 text-right text-muted tabular-nums sm:table-cell">
-                  {formatMs(match.averageReactionMs)}
-                </td>
-                <td className="hidden px-4 py-3 text-right text-muted tabular-nums sm:table-cell">
-                  {formatMs(match.bestReactionMs)}
-                </td>
-                <td className="px-4 py-3 text-right text-muted tabular-nums">
-                  {match.finishedAt.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </td>
-              </tr>
+                match={match}
+              />
             ))}
           </tbody>
         </table>
-      </Card>
-    </div>
+        {/* Below the table, not in a spanning row: a colSpan wider than
+            the phone's visible columns would squeeze them (see Leaderboard). */}
+        {matches.length === 0 && (
+          <p className={`${ROW} px-4 py-6 text-ui text-muted`}>
+            Matches you finish appear here, newest first.
+          </p>
+        )}
+      </div>
+    </section>
   )
 }
 
