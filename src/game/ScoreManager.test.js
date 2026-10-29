@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ScoreManager } from './ScoreManager'
 
-const target = (value = 100, age = 0.3) => ({ value, age })
+// A hit worth `value` base points, `reactionMs` after its target spawned.
+const hit = (scores, value = 100, reactionMs = 300) =>
+  scores.registerHit(value, reactionMs)
 
 describe('ScoreManager', () => {
   let scores
@@ -16,26 +18,26 @@ describe('ScoreManager', () => {
   })
 
   it('awards base value on the first hit (no streak yet)', () => {
-    expect(scores.registerHit(target(100))).toBe(100)
+    expect(hit(scores, 100)).toBe(100)
     expect(scores.score).toBe(100)
     expect(scores.hits).toBe(1)
   })
 
   it('grows the multiplier by 0.1x per consecutive hit', () => {
-    scores.registerHit(target()) // streak 0 → 1x
-    const second = scores.registerHit(target()) // streak 1 → 1.1x
+    hit(scores) // streak 0 → 1x
+    const second = hit(scores) // streak 1 → 1.1x
     expect(second).toBe(110)
   })
 
   it('caps the multiplier at 2x after a 10-hit streak', () => {
-    for (let i = 0; i < 12; i += 1) scores.registerHit(target())
+    for (let i = 0; i < 12; i += 1) hit(scores)
     expect(scores.multiplier).toBe(2)
-    expect(scores.registerHit(target(100))).toBe(200)
+    expect(hit(scores, 100)).toBe(200)
   })
 
   it('resets the combo (not the score) on a miss', () => {
-    scores.registerHit(target())
-    scores.registerHit(target())
+    hit(scores)
+    hit(scores)
     scores.registerMiss()
     expect(scores.combo).toBe(0)
     expect(scores.maxCombo).toBe(2)
@@ -44,17 +46,17 @@ describe('ScoreManager', () => {
   })
 
   it('computes accuracy from hits and misses', () => {
-    scores.registerHit(target())
-    scores.registerHit(target())
-    scores.registerHit(target())
+    hit(scores)
+    hit(scores)
+    hit(scores)
     scores.registerMiss()
     expect(scores.accuracy).toBe(75)
   })
 
   it('summarizes reaction times in milliseconds', () => {
-    scores.registerHit(target(100, 0.2))
-    scores.registerHit(target(100, 0.4))
-    scores.registerHit(target(100, 0.6))
+    hit(scores, 100, 200)
+    hit(scores, 100, 400)
+    hit(scores, 100, 600)
     const summary = scores.summary()
     expect(summary.averageReactionMs).toBe(400)
     expect(summary.bestReactionMs).toBe(200)
@@ -69,7 +71,7 @@ describe('ScoreManager', () => {
   })
 
   it('reset clears everything', () => {
-    scores.registerHit(target())
+    hit(scores)
     scores.registerMiss()
     scores.reset()
     expect(scores.score).toBe(0)

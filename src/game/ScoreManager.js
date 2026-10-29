@@ -2,13 +2,12 @@
 const MULTIPLIER_STEP = 0.1
 const MULTIPLIER_MAX_COMBO = 10
 
-const toMs = (seconds) => Math.round(seconds * 1000)
-
 /*
  * ScoreManager — owns all match statistics.
  *
  * Pure bookkeeping: no canvas, no React, no timing sources of its own.
- * Reaction time for a hit is the target's age (seconds from spawn to click).
+ * It's fed through scoring.js's applyEvent, so the live HUD and a replay
+ * of the match's event log produce the same figures.
  */
 export class ScoreManager {
   score = 0
@@ -16,7 +15,7 @@ export class ScoreManager {
   misses = 0
   combo = 0
   maxCombo = 0
-  #reactionTimes = []
+  #reactionTimesMs = []
 
   // Multiplier earned by the current streak; applies to the next hit.
   get multiplier() {
@@ -28,14 +27,15 @@ export class ScoreManager {
     return total === 0 ? 100 : (this.hits / total) * 100
   }
 
-  // Returns the points awarded (used for floating score text).
-  registerHit(target) {
-    const points = Math.round(target.value * this.multiplier)
+  // A hit on a target worth `value` base points, `reactionMs` after it
+  // spawned. Returns the points awarded (used for floating score text).
+  registerHit(value, reactionMs) {
+    const points = Math.round(value * this.multiplier)
     this.score += points
     this.hits += 1
     this.combo += 1
     this.maxCombo = Math.max(this.maxCombo, this.combo)
-    this.#reactionTimes.push(target.age)
+    this.#reactionTimesMs.push(reactionMs)
     return points
   }
 
@@ -59,15 +59,15 @@ export class ScoreManager {
 
   // Full match statistics for the results screen.
   summary() {
-    const times = this.#reactionTimes
+    const times = this.#reactionTimesMs
     const average = times.length
       ? times.reduce((sum, t) => sum + t, 0) / times.length
       : null
     return {
       ...this.snapshot(),
-      averageReactionMs: average === null ? null : toMs(average),
-      bestReactionMs: times.length ? toMs(Math.min(...times)) : null,
-      worstReactionMs: times.length ? toMs(Math.max(...times)) : null,
+      averageReactionMs: average === null ? null : Math.round(average),
+      bestReactionMs: times.length ? Math.min(...times) : null,
+      worstReactionMs: times.length ? Math.max(...times) : null,
     }
   }
 
@@ -77,6 +77,6 @@ export class ScoreManager {
     this.misses = 0
     this.combo = 0
     this.maxCombo = 0
-    this.#reactionTimes = []
+    this.#reactionTimesMs = []
   }
 }

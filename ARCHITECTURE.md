@@ -52,9 +52,10 @@ Plain ES classes with no React and no DOM beyond the canvas they're given.
 | Module | Owns |
 |---|---|
 | `GameEngine` | The `requestAnimationFrame` loop and its lifecycle API (`attach`, `start`, `pause`, `resume`, `stop`, `reset`). Delta time is clamped, so a backgrounded tab can't cause one huge physics step. |
-| `GameSession` | One match of one mode: spawning, scoring, the countdown or miss limit. It implements the engine's scene contract. |
+| `GameSession` | One match of one mode: spawning, the countdown or miss limit, and the match's event log (each hit, miss and expiry, stamped in game time). It implements the engine's scene contract. |
 | `Spawner`, `Target`, `Collision` | Non-overlapping placement (rejection sampling), target motion and lifetime, and hit-testing against the full radius. |
-| `ScoreManager`, `Timer` | Score, combo multiplier, accuracy and reaction times; the match clock. |
+| `scoring.js` | The pure definition of a score from an event log: a target's value from its spawn time, and `scoreEvents` for a whole match. The live HUD and the results screen both use it, and it imports nothing outside `src/game` and `src/utils`, so `/api` can too. |
+| `ScoreManager`, `Timer` | Score, combo multiplier, accuracy and reaction times, fed one event at a time through `scoring.js`; the match clock. |
 | `Particle`, `FloatingText`, `AudioManager` | Hit effects, and Web Audio sound synthesized at runtime (no audio files). |
 | `Input` | A queue of clicks in canvas coordinates, consumed during `update`, so a click is handled at a fixed point in the frame. |
 | `modes.js`, `palette.js` | Modes as pure configuration; theme colors read from CSS custom properties once per theme change, never per frame. |

@@ -58,7 +58,7 @@ What this buys, honestly stated:
 
 ## Workflow
 
-- Work happens on `hotfix/server-checked-scoring`. Push with an explicit refspec (`git push -u origin hotfix/server-checked-scoring:refs/heads/hotfix/server-checked-scoring`); the branch has no upstream yet.
+- Work happens on `hotfix/server-checked-scoring`, which tracks `origin/hotfix/server-checked-scoring`. Push with an explicit refspec (`git push origin hotfix/server-checked-scoring:refs/heads/hotfix/server-checked-scoring`).
 - Each milestone stops for review **before** committing, and the next one starts only after approval. A milestone's steps are detailed when it starts.
 
 ## Milestones
@@ -66,7 +66,7 @@ What this buys, honestly stated:
 | # | Status | Milestone | Key files |
 |---|---|---|---|
 | S0 | Done | **Plan + docs.** This plan, the two open choices settled, CLAUDE.md's document list and workflow updated for this branch. | `PLAN-SCORING.md`, `CLAUDE.md` |
-| S1 | Planned | **Shared scoring and the event log (client only).** `src/game/scoring.js` (`targetValueAt`, `scoreEvents`) with tests. `GameSession` records the event log and its summary comes from `scoreEvents`; a test plays a scripted session and checks the log reproduces its live score. `readJson` gains a byte limit. No API change yet, so the app keeps working. | `src/game/scoring.js`, `GameSession.js`, `ScoreManager.js`, `api/_lib/http.js` |
+| S1 | Done | **Shared scoring and the event log (client only).** `src/game/scoring.js` (`targetValueAt`, `scoreEvents`) with tests. `GameSession` records the event log and its summary comes from `scoreEvents`; a test plays a scripted session and checks the log reproduces its live score. `readJson` gains a byte limit. No API change yet, so the app keeps working. | `src/game/scoring.js`, `GameSession.js`, `ScoreManager.js`, `api/_lib/http.js` |
 | S2 | Planned | **Plausibility checks.** `api/_lib/matchCheck.js`, pure, with tests per rule and per mode (a real log passes; a 9,999,999 log, a too-fast log, a too-early submit and a non-ascending log each fail by name). Calibrate the thresholds against logs from the user's own matches under `npm run dev:full`. | `api/_lib/matchCheck.js`, `api/_lib/matchCheck.test.js` |
 | S3 | Planned | **Matches table and `POST /api/matches`.** Migration `004_matches.sql` (`matches`, `scores.match_id`, `CHECK`s), `matchStore` with the issue limit, the route, and `services/matches.js`. Unused by the client until S4. | `db/migrations/004_matches.sql`, `api/matches.js`, `api/_lib/matchStore.js` |
 | S4 | Planned | **`POST /api/scores` on matches.** Body `{ matchId, events }`. In one transaction: claim the match (owner, mode, unexpired, unsubmitted), run `matchCheck`, insert the computed figures with `match_id`. `scoreInput.js` becomes the body shape check. `GameArea` requests the match on Start and posts the log; the save status covers a missing or rejected ticket. | `api/scores.js`, `api/_lib/scoreInput.js`, `GameArea.jsx`, `services/scores.js` |
@@ -87,6 +87,31 @@ What this buys, honestly stated:
 - Docs only: no code changed, so lint, tests and build weren't run.
 - `npm run format:check` passes, but it doesn't cover these files: `.prettierignore` excludes `*.md`.
 - The links in CLAUDE.md's document list were checked to resolve to files in the repo root.
+
+## S1 detail
+
+1. **`src/game/scoring.js`** (new, pure; imports only `ScoreManager.js` and `utils/math.js`, with explicit extensions so Node can load it from `/api`):
+   - `targetValueAt(mode, spawnedAtMs)`: the mode's base value, ramped for Survival. It takes **ms**, not the seconds in the Decisions table, to match the log's unit.
+   - `applyEvent(scores, mode, event)`: feeds one event to a `ScoreManager`. Expiries count as misses.
+   - `scoreEvents(mode, events)`: replays a whole log through a fresh `ScoreManager` and returns its `summary()`, so the result has the shape the results screen already reads.
+2. **`ScoreManager`**: `registerHit(value, reactionMs)` replaces `registerHit(target)`, and reaction times are kept in ms.
+3. **`GameSession`**:
+   - Every hit, miss and expiry goes through `record`, which logs the event and scores it with `applyEvent`. The live HUD and the replay therefore share one code path.
+   - Clicks and expiries are stamped with the game time *before* the frame advances it, which is the world the player clicked on. That makes a hit's `t − spawnedAt` equal to its target's age, and keeps every `t` of a timed mode within its duration.
+   - `onGameOver` sends `{ ...scoreEvents(mode, events), events }`. `services/scores.js` still picks only the three old fields, so the API is unchanged.
+4. **A target's value moved out of the engine.** `Spawner` stamps `spawnedAt` (game-time ms) on each target and no longer carries `targetValue`. `Target.value` is gone, and `applyDifficulty` no longer ramps the value. The value exists only in `targetValueAt`, so the engine and the server can't disagree about it.
+5. **`readJson(request, { maxBytes })`**: the default limit is 16 KB, and S4 will pass a larger one for the log. An oversized body gets a 413 `{ error, maxBytes }`. A declared `Content-Length` over the limit is refused before the body is read, and the bytes actually read are checked as well.
+6. **ARCHITECTURE.md**'s engine table gains `scoring.js`, and its `GameSession` and `ScoreManager` rows now mention the event log.
+
+### S1 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (56 files, 306 tests) and `npm run build` pass.
+- New tests:
+  - `scoring.test.js`: the value ramp, the combo multiplier and its reset, expiries, and reaction stats.
+  - `GameSession.test.js`: scripted Gridshot and Survival matches, with Survival played past its 90 s ramp. Replaying the log reproduces the live HUD's score, hits, misses and max combo. Events ascend. Each hit's `t − spawnedAt` is within 1 ms of the clicked target's age. Speed's events all fall within 30 s. `reset()` leaves the last summary's log intact.
+  - `http.test.js`: the limit's edge cases (exactly at the limit, bytes vs characters, a declared length, the default).
+- `node -e "import('./src/game/scoring.js')…"` loads it in plain Node and scores a ramped Survival hit as 300.
+- **The user's browser check passed:** in a hand-played match, the results screen showed the same score as the final HUD.
 
 ## Verification (every gate)
 

@@ -559,3 +559,73 @@ The user chose the faked session over driving their own signed-in Chrome.
 
 - S0 is marked Done in PLAN-SCORING.md and committed on `hotfix/server-checked-scoring` with this session's history.
 - **Next:** S1, the shared scoring function and the client's event log, when the user says so.
+
+---
+
+## Session: 2026-10-29 (third)
+
+**Objective:** S1 of PLAN-SCORING.md: the shared scoring function and the client's match event log.
+
+### Interaction 1 — SITREP before S1
+
+**User Prompt**
+
+> /sitrep
+
+**Agent Outcome**
+
+- **Read-only report**, no code changed. The branch is clean and in sync with `origin/hotfix/server-checked-scoring`. S0 is done; S1–S5 aren't started, and the code agrees (no `scoring.js`, no `readJson` limit, migrations stop at `003`).
+- **Found:** PLAN-SCORING.md's Workflow said the branch had no upstream, but it already tracks one.
+- **Verification:** code inspected; tests not run.
+
+### Interaction 2 — S1: shared scoring and the event log; stopped at the review gate
+
+**User Prompt**
+
+> execute S1
+
+**Agent Outcome**
+
+- **`src/game/scoring.js`** (new): `targetValueAt(mode, spawnedAtMs)`, `applyEvent(scores, mode, event)` and `scoreEvents(mode, events)`. It loads in plain Node, so `/api` can import it in S4.
+- **`GameSession`** logs `{ t, kind, spawnedAt? }` for every hit, miss and expiry through `record`, which scores the event via `applyEvent`. Its game-over summary is `scoreEvents`' replay of the log, plus the log as `events`.
+- **Clicks and expiries are stamped before the frame advances time.** A hit's `t − spawnedAt` then equals its target's age, and a timed mode's `t` never passes its duration.
+- **A target's value lives only in `targetValueAt`:** `Spawner.targetValue` and `Target.value` were removed, and targets carry `spawnedAt` instead.
+- **`ScoreManager.registerHit(value, reactionMs)`** replaces `registerHit(target)`.
+- **`readJson`** has a 16 KB default limit, overridable per route, and answers 413 past it.
+- PLAN-SCORING.md: S1 is at Review, with an S1 detail section, and the stale upstream line is fixed. ARCHITECTURE.md's engine table lists `scoring.js`.
+
+**Rationale**
+
+- The live HUD and the replay share `applyEvent`, and the target value has a single definition. Client and server would otherwise each compute a score and could drift apart.
+- `targetValueAt` takes ms, not the plan's seconds, so it uses the log's own unit.
+
+**Changes**
+
+- New: [`src/game/scoring.js`](src/game/scoring.js), [`src/game/scoring.test.js`](src/game/scoring.test.js), [`src/game/GameSession.test.js`](src/game/GameSession.test.js).
+- Changed: `GameSession.js`, `ScoreManager.js` and its test, `Spawner.js`, `Target.js`, `api/_lib/http.js` and its test, `ARCHITECTURE.md`, `PLAN-SCORING.md`.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (306 tests) and `npm run build` pass.
+- Scripted Gridshot and Survival sessions (Survival past its 90 s ramp) reproduce the live HUD's figures from the log.
+- Not run: a hand-played match in the browser.
+
+**Collaboration**
+
+- Stopped at the review gate; nothing is committed.
+
+### Interaction 3 — S1 approved and committed
+
+**User Prompt**
+
+> browser check passes: result screen shows identical score as final HUD. commit S1
+
+**Agent Outcome**
+
+- S1 is marked Done in PLAN-SCORING.md. Its verification now records the user's browser check in place of "not run".
+- S1 is committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S2, the plausibility checks in `api/_lib/matchCheck.js`, when the user says so.
+
+**Verification**
+
+- The user hand-played a match in the browser: the results screen's score matched the final HUD's.
