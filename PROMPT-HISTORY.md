@@ -257,3 +257,17 @@ A tiebreak was first written as `order by created_at desc, id desc`. In Postgres
 **Collaboration**
 
 - The user approved the README as presented and chose to include the ARCHITECTURE.md correction in the same commit.
+
+### Interaction 3 — PR body for `improvement/Readme` → `main`
+
+**User Prompt**
+
+> Pushed, write the PR body
+
+**Agent Outcome**
+
+- **The body:** written to the agent's scratchpad (`PR-readme.md`) for the user to paste. It follows the `pr` skill's template:
+  - **Summary:** a diff sketch of the README's new architecture subsections (one line per diagram and what it traces), the test count and archive links, the ARCHITECTURE.md line and the new history session. It also names the code each diagram was checked against.
+  - **Evidence:** the old ASCII block and the stale `matchCheck.js` line, then all six blocks rendering in mermaid-cli 11.4.2, plus 436 tests and the 3.62 kB entry chunk that the README's figures rely on.
+  - **Merge Danger:** a two-way door with a docs-only blast radius. The one risk named is GitHub's renderer disagreeing with mermaid-cli, so the user should look at the rendered README on the branch before merging.
+- `improvement/Readme` tracks `origin/improvement/Readme`. The PR wasn't opened by the agent. This entry was committed at the user's "commit it".
