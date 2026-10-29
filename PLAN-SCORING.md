@@ -67,7 +67,7 @@ What this buys, honestly stated:
 |---|---|---|---|
 | S0 | Done | **Plan + docs.** This plan, the two open choices settled, CLAUDE.md's document list and workflow updated for this branch. | `PLAN-SCORING.md`, `CLAUDE.md` |
 | S1 | Done | **Shared scoring and the event log (client only).** `src/game/scoring.js` (`targetValueAt`, `scoreEvents`) with tests. `GameSession` records the event log and its summary comes from `scoreEvents`; a test plays a scripted session and checks the log reproduces its live score. `readJson` gains a byte limit. No API change yet, so the app keeps working. | `src/game/scoring.js`, `GameSession.js`, `ScoreManager.js`, `api/_lib/http.js` |
-| S2 | Planned | **Plausibility checks.** `api/_lib/matchCheck.js`, pure, with tests per rule and per mode (a real log passes; a 9,999,999 log, a too-fast log, a too-early submit and a non-ascending log each fail by name). Calibrate the thresholds against logs from the user's own matches under `npm run dev:full`. | `api/_lib/matchCheck.js`, `api/_lib/matchCheck.test.js` |
+| S2 | Done | **Plausibility checks.** `api/_lib/matchCheck.js`, pure, with tests per rule and per mode (a real log passes; a 9,999,999 log, a too-fast log, a too-early submit and a non-ascending log each fail by name). Calibrate the thresholds against logs from the user's own matches under `npm run dev:full`. | `api/_lib/matchCheck.js`, `api/_lib/matchCheck.test.js` |
 | S3 | Planned | **Matches table and `POST /api/matches`.** Migration `004_matches.sql` (`matches`, `scores.match_id`, `CHECK`s), `matchStore` with the issue limit, the route, and `services/matches.js`. Unused by the client until S4. | `db/migrations/004_matches.sql`, `api/matches.js`, `api/_lib/matchStore.js` |
 | S4 | Planned | **`POST /api/scores` on matches.** Body `{ matchId, events }`. In one transaction: claim the match (owner, mode, unexpired, unsubmitted), run `matchCheck`, insert the computed figures with `match_id`. `scoreInput.js` becomes the body shape check. `GameArea` requests the match on Start and posts the log; the save status covers a missing or rejected ticket. | `api/scores.js`, `api/_lib/scoreInput.js`, `GameArea.jsx`, `services/scores.js` |
 | S5 | Planned | **Legacy data and docs.** The read-only report of legacy rows that fail the new bounds (`scripts/`). ARCHITECTURE.md (routes, data model, the score flow, Security's "Scores are still computed in the browser"), README's next-features list, and an audit-response note. | `scripts/`, `ARCHITECTURE.md`, `README.md` |
@@ -112,6 +112,56 @@ What this buys, honestly stated:
   - `http.test.js`: the limit's edge cases (exactly at the limit, bytes vs characters, a declared length, the default).
 - `node -e "import('./src/game/scoring.js')…"` loads it in plain Node and scores a ramped Survival hit as 300.
 - **The user's browser check passed:** in a hand-played match, the results screen showed the same score as the final HUD.
+
+## S2 detail
+
+1. **`src/game/difficulty.js`** (new, pure): `RAMP_FACTORS`, `rampProgress(mode, ms)` and `settingAt(mode, setting, base, ms)`. These are Survival's ramp, moved out of `GameSession.applyDifficulty`, which now loops over `RAMP_FACTORS`. `targetValueAt` uses `rampProgress`. The server can then check a log against the exact lifespan and spawn interval the engine used when it spawned each target.
+2. **`api/_lib/matchCheck.js`** (new, pure): `checkMatch({ mode, events, elapsedMs })` returns the names of the failed rules, in the style of `scoreInput.js`'s `invalid` list. It takes a log that has already passed the body's shape check, which S4 adds.
+
+   | Rule | Fails when |
+   |---|---|
+   | `order` | times go backwards, or start below 0 |
+   | `expiry` | an `expire` appears in a mode where expiries don't cost a life |
+   | `hitTiming` | a hit comes before its target's `spawnedAt`, or after that target's lifespan at spawn time (+1 ms rounding) |
+   | `spawnRate` | the hit targets' sorted spawn times, starting from 0, are closer than the interval in force at the later one (−1 ms) |
+   | `clickRate` | more than 15 hits and misses fall in any one-second window |
+   | `reaction` | the average `t − spawnedAt` is under 120 ms |
+   | `duration` | in a timed mode, a `t` is past the duration |
+   | `tooEarly` | in a timed mode, `elapsedMs` is under the duration − 2 s |
+   | `missLimit` | in Survival, misses and expiries don't reach the limit, or reach it before the last `t` |
+   | `clock` | the last `t` is past `elapsedMs` + 2 s |
+
+   **Changed from the Decisions table:**
+   - **`spawnRate` replaces the hit-count bound** (`hits ≤ maxTargets + ⌊t / minSpawnInterval⌋`). The Spawner waits a full interval after the start and after each spawn, so this rule holds exactly for every real match. It's stricter than the count bound, and it also rejects a target hit twice, since two targets never share a spawn time.
+   - **`clock` applies to every mode**, not just Survival: game time can never pass wall-clock time.
+3. **`src/game/testing/playMatch.js`** (new, test-only): a headless scripted player, at a 0.3 s minimum reaction, that both `GameSession.test.js` and `matchCheck.test.js` use.
+4. **Calibration:**
+   - **Data:** the user hand-played one match per mode under `npm run dev`, including spammy bursts, and the logs were exported to `api/_lib/fixtures/real-matches.json`. That file is listed in `.prettierignore`, so it stays as exported. The temporary `window.matchLogs` collector in `GameArea` was removed afterwards.
+   - **Real play against the thresholds:** a peak of 8 clicks/s against the cap of 15, and a lowest average reaction of 648 ms against the floor of 120 ms (fastest single hit 366 ms). Both thresholds stay where they are. They're meant to reject inhuman logs, and one player's matches can't justify tightening them toward faster players.
+   - **The rounding slack is needed:** in the real Survival match, two hit spawns were 0.01 ms closer than the interval. The −1 ms allowance in `spawnRate` absorbs that.
+   - **Not yet calibrated:** the wall-clock tolerance (2 s) used by `tooEarly` and `clock`. It needs a server-issued `started_at`, so it's checked in S4's manual checks.
+5. **ARCHITECTURE.md** lists `difficulty.js` in the engine table and `matchCheck.js` among the `api/_lib` modules.
+
+### S2 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (58 files, 339 tests) and `npm run build` pass.
+- `matchCheck.test.js` (29 tests):
+  - Each of the six real matches passes, and the fixture covers every mode.
+  - A scripted match in each mode passes, and so does an empty Gridshot log.
+  - Each rule fails by name:
+    - a 9,999,999 log (`spawnRate`, `clickRate`, `duration`)
+    - a too-fast log (`reaction`)
+    - a submit 5 s after Start (`tooEarly`, `clock`)
+    - a non-ascending log
+    - an event past the duration
+    - an expiry in Gridshot
+    - a target hit twice
+    - a hit after its lifespan, or before its spawn
+    - Survival's ramped lifespan
+    - a Survival match short of its miss limit, an empty one, and one that played on past the limit
+    - game time ahead of the wall clock
+- `difficulty.test.js` (4 tests): the ramp's progress and clamping, the ramped settings, and an `Infinity` base passing through unchanged.
+- The randomized engine-log tests (`matchCheck` and `GameSession`) passed on 15 of 15 reruns.
 
 ## Verification (every gate)
 

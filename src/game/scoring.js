@@ -1,4 +1,5 @@
 import { ScoreManager } from './ScoreManager.js'
+import { rampProgress } from './difficulty.js'
 import { lerp } from '../utils/math.js'
 
 /*
@@ -14,17 +15,14 @@ import { lerp } from '../utils/math.js'
  */
 export const DEFAULT_TARGET_VALUE = 100
 
-const MS_PER_SECOND = 1000
-
 // A target's base points, from the game time it spawned at. Modes with a
 // `scaling` ramp (Survival) grow it from the base value to
-// base × (1 + valueFactor) over rampSeconds.
+// base × (1 + valueFactor) over the ramp (difficulty.js).
 export const targetValueAt = (mode, spawnedAtMs) => {
   const base = mode.spawner.targetValue ?? DEFAULT_TARGET_VALUE
   if (!mode.scaling) return base
-  const { rampSeconds, valueFactor } = mode.scaling
-  const progress = spawnedAtMs / MS_PER_SECOND / rampSeconds
-  return Math.round(lerp(base, base * (1 + valueFactor), progress))
+  const top = base * (1 + mode.scaling.valueFactor)
+  return Math.round(lerp(base, top, rampProgress(mode, spawnedAtMs)))
 }
 
 // Applies one event to a ScoreManager; returns the points a hit earned.

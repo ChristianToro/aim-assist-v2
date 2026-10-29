@@ -629,3 +629,63 @@ The user chose the faked session over driving their own signed-in Chrome.
 **Verification**
 
 - The user hand-played a match in the browser: the results screen's score matched the final HUD's.
+
+### Interaction 4 — S2: plausibility checks built; paused for calibration logs
+
+**User Prompt**
+
+> Pushed, working tree is clean. Execute S2
+
+**Agent Outcome**
+
+- **`api/_lib/matchCheck.js`** (new, pure): `checkMatch({ mode, events, elapsedMs })` returns the names of the failed rules. The rules are `order`, `expiry`, `hitTiming`, `spawnRate`, `clickRate`, `reaction`, `duration`, `tooEarly`, `missLimit` and `clock`.
+- **`src/game/difficulty.js`** (new): Survival's ramp, `rampProgress` and `settingAt(mode, setting, base, ms)`, moved out of `GameSession.applyDifficulty`. `targetValueAt` uses it too, so the server checks a log against the engine's exact lifespans and spawn intervals.
+- **`spawnRate` replaces the plan's hit-count bound.** The Spawner waits a full interval after each spawn, so the hit targets' spawn times, sorted, are at least the interval in force at the later one apart. That's stricter than the count bound, and it also catches a target hit twice.
+- **`src/game/testing/playMatch.js`** (new, test-only): a scripted player, with a 0.3 s minimum reaction, that both `GameSession.test` and `matchCheck.test` use.
+- **Calibration:** a temporary dev-only `window.matchLogs` collector in `GameArea`, to be removed before review. The thresholds are still the plan's starting values.
+
+**Verification**
+
+- `matchCheck.test.js` has 22 tests: a played match in each mode passes, and each rule fails by name on a mutated or fabricated log, including a 9,999,999 one. The randomized match tests passed on 15 of 15 reruns.
+
+**Collaboration**
+
+- Waiting for the user to play real matches and export their logs.
+
+### Interaction 5 — S2 calibrated against real matches; stopped at the review gate
+
+**User Prompt**
+
+> logs saved to api/_lib/fixtures/real-matches.json
+
+**Agent Outcome**
+
+- **All six real matches** (one per mode) pass every rule.
+  - Peak click rate: 8/s against the cap of 15.
+  - Lowest average reaction: 648 ms against the floor of 120 ms (fastest single hit 366 ms).
+  - **Thresholds unchanged:** they target inhuman logs, and one player's data can't justify tightening them toward faster players.
+- **The 1 ms rounding slack is needed:** two of the real Survival match's hit spawns were 0.01 ms closer than the spawn interval.
+- **The real logs became the test fixture.** `matchCheck.test.js` passes each one, and checks that the fixture covers every mode. `api/_lib/fixtures` is in `.prettierignore`, so the file stays as exported.
+- **The temporary `window.matchLogs` collector was removed.** `GameArea.jsx` has no diff against the S1 commit.
+- **Also added:** `difficulty.test.js`; ARCHITECTURE.md lists `difficulty.js` and `matchCheck.js`; PLAN-SCORING.md has S2 at Review, with a rule table and calibration notes.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (339 tests) and `npm run build` pass.
+- The wall-clock tolerance is still uncalibrated. It needs S3's `started_at`, and is checked in S4.
+
+**Collaboration**
+
+- The user played the calibration matches and exported the logs. The thresholds come from their data.
+- Stopped at the review gate; nothing is committed.
+
+### Interaction 6 — S2 approved and committed
+
+**User Prompt**
+
+> commit S2
+
+**Agent Outcome**
+
+- S2 is marked Done in PLAN-SCORING.md and committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S3, the `matches` table and `POST /api/matches`, when the user says so.

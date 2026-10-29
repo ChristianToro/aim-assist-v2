@@ -54,6 +54,7 @@ Plain ES classes with no React and no DOM beyond the canvas they're given.
 | `GameEngine` | The `requestAnimationFrame` loop and its lifecycle API (`attach`, `start`, `pause`, `resume`, `stop`, `reset`). Delta time is clamped, so a backgrounded tab can't cause one huge physics step. |
 | `GameSession` | One match of one mode: spawning, the countdown or miss limit, and the match's event log (each hit, miss and expiry, stamped in game time). It implements the engine's scene contract. |
 | `Spawner`, `Target`, `Collision` | Non-overlapping placement (rejection sampling), target motion and lifetime, and hit-testing against the full radius. |
+| `difficulty.js` | Survival's ramp as pure functions of game time: the spawner settings it changes and their value at any ms. `GameSession` ramps its spawner with them; `api/_lib/matchCheck.js` checks logs against the same values. |
 | `scoring.js` | The pure definition of a score from an event log: a target's value from its spawn time, and `scoreEvents` for a whole match. The live HUD and the results screen both use it, and it imports nothing outside `src/game` and `src/utils`, so `/api` can too. |
 | `ScoreManager`, `Timer` | Score, combo multiplier, accuracy and reaction times, fed one event at a time through `scoring.js`; the match clock. |
 | `Particle`, `FloatingText`, `AudioManager` | Hit effects, and Web Audio sound synthesized at runtime (no audio files). |
@@ -91,7 +92,7 @@ Modules that touch the outside world are split into a pure factory and a small w
 | `scoreStore.js`, `insightStore.js`: queries over a tagged-template `sql` | `db.js`: Neon's HTTP driver | `@neondatabase/serverless` |
 | `structuredOutput.js`: `createStructuredCaller(client)` | `claude.js`: `new Anthropic()` | `@anthropic-ai/sdk` |
 
-The rest are pure functions with unit tests: request validation (`scoreInput.js`, `checks.js`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`).
+The rest are pure functions with unit tests: request validation (`scoreInput.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`).
 
 ### Data model (`db/migrations/`)
 

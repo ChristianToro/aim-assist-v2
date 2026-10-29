@@ -1,61 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { createGameSession } from './GameSession'
 import { getModeById } from './modes'
 import { scoreEvents } from './scoring'
-
-const FRAME_SECONDS = 1 / 60
-const SIZE = { width: 1280, height: 720 }
-// Inside every target's spawn margin, so a click here always misses.
-const EMPTY_SPOT = { x: 1, y: 1 }
-const MAX_FRAMES = 60 * 60 * 5
-
-/*
- * Plays a match to its end with a scripted player: every `clickEvery`
- * frames it clicks the oldest live target's center, or empty space when
- * `missAt(frame)` says so. Returns the live HUD's last snapshot, the
- * game-over summary and the clicked targets' ages (seconds) in order.
- */
-const play = (modeId, { clickEvery = 15, missAt = () => false } = {}) => {
-  let pending = []
-  const input = {
-    consumeClicks: () => {
-      const clicks = pending
-      pending = []
-      return clicks
-    },
-  }
-  let lastHud = null
-  let summary = null
-  const session = createGameSession({
-    mode: getModeById(modeId),
-    reducedMotion: true,
-    onHud: (snapshot) => (lastHud = snapshot),
-    onGameOver: (result) => (summary = result),
-  })
-  const ages = []
-
-  for (let frame = 1; frame <= MAX_FRAMES && !summary; frame += 1) {
-    const target = session.targets.find(({ isAlive }) => isAlive)
-    if (missAt(frame)) {
-      pending.push(EMPTY_SPOT)
-    } else if (frame % clickEvery === 0 && target) {
-      pending.push({ x: target.x, y: target.y })
-      ages.push(target.age)
-    }
-    session.update(FRAME_SECONDS, SIZE, input)
-  }
-  return { session, lastHud, summary, ages }
-}
+import { playMatch, SURVIVAL_SCRIPT } from './testing/playMatch'
 
 const hitsOf = (events) => events.filter(({ kind }) => kind === 'hit')
 
 describe.each([
   // Gridshot: a timed mode; every 20th frame is a deliberate miss.
   ['gridshot', { missAt: (frame) => frame % 20 === 0 }],
-  // Survival: past the 90 s value ramp, then five misses to end it.
-  ['survival', { clickEvery: 10, missAt: (frame) => frame > 100 * 60 }],
+  ['survival', SURVIVAL_SCRIPT],
 ])('a scripted %s match', (modeId, script) => {
-  const { lastHud, summary, ages } = play(modeId, script)
+  const { lastHud, summary, ages } = playMatch(modeId, script)
 
   it('ends and logs every hit and miss', () => {
     expect(summary).not.toBeNull()
@@ -87,17 +42,14 @@ describe.each([
 })
 
 it('keeps every timed-mode event within the match duration', () => {
-  const { summary } = play('speed')
+  const { summary } = playMatch('speed')
   const durationMs = getModeById('speed').duration * 1000
   summary.events.forEach(({ t }) => expect(t).toBeLessThanOrEqual(durationMs))
 })
 
 // Guards the Survival script above: its replay must cover the value ramp.
 it('plays Survival past the end of its value ramp', () => {
-  const { summary } = play('survival', {
-    clickEvery: 10,
-    missAt: (frame) => frame > 100 * 60,
-  })
+  const { summary } = playMatch('survival', SURVIVAL_SCRIPT)
   const late = hitsOf(summary.events).filter(
     ({ spawnedAt }) => spawnedAt >= 90_000
   )
@@ -105,7 +57,7 @@ it('plays Survival past the end of its value ramp', () => {
 })
 
 it("leaves the last summary's log intact on reset", () => {
-  const { session, summary } = play('gridshot')
+  const { session, summary } = playMatch('gridshot')
   const logged = summary.events.length
   session.reset()
   expect(summary.events).toHaveLength(logged)

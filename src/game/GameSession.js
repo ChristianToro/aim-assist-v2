@@ -6,7 +6,7 @@ import { createBurst } from './Particle'
 import { FloatingText } from './FloatingText'
 import { FALLBACK_PALETTE } from './palette'
 import { applyEvent, scoreEvents } from './scoring'
-import { lerp } from '../utils/math'
+import { RAMP_FACTORS, settingAt } from './difficulty'
 
 const toMs = (seconds) => Math.round(seconds * 1000)
 
@@ -51,14 +51,10 @@ export const createGameSession = ({
   const spawner = new Spawner(mode.spawner)
   const scores = new ScoreManager()
   const timer = new Timer(mode.duration)
-  // Baseline spawner values for difficulty interpolation.
-  const base = {
-    spawnInterval: spawner.spawnInterval,
-    minRadius: spawner.minRadius,
-    maxRadius: spawner.maxRadius,
-    spacing: spawner.spacing,
-    targetLifespan: spawner.targetLifespan,
-  }
+  // Baseline spawner values for the difficulty ramp.
+  const base = Object.fromEntries(
+    Object.keys(RAMP_FACTORS).map((setting) => [setting, spawner[setting]])
+  )
   let events = []
   let elapsed = 0
   let isOver = false
@@ -83,38 +79,15 @@ export const createGameSession = ({
   }
 
   // Difficulty ramp (modes with a `scaling` config, e.g. Survival):
-  // as elapsed time approaches rampSeconds, targets get smaller, spawn
-  // faster and farther apart and expire sooner. Their growing point value
-  // is scoring.js's targetValueAt, from each target's spawn time.
+  // as the match goes on, targets get smaller, spawn faster and farther
+  // apart and expire sooner (difficulty.js). Their growing point value is
+  // scoring.js's targetValueAt, from each target's spawn time.
   const applyDifficulty = () => {
     if (!mode.scaling) return
-    const s = mode.scaling
-    const progress = elapsed / s.rampSeconds
-    spawner.spawnInterval = lerp(
-      base.spawnInterval,
-      base.spawnInterval * s.intervalFactor,
-      progress
-    )
-    spawner.minRadius = lerp(
-      base.minRadius,
-      base.minRadius * s.radiusFactor,
-      progress
-    )
-    spawner.maxRadius = lerp(
-      base.maxRadius,
-      base.maxRadius * s.radiusFactor,
-      progress
-    )
-    spawner.spacing = lerp(
-      base.spacing,
-      base.spacing * s.spacingFactor,
-      progress
-    )
-    spawner.targetLifespan = lerp(
-      base.targetLifespan,
-      base.targetLifespan * s.lifespanFactor,
-      progress
-    )
+    const now = toMs(elapsed)
+    Object.keys(RAMP_FACTORS).forEach((setting) => {
+      spawner[setting] = settingAt(mode, setting, base[setting], now)
+    })
   }
 
   const update = (dt, size, input) => {
