@@ -107,3 +107,43 @@ A tiebreak was first written as `order by created_at desc, id desc`. In Postgres
 - `npm run lint`, `npm run format:check`, `npm test` (409 tests, up from 401) and `npm run build` pass.
 - PGlite, 15 checks with the real store (scratchpad `check-i1.mjs`).
 - Not run: the routes against Neon (`005` is unapplied). Approved and committed at the user's "commit I1".
+
+### Interaction 4 — Client: open on the latest answer, pick older ones (I2)
+
+**User Prompt**
+
+> Pushed, execute I2
+
+**Agent Outcome**
+
+- **On load:** each Profile insight panel loads the player's saved answers and opens on the latest, with no Claude call. A "Showing" select ("Latest, …" first, then dates) appears once there are two or more answers.
+- **Generating:** a fresh answer goes to the top and is shown. A cached one isn't listed twice, and still says it's cached.
+- **Hardware answers** show the setup they were for, e.g. "For 1600 DPI at 500 Hz." Answers saved before I1 show nothing there.
+- **Failures:** if the history fails to load, the panel shows one quiet line with a Retry, and Generate still works.
+- **New modules:**
+  - `useInsightHistory`: the read hook, plus `add` and `select`.
+  - `utils/insightHistory.js`: the pure helpers `mergeEntries`, `shownEntry` and `formatGeneratedAt`.
+  - `InsightPicker`.
+  - `styles/field.js`: the square control class, shared with `HardwareInsight`.
+  - `describeSetup` in `mouseSetup.js`.
+- **Changed:** `useInsight` now hands its answer to the history (`onAnswer`) instead of keeping it.
+
+**Rationale**
+
+- The history is the single list a panel renders, and generated answers merge into it by id. That avoids a second "current answer" state that could disagree with the list, and a cached answer dedupes by id for free.
+- Selection and generated entries are keyed by uid, like the other read hooks, so a different account never sees the last one's.
+
+**Collaboration**
+
+- An edit to Profile's subtitle copy was reverted before review. The picker already makes the history visible.
+
+**Changes**
+
+- New: [`src/hooks/useInsightHistory.js`](src/hooks/useInsightHistory.js), [`src/utils/insightHistory.js`](src/utils/insightHistory.js), [`src/components/InsightPanel/InsightPicker.jsx`](src/components/InsightPanel/InsightPicker.jsx), [`src/styles/field.js`](src/styles/field.js), and tests for the hook and the utils.
+- Changed: `services/insights.js`, `hooks/useInsight.js`, `InsightPanel.jsx`, `HardwareInsight.jsx`, `PlatformInsight.jsx`, `Profile.jsx`, `utils/mouseSetup.js`, their tests, [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`PLAN-INSIGHTS.md`](PLAN-INSIGHTS.md).
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (436 tests, up from 409) and `npm run build` pass.
+- Browser: the production build with the U7 faked session and stubbed reads (scratchpad `insight-shots.mjs`), in Dark and Light at 1440 and Dark at 390. It opened on the latest answers, the keyboard picked an older one, there was no sideways scroll and no console errors.
+- Not run: against Neon (I3). Approved and committed at the user's "commit I2".

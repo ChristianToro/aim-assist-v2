@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const { mockApiFetch } = vi.hoisted(() => ({ mockApiFetch: vi.fn() }))
 vi.mock('./api', () => ({ apiFetch: mockApiFetch }))
 
-import { getHardwareInsight, getPlatformInsight } from './insights'
+import {
+  getHardwareInsight,
+  getPlatformInsight,
+  listHardwareInsights,
+  listPlatformInsights,
+} from './insights'
 
 beforeEach(() => mockApiFetch.mockReset())
 
@@ -30,5 +35,17 @@ describe('getPlatformInsight', () => {
       method: 'POST',
       auth: true,
     })
+  })
+})
+
+describe('the past-answer lists', () => {
+  it.each([
+    [listHardwareInsights, '/api/insights/hardware'],
+    [listPlatformInsights, '/api/insights/platforms'],
+  ])('%o gets %s with the session token', async (list, path) => {
+    const entries = [{ id: '1' }]
+    mockApiFetch.mockResolvedValue({ entries })
+    expect(await list()).toBe(entries)
+    expect(mockApiFetch).toHaveBeenCalledWith(path, { auth: true })
   })
 })

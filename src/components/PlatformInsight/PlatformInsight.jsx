@@ -1,6 +1,10 @@
 import InsightPanel from '../InsightPanel/InsightPanel'
 import { useInsight } from '../../hooks/useInsight'
-import { getPlatformInsight } from '../../services/insights'
+import { useInsightHistory } from '../../hooks/useInsightHistory'
+import {
+  getPlatformInsight,
+  listPlatformInsights,
+} from '../../services/insights'
 
 const Pick = ({ title, genre, platforms, fit }) => (
   <li>
@@ -28,19 +32,23 @@ const PlatformAdvice = ({ summary, picks, avoidForNow }) => (
 )
 
 // Shooter games, with their platforms, that suit the player's aim profile.
-const PlatformInsight = () => {
-  const { insight, error, isLoading, generate } = useInsight(getPlatformInsight)
+const PlatformInsight = ({ uid }) => {
+  const history = useInsightHistory(listPlatformInsights, uid)
+  const { error, isLoading, generate } = useInsight(
+    getPlatformInsight,
+    history.add
+  )
 
   return (
     <InsightPanel
       title="Games for your aim"
       description="Shooters, and the platforms they're on, that match the strengths your stats show."
-      insight={insight}
+      history={history}
       error={error}
       isLoading={isLoading}
       onGenerate={() => generate()}
     >
-      {(advice) => <PlatformAdvice {...advice} />}
+      {({ recommendation }) => <PlatformAdvice {...recommendation} />}
     </InsightPanel>
   )
 }

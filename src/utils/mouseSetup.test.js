@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toSetup } from './mouseSetup'
+import { describeSetup, toSetup } from './mouseSetup'
 
 describe('toSetup', () => {
   it('leaves out blank fields', () => {
@@ -26,4 +26,28 @@ describe('toSetup', () => {
       expect(toSetup({ dpi, pollingRateHz: '' })).toEqual({ invalid: true })
     }
   )
+})
+
+describe('describeSetup', () => {
+  it('names whichever fields the player gave', () => {
+    expect(describeSetup({ dpi: 800, pollingRateHz: 1000 })).toBe(
+      'For 800 DPI at 1000 Hz.'
+    )
+    expect(describeSetup({ dpi: 1600, pollingRateHz: null })).toBe(
+      'For 1600 DPI.'
+    )
+    expect(describeSetup({ dpi: null, pollingRateHz: 500 })).toBe(
+      'For a 500 Hz mouse.'
+    )
+  })
+
+  it('says when the player gave no setup', () => {
+    expect(describeSetup({ dpi: null, pollingRateHz: null })).toBe(
+      'No current setup was given.'
+    )
+  })
+
+  it('says nothing for an answer saved before setups were stored', () => {
+    expect(describeSetup(undefined)).toBeNull()
+  })
 })

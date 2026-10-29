@@ -87,8 +87,8 @@ const Profile = () => {
         From Claude, based on your scores in each mode.
       </p>
       <div className="mt-3 grid gap-4 md:grid-cols-2">
-        <HardwareInsight />
-        <PlatformInsight />
+        <HardwareInsight uid={user.uid} />
+        <PlatformInsight uid={user.uid} />
       </div>
     </section>
   )

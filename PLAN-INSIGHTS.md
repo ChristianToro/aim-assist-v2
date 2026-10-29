@@ -45,7 +45,7 @@ Every recommendation Claude generates is already saved: `insights` has one row p
 |---|---|---|---|
 | I0 | Done | **Plan + docs.** This plan with the two choices settled. CLAUDE.md's document list and workflow point at it. The prompt history is rotated (854 lines). | `PLAN-INSIGHTS.md`, `CLAUDE.md`, `PROMPT-HISTORY.md` |
 | I1 | Done | **Server: store the inputs, list the history.** Migration `005_insight_context.sql`. `insightStore` gains `history(uid, kind, limit)` and saves `context`. The runner returns `id` and `context`. `requestInsight` passes `context` to the store. Each insight route adds a `GET`, and a pure `historyEntries(rows, parseAdvice)` drops rows that don't parse. Tests: the runner with its in-memory store, `historyEntries`, and a throwaway PGlite check of the migration and the query. ARCHITECTURE.md's routes and data model. | `db/migrations/005_insight_context.sql`, `api/_lib/insightStore.js`, `api/_lib/insightRunner.js`, `api/_lib/insightRequest.js`, `api/insights/*.js` |
-| I2 | Planned | **Client: open on the latest answer, pick older ones.** `services/insights.js` list calls, a read hook for the history, `InsightPanel`'s picker and "Generated …" footer for a saved entry, and `HardwareInsight`'s setup line. A fresh answer goes to the top of the list. Tests for the service, the hook, the panel and Profile. ARCHITECTURE.md's data-fetching paragraph. | `src/services/insights.js`, `src/hooks/`, `src/components/InsightPanel/`, `src/components/HardwareInsight/`, `src/components/PlatformInsight/` |
+| I2 | Done | **Client: open on the latest answer, pick older ones.** `services/insights.js` list calls, a read hook for the history, `InsightPanel`'s picker and "Generated …" footer for a saved entry, and `HardwareInsight`'s setup line. A fresh answer goes to the top of the list. Tests for the service, the hook, the panel and Profile. ARCHITECTURE.md's data-fetching paragraph. | `src/services/insights.js`, `src/hooks/`, `src/components/InsightPanel/`, `src/components/HardwareInsight/`, `src/components/PlatformInsight/` |
 | I3 | Planned | **Final pass.** Run against Neon with `005` applied: the user checks the page and supplies screenshots, then the taste-skill app-screen checks follow (`lint.mjs`). README's features list, and the PR body. | `README.md`, `ARCHITECTURE.md` |
 
 ## I0 detail
@@ -78,6 +78,32 @@ Every recommendation Claude generates is already saved: `insights` has one row p
   - The runner's cached answer is the same row as its fresh one, with the same `id` and `context`.
   - Ties order by the numeric id across 99 → 100. The check fails if the `insights.` qualifier is removed.
 - Not run: the routes against Neon. `005` isn't applied there yet; that's the user's step in I3.
+
+## I2 detail
+
+1. `services/insights.js`: `listHardwareInsights()` and `listPlatformInsights()` return the `GET`'s `entries`.
+2. `utils/insightHistory.js` (new, pure):
+   - `mergeEntries(added, saved)` puts answers generated on the page together with the loaded ones, newest first. An id in both keeps the generated copy, which carries `cached`.
+   - `shownEntry(entries, selectedId)` returns the picked entry, else the latest.
+   - `formatGeneratedAt` formats an entry's date.
+3. `hooks/useInsightHistory.js` (new): the read-hook pattern (keyed result, derived loading, `reload`), plus `add` (a generated answer goes on top and is shown) and `select`. The added entries and the selection are kept per uid.
+4. `useInsight(request, onAnswer)`: it no longer holds the answer and hands it to the history instead. Its state is just `{ error, isLoading }`.
+5. `InsightPanel` takes `history` and renders `children(entry)`:
+   - While the history loads it says "Loading your last recommendation".
+   - A failed load shows one quiet line with a Retry, and Generate still works.
+   - With two or more entries, an `InsightPicker` (a labelled "Showing" select, "Latest, …" first) sits above the answer.
+6. `HardwareInsight` shows the answer's setup line (`describeSetup` in `utils/mouseSetup.js`). The square-control class moves to `styles/field.js`, which the picker shares. Both panels take `uid` from Profile.
+7. Tests cover the list services, `mergeEntries`/`shownEntry`, `describeSetup`, the hook, the panel's states and Profile end to end. ARCHITECTURE.md's hooks row, styles row and data-fetching paragraph are updated.
+
+### I2 verification (2026-10-29)
+
+- `npm run lint`, `npm run format:check`, `npm test` and `npm run build` pass.
+- In the browser: the production build under `vite preview`, signed in through the faked session from U7. `/api/me`, the personal board and both `GET`s were answered locally, with three hardware entries (full setup, no setup, a legacy `null`) and one platforms entry.
+  - Dark and Light at 1440, and Dark at 390.
+  - Profile opens on the latest answers with their setup line, and the picker lists "Latest, …" then two dates.
+  - Two ↓ presses on the focused picker showed the legacy entry, which has no setup line.
+  - At 390 there's no sideways scroll, and the console has no errors.
+- Not run: real `GET`s against Neon, which is I3.
 
 ## Verification
 

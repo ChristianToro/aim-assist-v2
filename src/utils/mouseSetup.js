@@ -22,3 +22,17 @@ export const toSetup = ({ dpi, pollingRateHz }) => {
 
   return { setup }
 }
+
+/*
+ * The line a past hardware answer shows about the mouse it was for, from
+ * its stored `setup` (either field may be null). Null when the setup wasn't
+ * recorded: answers saved before inputs were stored.
+ */
+export const describeSetup = (setup) => {
+  if (!setup) return null
+  const { dpi, pollingRateHz } = setup
+  if (dpi && pollingRateHz) return `For ${dpi} DPI at ${pollingRateHz} Hz.`
+  if (dpi) return `For ${dpi} DPI.`
+  if (pollingRateHz) return `For a ${pollingRateHz} Hz mouse.`
+  return 'No current setup was given.'
+}
