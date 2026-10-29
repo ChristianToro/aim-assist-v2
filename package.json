@@ -8,6 +8,7 @@
     "dev:full": "vercel dev",
     "build": "vite build",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.js",
+    "db:legacy-report": "node --env-file-if-exists=.env.local scripts/legacy-report.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

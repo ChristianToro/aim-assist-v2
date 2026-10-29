@@ -5,6 +5,7 @@ Browser-based aim trainer (Aimlabs-inspired), portfolio quality. v2 moves the v1
 ## Documents
 
 - [PLAN-SCORING.md](PLAN-SCORING.md) — **read first.** Server-checked scoring on `hotfix/server-checked-scoring`: the audit it answers, decisions and milestone tracker (S0–S5). Update a milestone's status when it changes.
+- [AUDIT-RESPONSE.md](AUDIT-RESPONSE.md) — the response to the 2026-10-29 audit that PLAN-SCORING.md answers: each finding's verdict, the fix and the remaining risk.
 - [PLAN-UI.md](PLAN-UI.md) — the UI refactor (taste-skill, U0–U7, all done, merged): its decisions, the app style and the design rules below.
 - [PLAN-V2.md](PLAN-V2.md) — the v2.0 milestone tracker (M0–M9, all done) and its decisions.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the v2 system design: layers, `/api` routes, data model, request flows, security and testing. Keep it in step with structural changes.
@@ -23,7 +24,7 @@ v2.0 (`release/v2.0`) and the UI refactor (`refactor/UI`) are merged into `main`
 | Layer | v2 |
 |---|---|
 | UI | React 19, React Router 7, Tailwind CSS 4, Vite |
-| Gameplay | HTML5 Canvas 2D engine in `src/game/` (v1's, plus the match event log and the shared `scoring.js` from PLAN-SCORING.md) |
+| Gameplay | HTML5 Canvas 2D engine in `src/game/` (v1's, plus the match event log and the shared `scoring.js` and `difficulty.js` from PLAN-SCORING.md) |
 | Server | Vercel Functions in `/api` (helpers in `api/_lib/`, underscore = not a route) |
 | Database | Neon Postgres via `@neondatabase/serverless`; schema as plain SQL in `db/migrations/` |
 | Auth | Google sign-in via Neon Auth (Neon's managed Better Auth, users in the `neon_auth` schema); `/api` verifies its JWTs with `jose` (Firebase removed entirely) |

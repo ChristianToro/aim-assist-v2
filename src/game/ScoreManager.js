@@ -1,6 +1,7 @@
 // Combo multiplier: +0.1x per consecutive hit, capped at 2x.
 const MULTIPLIER_STEP = 0.1
 const MULTIPLIER_MAX_COMBO = 10
+export const MAX_MULTIPLIER = 1 + MULTIPLIER_MAX_COMBO * MULTIPLIER_STEP
 
 /*
  * ScoreManager — owns all match statistics.

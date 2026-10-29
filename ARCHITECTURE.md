@@ -158,15 +158,19 @@ The cap is soft: two requests at the same instant can both get through. That's e
 
 - **Secrets stay on the server.** `DATABASE_URL` and `ANTHROPIC_API_KEY` are read only inside `/api` and `scripts/`. `VITE_*` variables are compiled into the client bundle, so they hold only public values (`VITE_NEON_AUTH_URL`). Google OAuth credentials live in the Neon Console.
 - **Validation happens twice.** Handlers validate input and name the bad fields in a 400. SQL `CHECK` constraints back the same bounds in the database.
-- **Scores are still computed in the browser.** The server validates bounds and ownership, but it can't prove that a plausible score was really played. The README's "next" list covers what would close that gap.
+- **Request bodies are capped.** `readJson` refuses a body over 16 KB with a 413. Score submissions allow 512 KB, for the event log.
+- **Scores are computed on the server.** The browser sends a server-issued match id and the match's event log, never a score. `matchCheck.js` holds the log to the engine's own rules, human limits and the database's clock, and then the server scores it (see "Saving a match").
+  - **Not proof of a human:** a fabricated but plausible log still passes, and a player can resubmit their own real log under a fresh ticket, which duplicates a score but can't raise it.
+  - **Legacy scores:** rows saved before matches existed stay on the boards. `npm run db:legacy-report` lists any that fail the bounds a log is now held to. [AUDIT-RESPONSE.md](AUDIT-RESPONSE.md) answers the audit that prompted this.
 
 ## Testing
 
 Vitest runs in two environments. Browser code (components and hooks) runs under `jsdom`. `/api` tests opt into `node` per file. The pyramid leans on pure functions:
 
-- **Pure unit tests.** The game classes, request validation, the UTC windows, the cache key and limit, the prompts and schemas, and the client error messages.
-- **Injected dependencies.** The JWT verifier runs with keys generated in the test. The Claude caller runs with a fake client and the SDK's real error classes. The insight runner runs with an in-memory store. The services run with a stubbed `fetch`.
-- **Outside the suite.** The SQL ran on PGlite (in-process Postgres) with every migration applied, and the deployed routes were checked live with temporary users. Both are recorded per milestone in [PLAN-V2.md](PLAN-V2.md).
+- **Pure unit tests.** The game classes, the shared scoring and difficulty ramp, the event-log checks and score bound, request validation, the UTC windows, the cache key and limits, the prompts and schemas, and the client error messages.
+- **Engine-made and real logs.** A headless scripted player (`src/game/testing/playMatch.js`) plays every mode through the real `GameSession`, so the checks and the score bound are tested against logs the engine produced. One hand-played match per mode, kept in `api/_lib/fixtures/`, must pass too.
+- **Injected dependencies.** The JWT verifier runs with keys generated in the test. The Claude caller runs with a fake client and the SDK's real error classes. The insight runner and the match issue and submit flows run with in-memory stores. The services run with a stubbed `fetch`.
+- **Outside the suite.** The SQL ran on PGlite (in-process Postgres) with every migration applied, and the deployed routes were checked live with temporary users. Both are recorded per milestone in [PLAN-V2.md](PLAN-V2.md) and [PLAN-SCORING.md](PLAN-SCORING.md).
 
 ## Deployment and local development
 

@@ -70,7 +70,7 @@ What this buys, honestly stated:
 | S2 | Done | **Plausibility checks.** `api/_lib/matchCheck.js`, pure, with tests per rule and per mode (a real log passes; a 9,999,999 log, a too-fast log, a too-early submit and a non-ascending log each fail by name). Calibrate the thresholds against logs from the user's own matches under `npm run dev:full`. | `api/_lib/matchCheck.js`, `api/_lib/matchCheck.test.js` |
 | S3 | Done | **Matches table and `POST /api/matches`.** Migration `004_matches.sql` (`matches`, `scores.match_id`, `CHECK`s), `matchStore` with the issue limit, the route, and `services/matches.js`. Unused by the client until S4. | `db/migrations/004_matches.sql`, `api/matches.js`, `api/_lib/matchStore.js` |
 | S4 | Done | **`POST /api/scores` on matches.** Body `{ matchId, events }`. In one transaction: claim the match (owner, mode, unexpired, unsubmitted), run `matchCheck`, insert the computed figures with `match_id`. `scoreInput.js` becomes the body shape check. `GameArea` requests the match on Start and posts the log; the save status covers a missing or rejected ticket. | `api/scores.js`, `api/_lib/scoreInput.js`, `GameArea.jsx`, `services/scores.js` |
-| S5 | Planned | **Legacy data and docs.** The read-only report of legacy rows that fail the new bounds (`scripts/`). ARCHITECTURE.md (routes, data model, the score flow, Security's "Scores are still computed in the browser"), README's next-features list, and an audit-response note. | `scripts/`, `ARCHITECTURE.md`, `README.md` |
+| S5 | Done | **Legacy data and docs.** The read-only report of legacy rows that fail the new bounds (`scripts/`). ARCHITECTURE.md (routes, data model, the score flow, Security's "Scores are still computed in the browser"), README's next-features list, and an audit-response note. | `scripts/`, `ARCHITECTURE.md`, `README.md` |
 
 ## S0 detail
 
@@ -265,6 +265,59 @@ What this buys, honestly stated:
   - A Gridshot submit straight after issue got 400 `[tooEarly]`.
   - The old client's body got 400 `[matchId, events]`.
 - **Not run here:** the Vercel preview and production, which need the user's push. The 2 s tolerance against production latency is still to be watched there.
+
+## S5 detail
+
+1. **`api/_lib/scoreBound.js`**, `maxPlausibleScore(mode)`: the most any log can earn in a mode and still pass `matchCheck`. It's derived from the same rules:
+   - **hits** ≤ the smaller of the spawn limit (`⌊game ms / (fastest interval − 1 ms)⌋`) and the click limit (15 × each whole second);
+   - **each hit** ≤ the mode's top target value × the 2× multiplier;
+   - **game time** is the duration, or for Survival the ticket's lifetime plus the clock tolerance.
+
+   | Mode | Bound |
+   |---|---|
+   | Gridshot | 93,000 |
+   | Precision | 5,400 |
+   | Speed | 19,800 |
+   | Tracking | 7,400 |
+   | Flick | 13,500 |
+   | Survival | 9,624,000 (loose: a 2 h ticket) |
+
+   To share the rules' own constants, `ScoreManager` exports `MAX_MULTIPLIER` and `matchCheck` exports `ROUNDING_MS`.
+2. **`scripts/legacyScores.js`** (pure): `legacyScoresQuery(sql)` returns every score without a `match_id`, with the player's name. `legacyScoreFailures(row)` names the rules a row fails, as far as a row without a log can still be held to them:
+   - `score`: above the mode's bound
+   - `reaction`: an average under 120 ms
+   - `noHits`: points with a null reaction time
+
+   **`scripts/legacy-report.js`** (`npm run db:legacy-report`) runs the query in a Neon `READ ONLY` transaction and prints the failing rows. It also prints a `delete … where match_id is null and id in (…)` statement for the user to review and run in the Neon Console. The script never writes.
+3. **`AUDIT-RESPONSE.md`** (new): each finding's verdict, what changed, the closed body-size gap, and the remaining risk (a fabricated plausible log, reused own logs). CLAUDE.md lists it.
+4. **ARCHITECTURE.md:**
+   - Security: "Scores are still computed in the browser" is replaced by body caps, server-computed scores with their stated limits, and the legacy report.
+   - Testing: covers the engine-made and real logs and the in-memory match flows.
+5. **README:**
+   - Project Plan has a server-checked scoring paragraph.
+   - Features gains "Server-checked scores".
+   - The "Server-authoritative scoring" next feature becomes "Replay-proof scoring", which is what's left.
+   - Engineering Notes gains "The server computes the score".
+   - The architecture diagram lists `matches`.
+   - Scripts lists `db:legacy-report`.
+   - The test count reads 400+.
+6. **CLAUDE.md**'s gameplay stack row names `difficulty.js`.
+
+### S5 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (66 files, 401 tests) and `npm run build` pass.
+- `scoreBound.test.js`:
+  - the Gridshot (click-limited) and Flick (spawn-limited) bounds, worked by hand
+  - Survival's bound under the database's 10,000,000 `CHECK`
+  - every real fixture match and every scripted match at or under its mode's bound
+- `scripts/legacyScores.test.js`:
+  - a score at the bound passes and one over fails
+  - the audit's 9,999,999 Survival score fails
+  - 9,880 fails in Precision but not in Gridshot
+  - 119 ms fails and 120 ms passes
+  - points without hits fail
+- **PGlite** (`001`–`004`, five legacy rows and one match-backed row), 7 checks passed: the query, run inside `begin read only`, returns only the legacy rows with names, and each seeded row gets its expected verdict.
+- **The user ran `npm run db:legacy-report` against Neon:** 25 legacy scores, 1 implausible. Row #32 is a Survival score of 1 with a null reaction time, so it fails `noHits`. No real match could have produced it: a null reaction time means no hits, and the smallest hit is worth 100 points. It most likely came from a direct call to the old endpoint. The user deleted it in the Neon Console.
 
 ## Verification (every gate)
 

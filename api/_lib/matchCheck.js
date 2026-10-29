@@ -24,7 +24,7 @@ export const MIN_AVERAGE_REACTION_MS = 120
 export const CLOCK_TOLERANCE_MS = 2000
 
 // Game times are rounded to whole ms, so a difference can be off by one.
-const ROUNDING_MS = 1
+export const ROUNDING_MS = 1
 const MS_PER_SECOND = 1000
 
 const isClick = ({ kind }) => kind !== 'expire'

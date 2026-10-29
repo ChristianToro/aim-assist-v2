@@ -787,3 +787,54 @@ The user chose the faked session over driving their own signed-in Chrome.
 **Verification**
 
 - The user ran the manual checks. The Vercel preview and production aren't checked yet; they need the push.
+
+### Interaction 11 — S5: legacy-score report and docs; stopped at the review gate
+
+**User Prompt**
+
+> Pushed, execute S5
+
+**Agent Outcome**
+
+- **`api/_lib/scoreBound.js`:** `maxPlausibleScore(mode)` is the most a log can earn and still pass `matchCheck`. It's the smaller of the spawn-limited and click-limited hit counts, × the top target value × 2. The bounds run from 5,400 (Precision) to 93,000 (Gridshot), and 9,624,000 for Survival over a 2 h ticket.
+- **`scripts/legacyScores.js` and `npm run db:legacy-report`:** a read-only report, in a Neon `READ ONLY` transaction, of legacy scores (no `match_id`) that fail the rules a row can still be held to (`score` over the bound, `reaction` under 120 ms, `noHits`). It prints a delete statement for the user to run by hand.
+- **`AUDIT-RESPONSE.md`** (new): F1 held and is fixed; F2 didn't hold; the body-size gap is closed; the remaining risk is stated.
+- **Docs:** ARCHITECTURE.md Security and Testing; README project plan, features, next features (now "Replay-proof scoring"), engineering notes, diagram, scripts and test count; CLAUDE.md document list.
+
+**Rationale**
+
+- Legacy rows have no log, so the report holds them to bounds derived from the log rules rather than to a separate set of limits. A row is then flagged only if no passing log could have produced it.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (401 tests) and `npm run build` pass.
+- PGlite: 7 checks on the report's query (run read-only) and its verdicts for seeded legacy rows.
+- Not run: the report against Neon (the user's step).
+
+**Collaboration**
+
+- Stopped at the review gate; nothing is committed.
+
+### Interaction 12 — Legacy report run against Neon
+
+**User Prompt**
+
+> report supplied: *(output of `npm run db:legacy-report`: 25 legacy scores, 1 implausible. #32, Survival, score 1, null reaction time, fails `noHits`; with the suggested `delete … id in (32)`)*
+
+**Agent Outcome**
+
+- **Row #32 is genuinely impossible.** A null reaction time means no hits, and no hit is worth less than 100 points, so a score of 1 can't come from any match. It most likely came from a direct call to the old endpoint.
+- **Where it shows:** it's invisible on the boards, but it counts in that player's games played and average accuracy.
+- Recorded in PLAN-SCORING.md's S5 verification. Deleting it is left to the user, as settled at S0.
+
+### Interaction 13 — #32 deleted; S5 approved and committed
+
+**User Prompt**
+
+> #32 deleted, commit S5
+
+**Agent Outcome**
+
+- The user deleted legacy row #32 in the Neon Console; PLAN-SCORING.md records it.
+- S5 is marked Done and committed on `hotfix/server-checked-scoring` with this session's history. Every milestone in PLAN-SCORING.md (S0–S5) is now done.
+- **Next:** the PR body for `hotfix/server-checked-scoring` → `main`, if the user wants it.
