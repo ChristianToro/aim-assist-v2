@@ -10,7 +10,7 @@
 @import './styles/themes.css';
 
 /* Type: Unbounded for display (always uppercase), Onest for text. Five
-   size steps cover the landing page, and four app steps (title down to
+   size steps cover the landing page, and five app steps (title down to
    meta) cover the screens players work in; nothing else sets a font size. */
 @theme {
   --font-sans: 'Onest', system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -30,6 +30,8 @@
      size. Onest is loaded at 400/500, so app titles use 500. */
   --text-title: clamp(1.375rem, 1.2rem + 0.5vw, 1.625rem);
   --text-title--line-height: 1.2;
+  --text-figure: 1.25rem;
+  --text-figure--line-height: 1.4;
   --text-label: 1rem;
   --text-label--line-height: 1.5;
   --text-ui: 0.875rem;
@@ -99,6 +101,17 @@
   --color-target-outer: var(--target-outer);
   --color-target-mid: var(--target-mid);
   --color-target-inner: var(--target-inner);
+}
+
+/* The navbar's height, for layouts sized to the rest of the screen (the
+   landing hero). On phones a signed-in bar adds a 44px row of page links. */
+:root {
+  --nav-h: 4rem;
+}
+@media (width < 40rem) {
+  :root:has([data-nav-links]) {
+    --nav-h: 6.75rem;
+  }
 }
 
 body {

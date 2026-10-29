@@ -1,5 +1,4 @@
 import Button from '../Button/Button'
-import Card from '../Card/Card'
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner'
 import { insightErrorMessage } from '../../utils/insightErrors'
 
@@ -16,8 +15,9 @@ const formatGenerated = ({ generatedAt, cached }) => {
 
 /*
  * The shared frame for an AI recommendation: a heading, optional inputs,
- * a Generate button with a loading state (a fresh answer takes Claude
- * 10–20 s), the error message, and the answer, which `children` renders.
+ * the answer (which `children` renders), any error, and a footer with the
+ * Generate button and its status (a fresh answer takes Claude 10–20 s).
+ * The footer sits at the panel's foot, so panels side by side end level.
  */
 const InsightPanel = ({
   title,
@@ -29,39 +29,46 @@ const InsightPanel = ({
   onGenerate,
   children,
 }) => (
-  <Card className="flex flex-col gap-4">
-    <div>
-      <h3 className="font-medium text-heading">{title}</h3>
-      <p className="mt-1 text-sm text-muted">{description}</p>
+  <div className="flex flex-col bg-surface">
+    <div className="p-4">
+      <h3 className="text-label font-medium text-heading">{title}</h3>
+      <p className="mt-1 text-ui text-muted">{description}</p>
+      {controls && <div className="mt-4">{controls}</div>}
     </div>
 
-    {controls}
-
-    <div className="flex flex-wrap items-center gap-3">
-      <Button size="sm" onClick={onGenerate} disabled={isLoading}>
-        {insight ? 'Update' : 'Get recommendation'}
-      </Button>
-      {isLoading && (
-        <span className="flex items-center gap-2 text-sm text-muted">
-          <LoadingSpinner className="h-4 w-4" />
-          Asking Claude. This can take 15 seconds.
-        </span>
-      )}
-    </div>
+    {insight && (
+      <div className="border-t border-edge p-4">
+        {children(insight.recommendation)}
+      </div>
+    )}
 
     {error && (
-      <p role="alert" className="text-sm text-accent">
+      <p role="alert" className="border-t border-edge p-4 text-ui text-body">
         {insightErrorMessage(error)}
       </p>
     )}
 
-    {insight && (
-      <div className="border-t border-edge pt-4">
-        {children(insight.recommendation)}
-        <p className="mt-4 text-xs text-muted">{formatGenerated(insight)}</p>
-      </div>
-    )}
-  </Card>
+    <div className="mt-auto flex flex-wrap items-center gap-3 border-t border-edge p-4">
+      <Button
+        variant="inverse"
+        size="sm"
+        onClick={onGenerate}
+        disabled={isLoading}
+      >
+        {insight ? 'Update' : 'Get recommendation'}
+      </Button>
+      {isLoading ? (
+        <span className="flex items-center gap-2 text-meta text-muted">
+          <LoadingSpinner className="size-4" />
+          Asking Claude. This can take 15 seconds.
+        </span>
+      ) : (
+        insight && (
+          <p className="text-meta text-muted">{formatGenerated(insight)}</p>
+        )
+      )}
+    </div>
+  </div>
 )
 
 export default InsightPanel

@@ -32,7 +32,7 @@ React owns everything around gameplay: routing, menus, auth state, settings, the
 | Folder | Role |
 |---|---|
 | `pages/` | One component per route. Each is code-split with `lazy()`; `/play` and `/profile` sit behind `ProtectedRoute`, and the navbar shows page links only to signed-in players. |
-| `components/` | Small presentational pieces (`Leaderboard`, `ProfileCard`, `InsightPanel`, …) plus the game bridge (`GameArea`, `GameCanvas`, `GameHud`). `components/landing/` holds the home page's sections, including a DOM warm-up target that reports reaction times (no canvas, nothing animated per frame). |
+| `components/` | Small presentational pieces (`Leaderboard`, `ProfileHeader`, `StatStrip`, `InsightPanel`, …) plus the game bridge (`GameArea`, `GameCanvas`, `GameHud`). `components/landing/` holds the home page's sections, including a DOM warm-up target that reports reaction times (no canvas, nothing animated per frame). |
 | `hooks/` | Stateful logic: `useAuth`, `useLeaderboard`, `useUserProfile`, `useInsight`, `useGameSession` (which owns one engine instance), the landing page's `useReveal`, `useCycle` and `useWarmupTarget`, and Settings' `useMediaQuery` (the OS's motion and contrast preferences). |
 | `contexts/` | `AuthProvider` (the Neon Auth session, mapped to `{ uid, displayName, photoURL }`) and `ThemeProvider`. |
 | `services/` | The only modules that leave the browser: `auth.js` (Neon Auth SDK) and `fetch` wrappers over `/api`. |

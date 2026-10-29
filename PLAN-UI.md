@@ -40,7 +40,7 @@ The first target is the landing page:
 | Canvas | The engine in `src/game/` doesn't change. Play's restyle covers only the React around it: `ModePicker`, `GameArea`'s controls and overlays, `GameHud`, `ResultsModal` and `SessionHistory`. The canvas keeps taking its colours from `themes.css`. |
 | Data | The screens keep their real data, from the existing hooks and `/api`. The app run's "write a dataset" step becomes a written inventory of each screen's real objects and magnitudes. Fixture data goes only in tests. |
 | States | Every block gets its loading, empty and error states (app-screens §11), and every row and control gets hover, selected, focus and disabled. The hooks already expose `isLoading` and `error`. |
-| Signed-in screens | **Open, settled when U5 starts.** `inspect.mjs` can't sign in with Google, and Play and Profile sit behind `ProtectedRoute`. *Recommended:* `lint.mjs` on their source, Testing Library for their states, and screenshots by the user from a real sign-in at 1440, 768 and 390. *Alternative:* a dev-only route that renders them with a fixture user. It would let the inspector run, but it's code that ships in the repo only to serve a tool. |
+| Signed-in screens | **Settled at U5's start (the user's choice, the recommended option):** `lint.mjs` on the source, Testing Library for the states, and screenshots by the user from a real sign-in at 1440, 768 and 390, critiqued against app-screens §2.7. `inspect.mjs` can't sign in with Google, and Play and Profile sit behind `ProtectedRoute`. *Rejected:* a dev-only route with a fixture user, which would ship code only to serve a tool. |
 
 ## Workflow
 
@@ -56,7 +56,7 @@ The first target is the landing page:
 | U2 | Done | **Landing + shell restyle (taste-skill).** Hero with the image, game modes, a leaderboard social-proof section, the CTA, and Navbar, Footer, Button and Card restyled to the dealt type and composition. | `Home.jsx`, `src/components/landing/`, `src/index.css`, `Button`, `Card`, `Navbar`, `Footer` |
 | U3 | Done | **App style + Settings.** Record the "before" `inspect.mjs --app` baseline of the four app screens (Play and Profile by the agreed signed-in method). Deal the app style (`--keep palette,type`) for the user to choose. Port its tokens into `src/index.css` (panels, small labels, tabs, controls). Restyle Settings: the theme picker and the system-preference notes, laid out as a settings screen (app-screens §8). | `src/index.css`, `Settings.jsx`, `ThemePicker` |
 | U4 | Done | **Leaderboards.** The view tabs as app tabs, the `Leaderboard` table to the app's table rules (figures right-aligned in tabular numerals, the player's own row marked, quiet dividers), and the Personal Best sign-in prompt. Every state: loading, empty per view, error and signed out. | `Leaderboards.jsx`, `Leaderboard` |
-| U5 | Planned | **Profile.** Settle the signed-in check first. Then `ProfileCard` and `StatTile`, the two AI insight panels (`InsightPanel`, `HardwareInsight` and `PlatformInsight`, including their loading, empty and error states), and Best Matches through U4's table. The screen's one question decides what's biggest. | `Profile.jsx`, `ProfileCard`, `StatTile`, `InsightPanel`, `HardwareInsight`, `PlatformInsight` |
+| U5 | Done | **Profile.** Settle the signed-in check first. Then `ProfileCard` and `StatTile`, the two AI insight panels (`InsightPanel`, `HardwareInsight` and `PlatformInsight`, including their loading, empty and error states), and Best Matches through U4's table. The screen's one question decides what's biggest. | `Profile.jsx`, `ProfileCard`, `StatTile`, `InsightPanel`, `HardwareInsight`, `PlatformInsight` |
 | U6 | Planned | **Play.** The mode picker, the match controls, the HUD, the idle and paused overlays on the canvas, `ResultsModal` (its save status included) and the session history. No engine changes. `Modal`'s backdrop blur and large shadow go, per the house rules. | `Play.jsx`, `ModePicker`, `GameArea`, `GameHud`, `Modal`, `ResultsModal`, `SessionHistory` |
 | U7 | Planned | **NotFound, shared states and the final pass.** NotFound in the landing direction. `LoadingScreen` and `LoadingSpinner` matched to the app style. Remove `PagePlaceholder`, which nothing imports. Then a whole-app pass: all five themes, reduced motion, increased contrast, the bundle against U2's numbers, the Vercel preview, and ARCHITECTURE.md and README.md updated. | `NotFound.jsx`, `LoadingScreen`, `LoadingSpinner`, `PagePlaceholder/`, docs |
 
@@ -444,6 +444,96 @@ The *Data terminal* sheet from U3 applies, with its `list` screen pattern.
   3. Profile → Best Matches still renders through the new table. Its own layout comes in U5.
   4. Optional: stop `vercel dev` while the page is open, switch tabs to see the error, restart it, and press Retry.
 - *2026-10-28, user report: the browser checks passed, including the signed-in paths and Profile's Best Matches through the new table.*
+
+## U5 detail
+
+The *Data terminal* sheet applies, with its `detail` pattern: the page header is the object itself, then KPIs, then the blocks.
+
+1. **Notes** (§2.1–2.2):
+   - **Inventory:**
+     - The player: name, avatar, member since.
+     - `/api/me`'s stats: matches played, highest score, average accuracy, favourite mode.
+     - Up to 10 best matches.
+     - Two AI recommendations, on demand. Each costs a Claude call, is cached until new matches arrive, is limited to 5 a day, and needs at least 5 matches.
+   - **The one question:** "How am I doing, and what should I change?"
+2. **The object header:** the avatar, the player's name as the h1, a meta line ("Playing since October 2026 · 12 matches"), and "Play a match" on the right.
+3. **`StatStrip`** (new): one container split by dividers into equal columns, each label over its value (§5). Four across from `sm`, two by two on a phone. It replaces Profile's `StatTile`s. The HUD keeps `StatTile` until U6.
+   - **Honest values:** a zero prints as 0, and a value that doesn't apply yet (accuracy or favourite mode with no matches) is a grey dash.
+   - **Loading:** bars at the values' size.
+4. **Best Matches** through U4's table, with a **personal variant**. Mode takes the Player column's place, since every row is the same player. The Leaderboards page's Personal Best tab uses the same variant.
+5. **AI recommendations:**
+   - `InsightPanel`: the answer above a footer row that holds the Generate/Update button and the "Generated …" stamp, pinned to the panel's foot, so the two panels in a row end level.
+   - The button takes `inverse`, keeping the accent to a line.
+   - Errors in the body colour, not the accent.
+   - `HardwareInsight`'s fields: labels above square 36px controls. Its recommendation labels become sentence case (it fails `micro-label` now).
+6. **Profile states:** loading keeps the page frame with placeholder bars, not a full-page spinner. A failed profile shows one sentence and Retry in the stats block, with `useUserProfile` gaining `reload()` like `useLeaderboard`.
+7. **Gate:**
+   - Lint, format check, tests and build.
+   - `lint.mjs --app` at 0 FAIL on Profile and its components.
+   - Testing Library covers the header, the stats, the zero and error states, and the personal table.
+   - **The user's screenshots** at 1440, 768 and 390, signed in, in at least Dark and Light, critiqued against §2.7.
+8. Stop for review.
+
+### As built
+
+- **`ProfileHeader`** (was `ProfileCard`, renamed with `git mv`):
+  - The avatar, or an initial; the player's name as the h1; the meta line from `profileMeta()`, with a placeholder bar while it loads; and an action slot.
+  - Profile passes "Play a match" (`inverse`, since the header is the surface).
+- **`StatStrip`** (new): a `dl` in a 1px-gap grid on `bg-edge`, so the dividers are the container showing through.
+  - Four cells across from `sm`, two by two on a phone, each a 12px label over a 20px value (the new `text-figure` token).
+  - A null value is a grey dash, read out as "None yet". Loading shows bars.
+- **`utils/profileStats.js`** (new):
+  - `profileFigures()`: highest score, matches played, average accuracy (null with no matches), favourite mode (null until there is one).
+  - `profileMeta()`: "Playing since October 2026 · 12 matches", or "No matches yet".
+- **`useUserProfile`:** the same keyed `reload()` as `useLeaderboard`. A failed load shows "Couldn't load your stats right now." and Retry in the stats block.
+- **The `Leaderboard` personal variant:**
+  - `personal` drops the Player column and makes the mode each row's identity. That covers the header, the rows, the placeholder rows and the message rows' `colSpan`.
+  - Profile's Best Matches and the Leaderboards Personal Best tab both use it.
+  - No caption on Profile: the strip already shows the highest score (§5, one figure in one place).
+- **`InsightPanel`:**
+  - A plain surface: the heading and controls, then the answer, then any error, each split by a rule.
+  - A footer pinned with `mt-auto` holds the `inverse` button and either the "Asking Claude…" status or the "Generated …" stamp.
+  - Errors are in the body colour.
+- **`HardwareInsight`:** labels at 14/500 above square 36px controls on `bg-bg`. The recommendation labels are now sentence case, which clears its `micro-label` FAIL.
+- **`PlatformInsight`:** the app type tokens only.
+- **Profile layout:** header, stats strip, "Best matches", then "AI recommendations" with a line naming the source, and the two panels side by side from `md`.
+- **Tests:** 267, up from 255: `useUserProfile` (2), `profileStats` (6) and the `Profile` page (4: header and figures, zero state, stats Retry, the personal table).
+- **Docs:** ARCHITECTURE.md's components row.
+
+### U5 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (267) and `npm run build` pass. **Bundle:** entry chunk 3.45 kB gzip, `Profile` 3.66 kB (3.24 before), `Leaderboard` 2.27 kB, CSS 8.41 kB gzip.
+- `lint.mjs --app` over Profile, `ProfileHeader`, `StatStrip`, `InsightPanel`, `HardwareInsight`, `PlatformInsight` and `Leaderboard/`: **0 FAIL, 0 WARN.** The baseline flagged `micro-label` in `StatTile` (still used by the HUD until U6) and `HardwareInsight`.
+- **The user's screenshots** (signed in, 1440, 768 and 390, Dark and Light, one with both AI answers filled in), critiqued against §2.7:
+  - **The question first:** the header names the player, and the strip and Best matches answer "how am I doing".
+  - **The figures agree:**
+    - Highest score 8,560 is the top Best-matches row.
+    - 5 matches played matches 5 rows.
+    - 88.8% is the mean of the five accuracies: 444.1 / 5.
+  - **Edges:** every block shares the page edges at all three widths.
+  - **Colour:** only on the nav's accent line and the players' own avatars.
+  - **Phone:** the strip folds two by two, and the table's secondary columns fold under the mode.
+- *2026-10-29, user report and requests, from the screenshots:*
+  1. *At 390px the nav links didn't fit: Settings couldn't be reached.* The links row scrolled sideways with no visible scrollbar, beside the avatar and Sign out.
+  2. *Best matches should scroll past 5 matches,* for players with many.
+- **Fix 1, the phone nav:**
+  - **Layout:** below `sm` the bar wraps. The wordmark (shown at every width again) and the account controls take the first row. The four links take a second, edge to edge, each 44px tall.
+  - **Rejected:** a menu sheet or a bottom bar (app-screens §12), both heavier for four short links that fit.
+  - **The landing hero** used `100svh - 4rem`. It now uses a `--nav-h` token, which `:root:has([data-nav-links])` raises to 6.75rem below `sm`, so a signed-in phone visitor's hero still fits the first screen.
+  - **Checked** in headless Chrome on a static copy of the signed-in bar's markup with the built CSS:
+    - At 320, 390, 640 and 1440 every link is fully on screen.
+    - At 390 Settings spans 321–374px, with no sideways page scroll.
+    - `--nav-h` reads 6.75rem against a 107.5px bar at 390, and 4rem against 64px at 1440.
+- **Fix 2, Best matches scrolls:**
+  - `Leaderboard` takes `visibleRows` and `label`. Past that many rows its frame scrolls under the sticky header and becomes a named, focusable region, so the keyboard can scroll it.
+  - **`useRowCap`** (new) measures the rows, which rewrap on phones, and sets the frame's max-height to five rows plus half the sixth, so the cut-off row shows there's more. It re-measures on resize.
+  - Profile shows 5. The section header adds "N matches, best first. Scroll for more." when there are more than 5.
+- **After the fixes:** lint, format check, tests (270: `useRowCap` 2, `Leaderboard` +1) and build pass. **Bundle:** `Profile` 3.75 kB gzip, CSS 8.55 kB.
+- **Browser checks (user),** under `npm run dev:full`:
+  1. At 390, signed in: all four links on their own row, each one tappable, Settings included.
+  2. The landing page at 390, signed in: the hero still fits the first screen.
+  3. With 6 or more matches: Best matches shows 5 rows and half of a sixth, scrolls under its header, and the line by the heading counts them. *(The user had 5 matches at the screenshots, so this needs one more match.)*
+- *2026-10-29, user report: all three browser checks passed: the phone nav, the landing hero at 390 signed in, and Best matches scrolling past five.*
 
 ## Verification (every gate)
 

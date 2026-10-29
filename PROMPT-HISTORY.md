@@ -192,3 +192,97 @@ The gate's screenshots caught three layout bugs:
 - The user reported that U4's browser checks passed. That covers the signed-in paths and Profile's Best Matches through the new table, which headless Chrome couldn't reach.
 - U4 is marked Done in PLAN-UI.md and committed on `refactor/UI` with Interactions 5–6.
 - U5 (Profile) is next. It opens with the open decision on how to check the signed-in screens.
+
+### Interaction 7 — U5: Profile built; signed-in check settled
+
+**User Prompt**
+
+> start U5 with the recommended approach
+
+**Agent Outcome**
+
+- **Settled the open decision.** Play and Profile are checked with `lint.mjs`, Testing Library and the user's own signed-in screenshots. The dev-only fixture route was rejected.
+- **Profile now follows the sheet's `detail` pattern:**
+  - **Header:** the player as the page header (avatar, name as the h1, "Playing since … · N matches", Play a match).
+  - **Stats:** a divided stats strip with honest zeros and dashes.
+  - **Best matches:** shown through a new personal variant of U4's table, with Mode instead of a repeated Player column.
+  - **AI recommendations:** their panels restyled with the footer pinned so they end level.
+- **Placeholders and Retry** replace the full-page spinner and the static error line.
+
+The full record is in [PLAN-UI.md](PLAN-UI.md#u5-detail).
+
+**Rationale**
+
+- **The personal variant applies to the Leaderboards Personal Best tab too,** since every row there is the same player.
+- **No finding caption on Profile:** the stats strip already shows the highest score.
+- **`StatStrip` is new rather than a restyled `StatTile`,** because the HUD still uses `StatTile` and is U6's.
+
+**Changes**
+
+- New:
+  - [`src/components/StatStrip/StatStrip.jsx`](src/components/StatStrip/StatStrip.jsx)
+  - [`src/utils/profileStats.js`](src/utils/profileStats.js) and its test
+  - [`src/hooks/useUserProfile.test.js`](src/hooks/useUserProfile.test.js)
+  - [`src/pages/Profile.test.jsx`](src/pages/Profile.test.jsx)
+- Renamed: `ProfileCard/ProfileCard.jsx` → [`ProfileHeader/ProfileHeader.jsx`](src/components/ProfileHeader/ProfileHeader.jsx), rewritten.
+- Edited:
+  - `Profile.jsx`, `Leaderboard.jsx`, `LeaderboardRow.jsx`, `InsightPanel.jsx`, `HardwareInsight.jsx`, `PlatformInsight.jsx` and `useUserProfile.js`;
+  - `index.css` (`text-figure`), `ARCHITECTURE.md`, `README.md` (test count) and `PLAN-UI.md`.
+
+**Verification**
+
+- Lint, format check, tests (267, up from 255) and build pass.
+- `lint.mjs --app`: 0 FAIL, 0 WARN.
+- **Not yet done:** the user's signed-in screenshots and their critique.
+
+### Interaction 8 — U5 screenshots reviewed; phone nav fixed; Best matches scrolls
+
+**User Prompt**
+
+> screenshots added. Something to note: with a width of 390px, the nav bar buttons are not displaying appropriately; settings cannot be selected.
+>
+> When a user have a numerous amount of games matches played, their "best matches" section should be scrollable past 5 matches
+
+**Agent Outcome**
+
+- **Critiqued the user's seven screenshots against app-screens §2.7.** The figures agree: 8,560 is the top row, 5 matches match 5 rows, and 88.8% is the mean of the five accuracies. The edges line up at every width.
+- **Phone nav:**
+  - **Cause:** the links row scrolled sideways, with no visible scrollbar, beside the account controls.
+  - **Fix:** below `sm` the bar wraps into two rows, with the four links edge to edge and 44px tall.
+  - The landing hero now sizes to a `--nav-h` token that a CSS `:has()` rule raises when that row exists.
+- **Best matches** shows 5 rows and half of the sixth, then scrolls inside its frame under the sticky header. The frame is a named, focusable region. A new `useRowCap` hook measures the rows, because their height varies with wrapping.
+
+**Rationale**
+
+- **Two rows instead of a menu or a bottom bar,** because four short links fit at 320px once they have their own row.
+- **`useRowCap` writes `max-height` directly** rather than holding it in state, because the value only feeds layout and the repo avoids setState inside effects.
+
+**Changes**
+
+- New: [`src/hooks/useRowCap.js`](src/hooks/useRowCap.js) and its test.
+- Edited:
+  - `Navbar.jsx`, `landing/Hero.jsx` and `index.css` (`--nav-h`);
+  - `Leaderboard.jsx` and its test (`visibleRows`, `label`);
+  - `Profile.jsx` and `PLAN-UI.md`.
+
+**Verification**
+
+- Lint, format check, tests (270, up from 267) and build pass.
+- **The signed-in bar's layout,** checked in headless Chrome on a static copy of its markup with the built CSS, at 320, 390, 640 and 1440: every link is on screen, and `--nav-h` matches the bar's real height.
+- **Not run:** the scrolling with real data (the user has 5 matches), and the signed-in phone nav in the real app. Both are listed as user checks.
+
+**Collaboration**
+
+The user found the phone nav bug in their own screenshots, which headless runs couldn't reach signed in, and asked for the scrolling Best matches.
+
+### Interaction 9 — U5 approved and committed
+
+**User Prompt**
+
+> browser checks passed. commit U5
+
+**Agent Outcome**
+
+- The user reported that U5's browser checks passed: the phone nav, the landing hero at 390 signed in, and Best matches scrolling past five.
+- U5 is marked Done in PLAN-UI.md and committed on `refactor/UI` with Interactions 7–9.
+- U6 (Play) is next.

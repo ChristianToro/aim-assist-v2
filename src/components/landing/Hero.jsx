@@ -33,7 +33,7 @@ const Headline = () => (
 )
 
 const Hero = () => (
-  <section className="relative overflow-hidden bg-bg [--seam-y:calc((100svh-4rem)*0.46)] sm:[--seam-y:calc((100svh-4rem)*0.5)]">
+  <section className="relative overflow-hidden bg-bg [--seam-y:calc((100svh-var(--nav-h))*0.46)] sm:[--seam-y:calc((100svh-var(--nav-h))*0.5)]">
     <div className="h-(--seam-y)" aria-hidden="true" />
 
     {/* Lower field: grows only if its text needs more than half. */}

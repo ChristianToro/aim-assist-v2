@@ -1,5 +1,6 @@
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 import LeaderboardRow, { EDGE_PADDING, SkeletonRow } from './LeaderboardRow'
+import { useRowCap } from '../../hooks/useRowCap'
 import { boardSummary } from '../../utils/leaderboardFormat'
 
 const UNAUTHORIZED = 401
@@ -28,18 +29,20 @@ const NUMERIC_HEAD = `${HEAD} text-right`
  * frame. The table is laid out fixed from these widths, so the spare width
  * spreads across the columns instead of opening a gap after the name.
  */
-const Header = () => (
+const Header = ({ personal }) => (
   <thead>
     <tr className="text-meta text-muted">
       <th scope="col" className={`${HEAD} w-14`}>
         Rank
       </th>
       <th scope="col" className={HEAD}>
-        Player
+        {personal ? 'Mode' : 'Player'}
       </th>
-      <th scope="col" className={`${HEAD} hidden w-[14%] sm:table-cell`}>
-        Mode
-      </th>
+      {!personal && (
+        <th scope="col" className={`${HEAD} hidden w-[14%] sm:table-cell`}>
+          Mode
+        </th>
+      )}
       <th scope="col" className={`${NUMERIC_HEAD} w-24 sm:w-[12%]`}>
         Score
       </th>
@@ -66,24 +69,35 @@ const Header = () => (
 )
 
 // One sentence across the whole table, for the empty and failed states.
-const MessageRow = ({ children, ...props }) => (
+const MessageRow = ({ columns, children, ...props }) => (
   <tr className="border-t border-edge">
-    <td colSpan={COLUMNS} className="px-4 py-6 text-ui text-muted">
+    <td colSpan={columns} className="px-4 py-6 text-ui text-muted">
       <div {...props}>{children}</div>
     </td>
   </tr>
 )
 
-const Body = ({ entries, isLoading, error, emptyMessage, uid, onRetry }) => {
+const Body = ({
+  entries,
+  isLoading,
+  error,
+  emptyMessage,
+  uid,
+  onRetry,
+  personal,
+}) => {
+  // A personal board has no Player column.
+  const columns = personal ? COLUMNS - 1 : COLUMNS
+
   if (isLoading) {
     return Array.from({ length: SKELETON_ROWS }, (_, i) => (
-      <SkeletonRow key={i} />
+      <SkeletonRow key={i} personal={personal} />
     ))
   }
 
   if (error) {
     return (
-      <MessageRow role="alert">
+      <MessageRow columns={columns} role="alert">
         {errorMessage(error)}
         {onRetry && (
           <button
@@ -98,7 +112,9 @@ const Body = ({ entries, isLoading, error, emptyMessage, uid, onRetry }) => {
     )
   }
 
-  if (entries.length === 0) return <MessageRow>{emptyMessage}</MessageRow>
+  if (entries.length === 0) {
+    return <MessageRow columns={columns}>{emptyMessage}</MessageRow>
+  }
 
   return entries.map((entry, index) => (
     <LeaderboardRow
@@ -106,14 +122,18 @@ const Body = ({ entries, isLoading, error, emptyMessage, uid, onRetry }) => {
       entry={entry}
       rank={index + 1}
       isYou={Boolean(uid) && entry.uid === uid}
+      personal={personal}
     />
   ))
 }
 
 /*
  * Ranked score table shared by every leaderboard view. With `withSummary`
- * its caption states the board's finding (who leads, where you stand);
- * `personal` words that finding for the player's own board.
+ * its caption states the board's finding (who leads, where you stand).
+ * `personal` is the player's own board: the finding is worded for them,
+ * and the mode replaces the Player column, which would repeat one name.
+ * With `visibleRows`, a longer board scrolls inside its frame under its
+ * sticky header; `label` names that scrolling region.
  */
 const Leaderboard = ({
   entries,
@@ -124,15 +144,27 @@ const Leaderboard = ({
   onRetry,
   withSummary = false,
   personal = false,
+  visibleRows,
+  label,
 }) => {
+  const frameRef = useRef(null)
+  const scrolls =
+    Boolean(visibleRows) && !isLoading && !error && entries.length > visibleRows
+  useRowCap(frameRef, scrolls ? visibleRows : 0, entries.length)
+
   const summary =
     withSummary && !isLoading && !error
       ? boardSummary(entries, { personal, uid: highlightUid })
       : null
 
-  // A plain surface rather than Card: the row rules run to its edges.
+  // A plain surface rather than Card: the row rules run to its edges. A
+  // scrolling frame takes focus so the keyboard can scroll it too.
   return (
-    <div className="bg-surface">
+    <div
+      ref={frameRef}
+      className={`bg-surface ${scrolls ? 'overflow-y-auto' : ''}`}
+      {...(scrolls && { role: 'region', 'aria-label': label, tabIndex: 0 })}
+    >
       {isLoading && (
         <p role="status" className="sr-only">
           Loading the board
@@ -154,7 +186,7 @@ const Leaderboard = ({
             )}
           </caption>
         )}
-        <Header />
+        <Header personal={personal} />
         <tbody>
           <Body
             entries={entries}
@@ -163,6 +195,7 @@ const Leaderboard = ({
             emptyMessage={emptyMessage}
             uid={highlightUid}
             onRetry={onRetry}
+            personal={personal}
           />
         </tbody>
       </table>

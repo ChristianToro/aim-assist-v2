@@ -91,6 +91,34 @@ describe('Leaderboard', () => {
     ).toBeGreaterThan(0)
   })
 
+  it('scrolls inside a named, focusable frame past its visible rows', () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({
+      ...entries[0],
+      id: `m${i}`,
+    }))
+    const { rerender } = render(
+      <Leaderboard
+        entries={many.slice(0, 5)}
+        emptyMessage="none"
+        visibleRows={5}
+        label="Best matches"
+      />
+    )
+    expect(screen.queryByRole('region')).toBeNull()
+
+    rerender(
+      <Leaderboard
+        entries={many}
+        emptyMessage="none"
+        visibleRows={5}
+        label="Best matches"
+      />
+    )
+    const frame = screen.getByRole('region', { name: 'Best matches' })
+    expect(frame).toHaveAttribute('tabindex', '0')
+    expect(frame).toHaveClass('overflow-y-auto')
+  })
+
   it("tags the signed-in player's own row", () => {
     render(
       <Leaderboard entries={entries} emptyMessage="none" highlightUid="u1" />

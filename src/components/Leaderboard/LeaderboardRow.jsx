@@ -42,24 +42,40 @@ const Avatar = ({ entry }) =>
     </span>
   )
 
-// One ranked entry. `isYou` tags the signed-in player's own row.
-const LeaderboardRow = ({ entry, rank, isYou }) => (
+const Player = ({ entry, isYou }) => (
+  <div className="flex items-center gap-2">
+    <Avatar entry={entry} />
+    <span className="truncate text-heading">
+      {entry.displayName ?? 'Anonymous'}
+    </span>
+    {isYou && (
+      <span className="shrink-0 bg-bg px-1.5 py-0.5 text-meta text-body">
+        You
+      </span>
+    )}
+  </div>
+)
+
+/*
+ * One ranked entry. `isYou` tags the signed-in player's own row. On a
+ * `personal` board every row is the same player, so the mode becomes the
+ * row's identity and the Player column goes.
+ */
+const LeaderboardRow = ({ entry, rank, isYou, personal = false }) => (
   <tr className="border-t border-edge">
     <td className={`${CELL} text-muted tabular-nums`}>{rank}</td>
     <td className={CELL}>
-      <div className="flex items-center gap-2">
-        <Avatar entry={entry} />
-        <span className="truncate text-heading">
-          {entry.displayName ?? 'Anonymous'}
-        </span>
-        {isYou && (
-          <span className="shrink-0 bg-bg px-1.5 py-0.5 text-meta text-body">
-            You
-          </span>
-        )}
-      </div>
-      <p className="mt-0.5 flex flex-wrap gap-x-3 pl-8 text-meta text-muted tabular-nums lg:hidden">
-        <span className="sm:hidden">{entry.mode}</span>
+      {personal ? (
+        <span className="text-heading">{entry.mode}</span>
+      ) : (
+        <Player entry={entry} isYou={isYou} />
+      )}
+      <p
+        className={`mt-0.5 flex flex-wrap gap-x-3 text-meta text-muted tabular-nums lg:hidden ${
+          personal ? '' : 'pl-8'
+        }`}
+      >
+        {!personal && <span className="sm:hidden">{entry.mode}</span>}
         <span className="sm:hidden">{formatAccuracy(entry.accuracy)}</span>
         <span>
           <Reaction ms={entry.reactionTime} />
@@ -67,9 +83,11 @@ const LeaderboardRow = ({ entry, rank, isYou }) => (
         <span>{formatDay(entry.createdAt)}</span>
       </p>
     </td>
-    <td className={`${CELL} ${FROM_SM} whitespace-nowrap text-muted`}>
-      {entry.mode}
-    </td>
+    {!personal && (
+      <td className={`${CELL} ${FROM_SM} whitespace-nowrap text-muted`}>
+        {entry.mode}
+      </td>
+    )}
     <td
       className={`${CELL} text-right font-medium whitespace-nowrap text-heading tabular-nums`}
     >
@@ -100,20 +118,26 @@ const SKELETON_FIGURES = [
 ]
 
 // A placeholder row at the real row's size: flat bars, no shimmer.
-export const SkeletonRow = () => (
+export const SkeletonRow = ({ personal = false }) => (
   <tr aria-hidden="true" className="border-t border-edge">
     <td className={CELL}>
       <span className="block h-3 w-4 bg-edge" />
     </td>
     <td className={CELL}>
-      <span className="flex items-center gap-2">
-        <span className="size-6 shrink-0 rounded-full bg-edge" />
-        <span className="block h-3 w-32 bg-edge" />
-      </span>
+      {personal ? (
+        <span className="my-1.5 block h-3 w-20 bg-edge" />
+      ) : (
+        <span className="flex items-center gap-2">
+          <span className="size-6 shrink-0 rounded-full bg-edge" />
+          <span className="block h-3 w-32 bg-edge" />
+        </span>
+      )}
     </td>
-    <td className={`${CELL} ${FROM_SM}`}>
-      <span className="block h-3 w-16 bg-edge" />
-    </td>
+    {!personal && (
+      <td className={`${CELL} ${FROM_SM}`}>
+        <span className="block h-3 w-16 bg-edge" />
+      </td>
+    )}
     {SKELETON_FIGURES.map(({ width, show }, i) => (
       <td key={i} className={`${CELL} ${show}`}>
         <span className={`ml-auto block h-3 bg-edge ${width}`} />
