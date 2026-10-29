@@ -31,16 +31,19 @@ React owns everything around gameplay: routing, menus, auth state, settings, the
 
 | Folder | Role |
 |---|---|
-| `pages/` | One component per route. Each is code-split with `lazy()`; `/profile` sits behind `ProtectedRoute`. |
-| `components/` | Small presentational pieces (`Leaderboard`, `ProfileCard`, `InsightPanel`, …) plus the game bridge (`GameArea`, `GameCanvas`, `GameHud`). |
-| `hooks/` | Stateful logic: `useAuth`, `useLeaderboard`, `useUserProfile`, `useInsight`, and `useGameSession`, which owns one engine instance. |
+| `pages/` | One component per route. Each is code-split with `lazy()`; `/play` and `/profile` sit behind `ProtectedRoute`, and the navbar shows page links only to signed-in players. |
+| `components/` | Small presentational pieces (`Leaderboard`, `ProfileHeader`, `StatStrip`, `Tabs`, `InsightPanel`, …) plus the game bridge (`GameArea`, `GameCanvas`, `GameHud`). `LoadingScreen` is the one "page not ready" frame, shown both while a route's chunk downloads and while `ProtectedRoute` waits for the session. `components/landing/` holds the home page's sections, including the waterline headline the 404 page reuses and a DOM warm-up target that reports reaction times (no canvas, nothing animated per frame). |
+| `hooks/` | Stateful logic: `useAuth`, `useLeaderboard`, `useUserProfile`, `useInsight`, `useGameSession` (which owns one engine instance), the landing page's `useReveal`, `useCycle` and `useWarmupTarget`, and Settings' `useMediaQuery` (the OS's motion and contrast preferences). |
 | `contexts/` | `AuthProvider` (the Neon Auth session, mapped to `{ uid, displayName, photoURL }`) and `ThemeProvider`. |
 | `services/` | The only modules that leave the browser: `auth.js` (Neon Auth SDK) and `fetch` wrappers over `/api`. |
-| `utils/` | Pure functions (error messages, form parsing, user mapping), tested without mocks. |
+| `utils/` | Pure functions (error messages, form parsing, user mapping, mode facts, reaction timing, leaderboard and profile formatting), tested without mocks. |
+| `styles/` | `themes.css` (the five themes as one set of semantic colour roles, which the canvas reads too), the theme list, and the shared data-table class lists. |
 
 **Services.** `services/api.js` holds `apiFetch`, the single place the browser calls `/api`. With `auth: true` it attaches `Authorization: Bearer <jwt>` from `getAuthToken()`; when no one is signed in, it fails with a 401 before making any request. A non-2xx response becomes an `ApiError { status, message, details }`, so the UI can word each failure: the leaderboard tells a 401 apart from an outage, and the insight panels say how many more matches are needed or when the daily limit resets. The other services (`users`, `scores`, `leaderboard`, `insights`) are thin wrappers that take no user id, because the server already knows who is asking.
 
 **Data fetching.** The read hooks key their results by request (view and uid), and derive loading state by comparing the requested key with the key of the last result, so there's no synchronous `setState` inside effects. `useInsight` is the exception by design. It runs on a button click, never on mount, because each fresh answer is a paid Claude call. It keeps the previous answer on screen while a new one loads, and only the latest of overlapping requests is applied.
+
+**Styling.** Components use only the semantic utilities that `src/index.css` maps onto the theme roles (`bg-surface`, `text-muted`, `text-accent`, …), so switching theme changes no markup. The same file holds two type scales: a page scale in Unbounded and Onest for the landing and 404 pages, and an app scale (title, label, ui, meta) for the screens players work in. The accent appears on actions and on one selection mark, a 1px line under the chosen tab or nav link. Motion is CSS only (transform and opacity), and `prefers-reduced-motion` collapses it globally. Each theme strengthens its own borders and secondary text under `prefers-contrast: more`. [PLAN-UI.md](PLAN-UI.md) records the design decisions.
 
 ## Layer 2: Canvas game engine (`src/game/`)
 
@@ -103,7 +106,7 @@ Profile stats (games played, best score, average accuracy, favourite mode) are n
 
 ### Sign-in and identity
 
-1. "Continue with Google" calls Neon Auth's `signIn.social`. That's a full-page redirect through Google and back to the same page, where the SDK exchanges a one-time verifier for the session.
+1. "Continue with Google" calls Neon Auth's `signIn.social`. That's a full-page redirect through Google and back to the same page (from the landing page, on to `/play`), where the SDK exchanges a one-time verifier for the session. `useSession` stays pending during that exchange, so `ProtectedRoute` waits instead of redirecting.
 2. `AuthProvider` exposes the session user, and `getAuthToken()` supplies a short-lived Ed25519 JWT (15 minutes), cached by the SDK.
 3. `/api` verifies each JWT against Neon Auth's JWKS. It pins `EdDSA`, checks the issuer, audience and expiry, and requires `sub`. The uid is `sub`.
 4. A token can stay valid for up to 15 minutes after its user is deleted. `/api/me` answers it with a 401 because the user row is gone, and `POST /api/scores` with a 401 because the insert breaks the foreign key.

@@ -11,7 +11,7 @@ const Layout = () => {
   const { pathname } = useLocation()
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-body">
+    <div className="flex min-h-svh flex-col bg-bg text-body">
       <a
         href="#main"
         className="sr-only rounded-lg bg-accent px-4 py-2 font-medium text-on-accent focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"

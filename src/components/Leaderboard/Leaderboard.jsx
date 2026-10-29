@@ -1,16 +1,12 @@
-import { memo } from 'react'
-import Card from '../Card/Card'
-import LoadingSpinner from '../LoadingSpinner/LoadingSpinner'
+import { memo, useRef } from 'react'
+import LeaderboardRow, { SkeletonRow } from './LeaderboardRow'
+import { HEAD, NUMERIC_HEAD, ROW } from '../../styles/table'
+import { useRowCap } from '../../hooks/useRowCap'
+import { boardSummary } from '../../utils/leaderboardFormat'
 
 const UNAUTHORIZED = 401
 const SERVER_ERROR = 500
-
-// createdAt is an ISO timestamp from /api/leaderboard.
-const formatDate = (createdAt) =>
-  createdAt ? new Date(createdAt).toLocaleDateString() : '—'
-
-const rankClass = (rank) =>
-  rank <= 3 ? 'font-semibold text-accent' : 'text-muted'
+const SKELETON_ROWS = 5
 
 // A failed query and an empty result are very different problems, so they
 // must not look alike. Errors carry the /api status (ApiError); a network
@@ -25,103 +21,182 @@ const errorMessage = (error) => {
   return 'Something went wrong loading the leaderboard. See the browser console for details.'
 }
 
-const PlayerCell = ({ entry }) => (
-  <div className="flex items-center gap-2">
-    {entry.photoURL ? (
-      <img
-        src={entry.photoURL}
-        alt=""
-        referrerPolicy="no-referrer"
-        className="h-6 w-6 rounded-full border border-edge"
-      />
-    ) : (
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-xs text-muted">
-        {(entry.displayName ?? '?').charAt(0).toUpperCase()}
-      </span>
-    )}
-    <span className="truncate">{entry.displayName ?? 'Anonymous'}</span>
+/*
+ * Headers stay up in every state, so an empty or failed board keeps its
+ * frame. The table is laid out fixed from these widths, so the spare width
+ * spreads across the columns instead of opening a gap after the name.
+ */
+const Header = ({ personal }) => (
+  <thead>
+    <tr className="text-meta text-muted">
+      <th scope="col" className={`${HEAD} w-14`}>
+        Rank
+      </th>
+      <th scope="col" className={HEAD}>
+        {personal ? 'Mode' : 'Player'}
+      </th>
+      {!personal && (
+        <th scope="col" className={`${HEAD} hidden w-[14%] sm:table-cell`}>
+          Mode
+        </th>
+      )}
+      <th scope="col" className={`${NUMERIC_HEAD} w-24 sm:w-[12%]`}>
+        Score
+      </th>
+      <th
+        scope="col"
+        className={`${NUMERIC_HEAD} hidden w-[12%] sm:table-cell`}
+      >
+        Accuracy
+      </th>
+      <th
+        scope="col"
+        className={`${NUMERIC_HEAD} hidden w-[12%] lg:table-cell`}
+      >
+        Reaction
+      </th>
+      <th
+        scope="col"
+        className={`${NUMERIC_HEAD} hidden w-[14%] lg:table-cell`}
+      >
+        Date
+      </th>
+    </tr>
+  </thead>
+)
+
+/*
+ * One sentence under the header, for the empty and failed states. It sits
+ * below the table, not in a spanning row: with columns hidden on phones, a
+ * colSpan wider than the visible columns makes the fixed layout add
+ * phantom ones and squeeze the real columns.
+ */
+const Message = ({ children, ...props }) => (
+  <div className={`${ROW} px-4 py-6 text-ui text-muted`} {...props}>
+    {children}
   </div>
 )
 
-// Ranked score table shared by every leaderboard view.
+const StateMessage = ({ entries, isLoading, error, emptyMessage, onRetry }) => {
+  if (error) {
+    return (
+      <Message role="alert">
+        {errorMessage(error)}
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="ml-2 font-medium text-heading underline-offset-4 hover:underline"
+          >
+            Retry
+          </button>
+        )}
+      </Message>
+    )
+  }
+  if (!isLoading && entries.length === 0)
+    return <Message>{emptyMessage}</Message>
+  return null
+}
+
+// The rows: placeholders while loading, the entries once they land.
+const Body = ({ entries, isLoading, error, uid, personal }) => {
+  if (isLoading) {
+    return Array.from({ length: SKELETON_ROWS }, (_, i) => (
+      <SkeletonRow key={i} personal={personal} />
+    ))
+  }
+  if (error) return null
+
+  return entries.map((entry, index) => (
+    <LeaderboardRow
+      key={entry.id}
+      entry={entry}
+      rank={index + 1}
+      isYou={Boolean(uid) && entry.uid === uid}
+      personal={personal}
+    />
+  ))
+}
+
+/*
+ * Ranked score table shared by every leaderboard view. With `withSummary`
+ * its caption states the board's finding (who leads, where you stand).
+ * `personal` is the player's own board: the finding is worded for them,
+ * and the mode replaces the Player column, which would repeat one name.
+ * With `visibleRows`, a longer board scrolls inside its frame under its
+ * sticky header; `label` names that scrolling region.
+ */
 const Leaderboard = ({
   entries,
   isLoading,
   error,
   emptyMessage,
   highlightUid,
+  onRetry,
+  withSummary = false,
+  personal = false,
+  visibleRows,
+  label,
 }) => {
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <LoadingSpinner />
-      </div>
-    )
-  }
+  const frameRef = useRef(null)
+  const scrolls =
+    Boolean(visibleRows) && !isLoading && !error && entries.length > visibleRows
+  useRowCap(frameRef, scrolls ? visibleRows : 0, entries.length)
 
-  if (error) {
-    return (
-      <Card className="border-accent/40 bg-accent/5" role="alert">
-        <h2 className="font-medium text-heading">
-          This leaderboard failed to load
-        </h2>
-        <p className="mt-2 max-w-prose text-sm text-muted">
-          {errorMessage(error)}
-        </p>
-      </Card>
-    )
-  }
+  const summary =
+    withSummary && !isLoading && !error
+      ? boardSummary(entries, { personal, uid: highlightUid })
+      : null
 
-  if (entries.length === 0) {
-    return <p className="py-16 text-center text-muted">{emptyMessage}</p>
-  }
-
+  // A plain surface rather than Card: the row rules run to its edges. A
+  // scrolling frame takes focus so the keyboard can scroll it too.
   return (
-    <Card className="overflow-x-auto p-0">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-edge text-xs tracking-wide text-muted uppercase">
-            <th className="px-4 py-3 font-medium">#</th>
-            <th className="px-4 py-3 font-medium">Player</th>
-            <th className="px-4 py-3 text-right font-medium">Score</th>
-            <th className="px-4 py-3 text-right font-medium">Accuracy</th>
-            <th className="hidden px-4 py-3 font-medium sm:table-cell">Mode</th>
-            <th className="hidden px-4 py-3 text-right font-medium sm:table-cell">
-              Date
-            </th>
-          </tr>
-        </thead>
+    <div
+      ref={frameRef}
+      className={`bg-surface ${scrolls ? 'overflow-y-auto' : ''}`}
+      {...(scrolls && { role: 'region', 'aria-label': label, tabIndex: 0 })}
+    >
+      {isLoading && (
+        <p role="status" className="sr-only">
+          Loading the board
+        </p>
+      )}
+      <table
+        aria-busy={isLoading}
+        className="w-full table-fixed text-left text-ui"
+      >
+        {withSummary && (isLoading || summary) && (
+          <caption className="caption-top px-4 pt-4 pb-2 text-left text-body">
+            {isLoading ? (
+              <span
+                aria-hidden="true"
+                className="my-1 block h-3 w-72 bg-edge"
+              />
+            ) : (
+              summary
+            )}
+          </caption>
+        )}
+        <Header personal={personal} />
         <tbody>
-          {entries.map((entry, index) => (
-            <tr
-              key={entry.id}
-              className={`border-b border-edge last:border-b-0 ${
-                entry.uid === highlightUid ? 'bg-accent/5' : ''
-              }`}
-            >
-              <td className={`px-4 py-3 tabular-nums ${rankClass(index + 1)}`}>
-                {index + 1}
-              </td>
-              <td className="max-w-48 px-4 py-3 text-body">
-                <PlayerCell entry={entry} />
-              </td>
-              <td className="px-4 py-3 text-right font-semibold text-heading tabular-nums">
-                {entry.score}
-              </td>
-              <td className="px-4 py-3 text-right text-body tabular-nums">
-                {entry.accuracy?.toFixed(1)}%
-              </td>
-              <td className="hidden px-4 py-3 text-muted sm:table-cell">
-                {entry.mode}
-              </td>
-              <td className="hidden px-4 py-3 text-right text-muted tabular-nums sm:table-cell">
-                {formatDate(entry.createdAt)}
-              </td>
-            </tr>
-          ))}
+          <Body
+            entries={entries}
+            isLoading={isLoading}
+            error={error}
+            uid={highlightUid}
+            personal={personal}
+          />
         </tbody>
       </table>
-    </Card>
+      <StateMessage
+        entries={entries}
+        isLoading={isLoading}
+        error={error}
+        emptyMessage={emptyMessage}
+        onRetry={onRetry}
+      />
+    </div>
   )
 }
 

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import Button from '../Button/Button'
-import Card from '../Card/Card'
 import GameCanvas from '../GameCanvas/GameCanvas'
 import GameHud from '../GameHud/GameHud'
 import ResultsModal from '../ResultsModal/ResultsModal'
@@ -8,9 +7,10 @@ import { useGameSession } from '../../hooks/useGameSession'
 import { useAuth } from '../../hooks/useAuth'
 import { saveMatchResult } from '../../services/scores'
 
-// Dimmed overlay shown on top of the canvas between/within matches.
+// The scrim over the canvas between and within matches: opaque enough to
+// read on, with no blur (glass is off-style, and the canvas is still).
 const CanvasOverlay = ({ children }) => (
-  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-bg/70 backdrop-blur-sm">
+  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-bg/85 p-6 text-center">
     {children}
   </div>
 )
@@ -61,13 +61,16 @@ const GameArea = ({ mode, onMatchFinished }) => {
     : `${mode.duration}-second match`
   const overlayHint = mode.missLimit
     ? `Targets get smaller, faster, and more valuable over time. ${mode.missLimit} misses (or expired targets) ends the run.`
-    : 'Click as many targets as you can. Consecutive hits build a score multiplier — misses reset it.'
+    : 'Click as many targets as you can. Consecutive hits build a score multiplier, and a miss resets it.'
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted">{mode.description}</p>
-        <div className="flex items-center gap-2">
+      {/* On phones the controls take their own 36px line, so Pause and
+          Restart appearing at the start of a match never push the HUD and
+          canvas down. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-ui text-body">{mode.description}</p>
+        <div className="flex min-h-9 items-center gap-2">
           {phase === 'running' && (
             <>
               <Button variant="secondary" size="sm" onClick={togglePause}>
@@ -89,36 +92,42 @@ const GameArea = ({ mode, onMatchFinished }) => {
         </div>
       </div>
 
-      <GameHud hud={hud} />
+      {/* Between matches the strip shows the next round's starting
+          values, not the last match's (those are in the results). */}
+      <GameHud hud={phase === 'idle' ? null : hud} mode={mode} />
 
-      <Card className="relative overflow-hidden p-0">
+      {/* A plain surface: the canvas fills it edge to edge. */}
+      <div className="relative overflow-hidden bg-surface">
         <GameCanvas
           engine={engine}
-          label={`${mode.label} game area — click targets as they appear`}
+          label={`${mode.label} game area: click targets as they appear`}
           className="block h-[60vh] min-h-96 w-full cursor-crosshair"
         />
 
         {phase === 'idle' && (
           <CanvasOverlay>
-            <h2 className="text-2xl font-semibold text-heading">
-              {mode.label} — {matchTitle}
+            <h2 className="text-title font-medium tracking-tight text-heading">
+              {mode.label}
             </h2>
-            <p className="max-w-sm text-center text-sm text-muted">
-              {overlayHint}
-            </p>
-            <Button size="lg" onClick={handleStart}>
-              Start Match
+            <p className="text-ui text-body">{matchTitle}</p>
+            <p className="max-w-sm text-ui text-muted">{overlayHint}</p>
+            <Button variant="solid" className="mt-3" onClick={handleStart}>
+              Start match
             </Button>
           </CanvasOverlay>
         )}
 
         {isPaused && (
           <CanvasOverlay>
-            <h2 className="text-2xl font-semibold text-heading">Paused</h2>
-            <Button onClick={togglePause}>Resume</Button>
+            <h2 className="text-title font-medium tracking-tight text-heading">
+              Paused
+            </h2>
+            <Button variant="solid" className="mt-3" onClick={togglePause}>
+              Resume
+            </Button>
           </CanvasOverlay>
         )}
-      </Card>
+      </div>
 
       <ResultsModal
         open={phase === 'over'}

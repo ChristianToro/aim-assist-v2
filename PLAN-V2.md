@@ -44,7 +44,7 @@ Because the data is reset, the uid format can change freely when auth moves, so 
 | M6 | Done | **Client data switchover + remove Firebase.** Turn the services into `fetch` wrappers with the same exports. Delete `recordMatchOnProfile`. Update the `Leaderboard.jsx` dates and errors and `Footer.jsx`. Remove the `firebase` dependency, `src/firebase/`, the firestore/firebase config files and the vite firebase chunk. Rewrite `users.test.js`. | `src/services/*`, `src/components/Leaderboard`, root Firebase files |
 | M7 | Done | **AI hardware recommendations.** Add `POST /api/insights/hardware`, which feeds aggregated score stats to Claude and returns a structured result (DPI, sensitivity, polling rate). Rate-limit and cache it per user in a Neon table. | `api/insights/`, `api/_lib/claude.js`, migration `003` |
 | M8 | Done | **AI platform recommendations.** Add `POST /api/insights/platforms` on the same foundation, plus a minimal display surface on Profile. Polished UI comes later on feature branches. | `api/insights/`, `src/pages/Profile.jsx` |
-| M9 | Done | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* the steps in [Pre-launch user steps](#pre-launch-user-steps-m9): your own Google OAuth client, and the database credentials stored as Secrets. | `ARCHITECTURE.md`, `README.md` |
+| M9 | Done | **Docs.** Write a new `ARCHITECTURE.md` (Layer 3 becomes Vercel Functions + Neon + Anthropic) and update the README stack, setup, live-demo and anti-cheat sections. *User, before launch:* the steps in [Pre-launch user steps](#pre-launch-user-steps-m9): your own Google OAuth client, and the database credentials stored as Secrets. *Both done by 2026-10-28.* | `ARCHITECTURE.md`, `README.md` |
 
 ### Dependencies
 
@@ -247,7 +247,8 @@ Each dependency is added only in the milestone that uses it, with a justificatio
   - `getJWTToken(false)` returns `null` when signed out.
   - A Google sign-in for a trusted callback (`localhost:3000`) returns Neon's `/sign-in/social/init` URL.
   - An untrusted callback is rejected with 403.
-- *2026-10-27: the user reported that "sign-in works locally" under `npm run dev:full`, which covers check 1. Checks 2–6 (reload, Safari or blocked third-party cookies, sign-out, `/profile`, and a browser JWT reaching `/api/me`) weren't reported and remain open. Check 3 matters most before launch.*
+- *2026-10-27: the user reported that "sign-in works locally" under `npm run dev:full`, which covers check 1. Checks 2–6 (reload, Safari or blocked third-party cookies, sign-out, `/profile`, and a browser JWT reaching `/api/me`) weren't reported then.*
+- *2026-10-28: the user reported the M4 browser checks conducted, closing checks 2–6.*
 - **Browser checks (user):** on `vercel dev`, or on the Vercel deploy after a push.
   1. "Continue with Google" goes to Google (Neon branding with the shared keys), returns to the same page, and the avatar appears.
   2. Reload: still signed in.
@@ -352,7 +353,7 @@ Each dependency is added only in the milestone that uses it, with a justificatio
   - `dist/` has no Firebase, Firestore or `googleapis` strings, and `package-lock.json` has no `@firebase` packages.
 - The server routes the client now calls were checked end to end with a real JWT in M5.
 - Under `vercel dev`, `/leaderboards` returns HTML, the new client modules (`/src/services/api.js`, `leaderboard.js`, `Leaderboard.jsx`) are served as `text/javascript`, and `/api/leaderboard` returns 200 JSON.
-- *2026-10-28: the user reported "browser checks pass". That covers the five M6 checks below. Whether the M4 checks run in the same pass (reload, Safari or blocked third-party cookies, sign-out) wasn't stated, so they stay open under M4.*
+- *2026-10-28: the user reported "browser checks pass". That covers the five M6 checks below. Whether the M4 checks run in the same pass (reload, Safari or blocked third-party cookies, sign-out) wasn't stated, so they stayed open under M4 until the user reported them conducted later that day.*
 - **Browser checks (user):** under `npm run dev:full`, then on the Vercel deploy after a push. The open M4 checks (reload, Safari or blocked third-party cookies, sign-out) can run in the same pass.
   1. Signed out, `/leaderboards`: All Time, Today and This Week load, and Personal Best shows the sign-in prompt.
   2. Signed in, finish a match: the results say "Saved to your profile."
@@ -523,14 +524,14 @@ Steps:
   - the routes and their auth;
   - the table columns, the insight limits (5 matches, 5 per day) and the model id.
 - `npm run lint`, `npm run format:check`, `npm test` and `npm run build` pass. Only docs changed.
-- **Still open, user steps outside the repo:** the two pre-launch steps below. M9's doc work doesn't depend on them.
+- **User steps outside the repo:** the two pre-launch steps below, done by 2026-10-28. M9's doc work didn't depend on them.
 
 ## Pre-launch user steps (M9)
 
-M9 is detailed when it starts. These steps happen outside the repo, and they're recorded here so they aren't lost.
+These steps happen outside the repo, and they're recorded here so they aren't lost. *Both were done by 2026-10-28, as reported by the user.*
 
-1. **Your own Google OAuth client.** Replace Neon's shared keys, as described in the M3 detail under "Google OAuth, in two stages".
-2. **Store the database credentials as Secrets.**
+1. **Your own Google OAuth client.** Replace Neon's shared keys, as described in the M3 detail under "Google OAuth, in two stages". *Done: the user's own OAuth client is in use.*
+2. **Store the database credentials as Secrets.** *Done: the Neon credentials are Secrets.*
    - **Problem** (found 2026-10-28): Vercel flags the Neon integration's variables as "needs attention: looks like a secret, but its value is visible to anyone with access". The integration created them as readable Config values.
    - **Exposure:** limited to members of the Vercel team. A grep of `dist/` found no connection strings or API keys, and only the two public Neon Auth URLs carry the `VITE_` prefix.
    - **Real secrets:** `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`, `POSTGRES_URL_NO_SSL`, `POSTGRES_PRISMA_URL`, `POSTGRES_PASSWORD` and `PGPASSWORD`.

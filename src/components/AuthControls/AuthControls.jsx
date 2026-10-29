@@ -1,29 +1,29 @@
+import { useLocation } from 'react-router-dom'
 import Button from '../Button/Button'
+import GoogleSignInButton from '../GoogleSignInButton/GoogleSignInButton'
 import { useAuth } from '../../hooks/useAuth'
-import { signInWithGoogle, signOutUser } from '../../services/auth'
+import { signOutUser } from '../../services/auth'
+
+// Signing in from the landing page means "I want to play"; anywhere else,
+// the player returns to the page they were on.
+const returnPathFor = (pathname) => (pathname === '/' ? '/play' : undefined)
 
 // Navbar auth section: Google sign-in when signed out; avatar +
-// sign-out when signed in (per CLAUDE.md, Google is the only provider).
+// sign-out when signed in.
 const AuthControls = () => {
   const { user, isLoading } = useAuth()
-
-  const handleSignIn = async () => {
-    // Success navigates away to Google, so only a failure returns here.
-    try {
-      await signInWithGoogle()
-    } catch (error) {
-      console.error('Sign-in failed:', error)
-    }
-  }
+  const { pathname } = useLocation()
 
   // Reserve width during session restore to avoid layout shift.
   if (isLoading) return <div className="w-24" aria-hidden="true" />
 
   if (!user) {
     return (
-      <Button variant="secondary" size="sm" onClick={handleSignIn}>
-        Continue with Google
-      </Button>
+      <GoogleSignInButton
+        variant="secondary"
+        size="sm"
+        returnTo={returnPathFor(pathname)}
+      />
     )
   }
 

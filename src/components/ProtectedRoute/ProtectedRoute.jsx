@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom'
-import LoadingSpinner from '../LoadingSpinner/LoadingSpinner'
+import LoadingScreen from '../LoadingScreen/LoadingScreen'
 import { useAuth } from '../../hooks/useAuth'
 
 // Route guard: waits out the initial session restore, then either
@@ -7,14 +7,7 @@ import { useAuth } from '../../hooks/useAuth'
 const ProtectedRoute = () => {
   const { user, isLoading } = useAuth()
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-24">
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
+  if (isLoading) return <LoadingScreen />
   if (!user) return <Navigate to="/" replace />
   return <Outlet />
 }

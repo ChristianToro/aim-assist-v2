@@ -24,6 +24,8 @@ The approach was to plan the architecture completely before writing any code. A 
 
 **v2** kept the game engine unchanged and replaced the platform underneath it. The v1 prototype ran on Firebase and GitHub Pages, with the browser talking straight to Firestore. v2 moves hosting to Vercel, data to Neon Postgres behind a small API, and sign-in to Neon Auth, removing Firebase entirely. It then adds AI recommendations through the Anthropic API. The work ran as ten small milestones, each stopping for review before it was committed. [PLAN-V2.md](./PLAN-V2.md) records every decision and how each milestone was verified.
 
+**The UI refactor** then reworked the interface without touching the engine or the API, in eight more milestones (U0–U7). The landing and 404 pages share one poster-like direction: flat colour fields and heavy display type. Play, Leaderboards, Profile and Settings share a quieter app style: tabular figures, one accent line for the selection, and a loading, empty and error state for every block. Signed-out visitors get no page links, only the way to sign in, and `/play` needs an account. Both directions were dealt by the [taste-skill](https://github.com/Leonxlnx/taste-skill) design skill and checked in headless Chrome at three widths. [PLAN-UI.md](./PLAN-UI.md) records each decision and its verification.
+
 ## Features
 
 - **Six game modes** — Gridshot, Precision, Speed, Tracking, Flick, and an endless Survival mode with escalating difficulty
@@ -47,7 +49,7 @@ The approach was to plan the architecture completely before writing any code. A 
 
 | Layer | Choice |
 |---|---|
-| UI | React 19, React Router 7, Tailwind CSS 4 |
+| UI | React 19, React Router 7, Tailwind CSS 4, self-hosted Unbounded and Onest (Fontsource) |
 | Gameplay | HTML5 Canvas 2D, vanilla ES2022+ classes |
 | API | Vercel Functions (`/api`), JWTs verified with `jose` |
 | Database | Neon Postgres, plain SQL migrations, `@neondatabase/serverless` |
@@ -55,7 +57,7 @@ The approach was to plan the architecture completely before writing any code. A 
 | AI | Anthropic API (Claude Opus 5.5), structured JSON output, server-side only |
 | Hosting | Vercel, with GitHub Actions running lint, tests, and build |
 | Build | Vite 8 (Rolldown) |
-| Quality | ESLint 10, Prettier, Vitest + React Testing Library (193 tests) |
+| Quality | ESLint 10, Prettier, Vitest + React Testing Library (280 tests) |
 
 ## AI Tools Used
 
@@ -141,7 +143,7 @@ Things this codebase demonstrates that a reviewer might care about:
 - **Structured AI output, still checked.** Claude answers against a JSON schema, and the server then checks what a schema can't express (DPI range, 3–5 distinct picks) before anything reaches the UI. Answers are cached by a hash of their inputs and capped at 5 fresh ones per player per day, so repeat requests are instant and free.
 - **Dependencies are injected at the edges.** The JWT verifier, the database queries, and the Claude client are factories wired from environment variables in one place each, so the whole suite runs without a network, and the real SQL was exercised against in-process Postgres (PGlite).
 - **Zero-asset audio.** All sound effects are synthesized with the Web Audio API (oscillator + exponential-decay envelope), created lazily after a user gesture to satisfy autoplay policies.
-- **Bundle discipline.** Route-level code splitting plus Rolldown `advancedChunks` keeps the entry chunk at 3.3 kB gzip, with React (72 kB) and the Neon Auth SDK (67 kB) in independently cached vendor chunks. Removing Firebase dropped its 141 kB chunk.
+- **Bundle discipline.** Route-level code splitting plus Rolldown `advancedChunks` keeps the entry chunk at 3.6 kB gzip, with React (72 kB) and the Neon Auth SDK (67 kB) in independently cached vendor chunks. Removing Firebase dropped its 141 kB chunk.
 - **Frame-loop hygiene.** Delta time is clamped (backgrounded tabs can't cause physics jumps), pause re-anchors the clock, hit-testing uses the full target radius (shrinking targets stay fair), and hot paths avoid per-frame allocations.
 
 ## License

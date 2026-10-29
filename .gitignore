@@ -20,6 +20,9 @@ dist-ssr
 # Vercel CLI project link (`vercel link`)
 .vercel
 
+# taste-skill scratch output (inspector screenshots, dealt direction sheet)
+.taste-skill/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

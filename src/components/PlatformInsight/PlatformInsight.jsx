@@ -4,23 +4,23 @@ import { getPlatformInsight } from '../../services/insights'
 
 const Pick = ({ title, genre, platforms, fit }) => (
   <li>
-    <p className="font-medium text-heading">{title}</p>
-    <p className="text-xs text-muted">
+    <p className="text-ui font-medium text-heading">{title}</p>
+    <p className="text-meta text-muted">
       {genre} · {platforms.join(', ')}
     </p>
-    <p className="mt-1 text-sm text-muted">{fit}</p>
+    <p className="mt-1 text-ui text-muted">{fit}</p>
   </li>
 )
 
 const PlatformAdvice = ({ summary, picks, avoidForNow }) => (
   <>
-    <p className="text-sm text-body">{summary}</p>
+    <p className="text-ui text-body">{summary}</p>
     <ul className="mt-4 space-y-4">
       {picks.map((pick) => (
         <Pick key={pick.title} {...pick} />
       ))}
     </ul>
-    <p className="mt-4 text-sm text-body">
+    <p className="mt-4 text-ui text-body">
       <span className="font-medium text-heading">Hold off on: </span>
       {avoidForNow}
     </p>

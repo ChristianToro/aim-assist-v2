@@ -9,20 +9,22 @@ import {
   toSetup,
 } from '../../utils/mouseSetup'
 
+// Label above a square 36px control (one control height per panel).
+const LABEL_CLASS = 'text-ui font-medium text-body'
 const FIELD_CLASS =
-  'mt-1 w-full rounded-lg border border-edge-strong bg-surface/50 px-3 py-1.5 text-sm text-heading focus-visible:outline-2 focus-visible:outline-accent'
+  'mt-2 block h-9 w-full border border-edge-strong bg-bg px-3 text-ui text-heading placeholder:text-muted focus-visible:outline-2 focus-visible:outline-accent'
 
 const Recommendation = ({ label, value, rationale }) => (
   <div>
-    <dt className="text-xs tracking-wide text-muted uppercase">{label}</dt>
-    <dd className="mt-0.5 font-medium text-heading">{value}</dd>
-    <dd className="mt-1 text-sm text-muted">{rationale}</dd>
+    <dt className="text-meta text-muted">{label}</dt>
+    <dd className="mt-0.5 text-ui font-medium text-heading">{value}</dd>
+    <dd className="mt-1 text-ui text-muted">{rationale}</dd>
   </div>
 )
 
 const HardwareAdvice = ({ summary, dpi, sensitivity, pollingRateHz }) => (
   <>
-    <p className="text-sm text-body">{summary}</p>
+    <p className="text-ui text-body">{summary}</p>
     <dl className="mt-4 space-y-4">
       <Recommendation
         label="DPI"
@@ -59,8 +61,8 @@ const HardwareInsight = () => {
   }
 
   const controls = (
-    <div className="grid grid-cols-2 gap-3 text-sm">
-      <label className="text-muted">
+    <div className="grid grid-cols-2 gap-4">
+      <label className={LABEL_CLASS}>
         Current DPI
         <input
           type="number"
@@ -74,7 +76,7 @@ const HardwareInsight = () => {
           className={FIELD_CLASS}
         />
       </label>
-      <label className="text-muted">
+      <label className={LABEL_CLASS}>
         Polling rate
         <select
           value={fields.pollingRateHz}
@@ -90,7 +92,7 @@ const HardwareInsight = () => {
         </select>
       </label>
       {isInvalid && (
-        <p role="alert" className="col-span-2 text-accent">
+        <p role="alert" className="col-span-2 text-ui text-body">
           DPI must be a whole number from {MIN_DPI} to{' '}
           {MAX_DPI.toLocaleString()}.
         </p>

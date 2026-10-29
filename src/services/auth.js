@@ -1,4 +1,5 @@
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters'
+import { callbackUrl } from '../utils/callbackUrl'
 
 // All Neon Auth access goes through this service — components and
 // contexts never import the SDK directly (see CLAUDE.md, Ownership).
@@ -11,14 +12,15 @@ const authClient = adapter.getBetterAuthInstance()
 
 /*
  * Full-page redirect to Google. Neon Auth sends the browser back to the
- * current page with a one-time session verifier, which the SDK exchanges
- * for the session on load. The URL must be absolute: a relative one would
- * resolve against the auth server's origin, not the app's.
+ * current page (or to `returnTo`, an app path) with a one-time session
+ * verifier, which the SDK exchanges for the session in its first
+ * getSession call; useSession stays pending until then, so a protected
+ * page waits rather than redirecting.
  */
-export const signInWithGoogle = async () => {
+export const signInWithGoogle = async ({ returnTo } = {}) => {
   const { error } = await authClient.signIn.social({
     provider: 'google',
-    callbackURL: globalThis.location.href,
+    callbackURL: callbackUrl(returnTo, globalThis.location.href),
   })
   if (error) throw error
 }
