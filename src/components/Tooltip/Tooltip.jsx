@@ -2,13 +2,27 @@ import { useEffect, useId, useRef, useState } from 'react'
 
 const OVERLAY_SHADOW = 'shadow-lg' // taste-skill-ignore: it floats over the page
 
+// `center` sits under the trigger's middle. `start` lines up with its left
+// edge, for a trigger at the left of a narrow column.
+const alignments = {
+  center: 'left-1/2 -translate-x-1/2',
+  start: 'left-0',
+}
+
+const sizes = {
+  sm: 'max-w-[min(18rem,calc(100vw-2rem))]',
+  lg: 'max-w-[min(24rem,calc(100vw-2rem))]',
+}
+
 /*
- * A short hint under one trigger. It opens on hover, focus or click (click
- * is what a touch screen sends) and closes on Escape, an outside press,
- * blur or the pointer leaving. `children` is a render prop that receives
- * the props the trigger needs, so any element can be the trigger.
+ * A hint under one trigger. It opens on hover, focus or click (click is
+ * what a touch screen sends) and closes on Escape, an outside press, blur
+ * or the pointer leaving. `children` is a render prop that receives the
+ * props the trigger needs, so any element can be the trigger. The gap
+ * above the box is padding, not margin, so the pointer can cross it onto
+ * the hint without closing it.
  */
-const Tooltip = ({ content, children }) => {
+const Tooltip = ({ content, align = 'center', size = 'sm', children }) => {
   const id = useId()
   const wrapperRef = useRef(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -48,9 +62,13 @@ const Tooltip = ({ content, children }) => {
         id={id}
         role="tooltip"
         hidden={!isOpen}
-        className={`absolute top-full left-1/2 z-20 mt-2 w-max max-w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 animate-fade-in bg-raised px-3 py-2 text-caption text-heading ${OVERLAY_SHADOW}`}
+        className={`absolute top-full z-20 w-max pt-2 ${alignments[align]} ${sizes[size]}`}
       >
-        {content}
+        <span
+          className={`block animate-fade-in bg-raised px-3 py-2 text-caption text-heading ${OVERLAY_SHADOW}`}
+        >
+          {content}
+        </span>
       </span>
     </span>
   )

@@ -271,3 +271,57 @@ A tiebreak was first written as `order by created_at desc, id desc`. In Postgres
   - **Evidence:** the old ASCII block and the stale `matchCheck.js` line, then all six blocks rendering in mermaid-cli 11.4.2, plus 436 tests and the 3.62 kB entry chunk that the README's figures rely on.
   - **Merge Danger:** a two-way door with a docs-only blast radius. The one risk named is GitHub's renderer disagreeing with mermaid-cli, so the user should look at the rendered README on the branch before merging.
 - `improvement/Readme` tracks `origin/improvement/Readme`. The PR wasn't opened by the agent. This entry was committed at the user's "commit it".
+
+---
+
+## Session: 2026-10-29 (sixth)
+
+**Objective:** Take stock of the project after the README PR, then add a hover hint on Profile that explains where to find mouse settings (`feature/mouse-tool-tip`).
+
+### Interaction 1 — SITREP after the README merge
+
+**User Prompt**
+
+> /sitrep
+
+**Agent Outcome**
+
+- A read-only report: `main` is clean and level with `origin/main` at `d7edb78`. All 31 tracked milestones (M0–M9, U0–U7, S0–S5, I0–I3) are Done and merged, and no plan is active.
+- Gaps noted, none blocking: CLAUDE.md's Workflow still names `improvement/insights` as the current work. The known limits recorded in the plans are a player replaying their own log under a fresh ticket (`PLAN-SCORING.md`), no cleanup of expired matches, and the deferred prefill of the hardware fields (`PLAN-INSIGHTS.md`).
+
+### Interaction 2 — Where to find DPI and polling rate
+
+**User Prompt**
+
+> start a new branch, `feature/mouse-tool-tip`, where on hover, a user can learn where to find mouse setting info:
+>
+> *(pasted: "Not sure what your DPI and polling rate are?" with two steps, "Check your mouse's software" (G HUB, Synapse, SteelSeries GG, iCUE, Glorious Core; "DPI"/"CPI", "Polling Rate"/"Report Rate") and "Look up your mouse model" (the spec page's defaults))*
+
+**Agent Outcome**
+
+- Created `feature/mouse-tool-tip` from `main` (`d7edb78`). It has no upstream yet.
+- **The trigger:** the pasted heading, "Not sure what your DPI and polling rate are?", is a small dotted-underline button under the Mouse settings panel's DPI and polling-rate fields. Hovering, focusing or tapping it opens the two steps, with the user's wording kept as given.
+- **`Tooltip` grows two options** instead of a second overlay component:
+  - `align`: `center` (the default) or `start`, which lines the hint up with the trigger's left edge so it doesn't run off a phone screen from the panel's left column.
+  - `size`: `sm` (the default, 18rem) or `lg` (24rem), so the two steps don't stack into a tall column.
+- **Hoverable hint:** the gap above the box is now padding on the positioned element rather than margin, so the pointer can move from the trigger onto the hint without closing it (WCAG 1.4.13). The landing page's "Start Training" hint looks the same.
+
+**Rationale**
+
+- The pasted heading is a question the player asks, so it works as the trigger's label and isn't repeated inside the hint.
+- The steps are built from `block` spans, not `<p>` or `<ol>`, because the tooltip element is a `<span>` (phrasing content). A screen reader hears the hint flattened as the trigger's description, so list semantics would be lost anyway.
+- No new dependency.
+
+**Changes**
+
+- [`src/components/Tooltip/Tooltip.jsx`](src/components/Tooltip/Tooltip.jsx): the `align` and `size` maps, and the padding bridge.
+- [`src/components/HardwareInsight/MouseSetupHelp.jsx`](src/components/HardwareInsight/MouseSetupHelp.jsx) (new): the trigger and the two steps.
+- [`src/components/HardwareInsight/HardwareInsight.jsx`](src/components/HardwareInsight/HardwareInsight.jsx): the help sits across both columns under the fields.
+- [`src/components/HardwareInsight/MouseSetupHelp.test.jsx`](src/components/HardwareInsight/MouseSetupHelp.test.jsx) (new): the trigger's accessible description, and both steps on hover.
+
+**Verification**
+
+- `npx vitest run`: 70 files, 438 tests pass (436 before, plus the two new ones).
+- `npm run lint`, `prettier --check src` and `npm run build`: clean.
+- taste-skill `lint.mjs --app` on `Tooltip/`, `HardwareInsight/` and `StartTrainingButton.jsx`: 0 FAIL, 0 WARN.
+- **Rendered check:** Profile needs a Google sign-in, which `inspect.mjs` can't do, so the user looked at the hint on the running app and replied "looks good". This entry was committed at the user's "commit the changes".
