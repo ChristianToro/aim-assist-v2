@@ -838,3 +838,17 @@ The user chose the faked session over driving their own signed-in Chrome.
 - The user deleted legacy row #32 in the Neon Console; PLAN-SCORING.md records it.
 - S5 is marked Done and committed on `hotfix/server-checked-scoring` with this session's history. Every milestone in PLAN-SCORING.md (S0–S5) is now done.
 - **Next:** the PR body for `hotfix/server-checked-scoring` → `main`, if the user wants it.
+
+### Interaction 14 — PR body for `hotfix/server-checked-scoring` → `main`
+
+**User Prompt**
+
+> Pushed, write the PR body
+
+**Agent Outcome**
+
+- **The body:** written to the agent's scratchpad (`PR-server-checked-scoring.md`) for the user to paste when opening the PR on GitHub. It follows the `pr` skill's template:
+  - **Summary:** the request-body diff, a sequence diagram of the new save flow, and the file tree.
+  - **Evidence:** the 9,999,999 body before (201) and after (400), the user's manual checks, tests 280 → 401, the PGlite checks, and the legacy report.
+  - **Merge Danger:** a two-way door, since `004` is additive and already applied. The blast radius is score saving: stale tabs until reload, the production check of the 2 s tolerance, and the documented limits.
+- The PR wasn't opened by the agent. This entry is uncommitted.
