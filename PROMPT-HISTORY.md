@@ -128,3 +128,67 @@ The full record (departures, as built, contrast table, before and after) is in [
 - All four of U3's browser checks passed in the user's browser. That covers the navbar's accent line signed in, which headless Chrome couldn't reach.
 - U3 is marked Done in PLAN-UI.md and committed on `refactor/UI` with Interactions 2–4.
 - U4 (Leaderboards) is next, once the user says to start it.
+
+### Interaction 5 — U4: Leaderboards built
+
+**User Prompt**
+
+> start U4
+
+**Agent Outcome**
+
+Leaderboards is restyled in the *Data terminal* app style.
+
+- **Page:** underline tabs on one rule, each view's window in words ("Resets Monday at 00:00 UTC"), and "Play a match" for signed-in players.
+- **Table:**
+  - Sentence-case headers, right-aligned tabular figures with separators, a new Reaction column, ISO dates, and a "You" tag on the player's own row.
+  - A caption that states the board's finding ("A leads with 13,125 in Speed. You're 2nd of 2.").
+  - Placeholder rows while loading, one sentence when empty, and Retry on an error.
+
+The full record is in [PLAN-UI.md](PLAN-UI.md#u4-detail).
+
+**Rationale**
+
+- **Underline tabs instead of the sheet's count cards.** The four views are periods, not types, and counts would cost four queries.
+- **Figures and the finding as pure functions** (`utils/leaderboardFormat.js`), so the table, the caption and the tests share one definition.
+- **`reload()` as part of the request key,** so the hook keeps deriving its loading state with no setState inside effects.
+
+**Attempted Approach / Resolution**
+
+The gate's screenshots caught three layout bugs:
+- **Padding:** `Card`'s `p-5` overrode the `p-0` passed to it, so the table now sits in a plain surface.
+- **Column gap:** a `w-full` player column left a 440px gap, fixed with `table-fixed` and set widths.
+- **Hidden tab line:** the tablist's `overflow-x-auto` clipped the selected tab's `-mb-px` accent line, so the rule moved inside the scroller.
+
+**Changes**
+
+- New:
+  - [`src/utils/leaderboardFormat.js`](src/utils/leaderboardFormat.js) and its test
+  - [`src/components/Leaderboard/LeaderboardRow.jsx`](src/components/Leaderboard/LeaderboardRow.jsx)
+  - [`src/hooks/useLeaderboard.test.js`](src/hooks/useLeaderboard.test.js)
+  - [`src/pages/Leaderboards.test.jsx`](src/pages/Leaderboards.test.jsx)
+- Edited:
+  - `src/components/Leaderboard/Leaderboard.jsx` and its test, `src/hooks/useLeaderboard.js` and `src/pages/Leaderboards.jsx`;
+  - `README.md` (test count) and `PLAN-UI.md`.
+
+**Verification**
+
+- Lint, format check, tests (255, up from 236) and build pass.
+- `lint.mjs --app`: 0 FAIL, 0 WARN.
+- `inspect.mjs --app`: 0 FAIL, 3 WARN, each explained in PLAN-UI:
+  - the skip-link false positive;
+  - the space between a two-row board and the footer.
+- **Headless Chrome:** the empty, signed-out, error, loading and retried states (request interception), and all five themes.
+- **Not run:** the signed-in paths, Profile's Best Matches, and the Vercel preview. They're listed as user checks.
+
+### Interaction 6 — U4 approved and committed
+
+**User Prompt**
+
+> browser checks passed. commit U4
+
+**Agent Outcome**
+
+- The user reported that U4's browser checks passed. That covers the signed-in paths and Profile's Best Matches through the new table, which headless Chrome couldn't reach.
+- U4 is marked Done in PLAN-UI.md and committed on `refactor/UI` with Interactions 5–6.
+- U5 (Profile) is next. It opens with the open decision on how to check the signed-in screens.

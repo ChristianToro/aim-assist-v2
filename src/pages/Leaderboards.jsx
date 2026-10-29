@@ -1,56 +1,101 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
+import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import GoogleSignInButton from '../components/GoogleSignInButton/GoogleSignInButton'
 import Leaderboard from '../components/Leaderboard/Leaderboard'
 import { useAuth } from '../hooks/useAuth'
 import { useLeaderboard } from '../hooks/useLeaderboard'
 
+// Each view's window, in words (the boards reset on UTC days).
 const VIEWS = [
-  { id: 'all', label: 'All Time', empty: 'No scores yet — be the first!' },
-  { id: 'daily', label: 'Today', empty: 'No scores today yet.' },
-  { id: 'weekly', label: 'This Week', empty: 'No scores this week yet.' },
+  {
+    id: 'all',
+    label: 'All Time',
+    scope: "Each player's best score of all time.",
+    empty: 'No scores yet. Be the first!',
+  },
+  {
+    id: 'daily',
+    label: 'Today',
+    scope: "Each player's best score today. Resets at 00:00 UTC.",
+    empty: 'No scores today yet.',
+  },
+  {
+    id: 'weekly',
+    label: 'This Week',
+    scope: "Each player's best score this week. Resets Monday at 00:00 UTC.",
+    empty: 'No scores this week yet.',
+  },
   {
     id: 'personal',
     label: 'Personal Best',
+    scope: 'Your best matches, across every mode.',
     empty: 'Play a match to set your first record.',
   },
 ]
 
+// Underline tabs on one rule; the chosen label carries the accent line,
+// drawn over the rule's last pixel row.
 const tabClass = (isActive) =>
-  `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+  `relative border-b py-2 text-ui font-medium whitespace-nowrap transition-colors ${
     isActive
-      ? 'bg-surface text-heading'
-      : 'text-muted hover:bg-surface hover:text-heading'
+      ? 'border-accent text-heading'
+      : 'border-transparent text-muted hover:text-heading'
   }`
 
 const SignInPrompt = () => (
-  <Card className="flex flex-col items-center gap-4 py-12 text-center">
-    <p className="text-muted">Sign in to track your personal best scores.</p>
-    <GoogleSignInButton />
+  <Card className="flex flex-wrap items-center justify-between gap-4">
+    <p className="text-ui text-body">Sign in to see your best matches.</p>
+    <GoogleSignInButton variant="inverse" size="sm" />
   </Card>
 )
 
 const Leaderboards = () => {
   const { user } = useAuth()
   const [view, setView] = useState('all')
-  const { entries, error, isLoading } = useLeaderboard(view, user?.uid)
+  const { entries, error, isLoading, reload } = useLeaderboard(view, user?.uid)
+  const idPrefix = useId()
 
   const activeView = VIEWS.find(({ id }) => id === view)
-  const needsSignIn = view === 'personal' && !user
+  const isPersonal = view === 'personal'
+  const tabId = (id) => `${idPrefix}-tab-${id}`
+  const panelId = `${idPrefix}-panel`
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <h1 className="text-3xl font-semibold tracking-tight text-heading">
-        Leaderboards
-      </h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-title font-medium tracking-tight text-heading">
+            Leaderboards
+          </h1>
+          <p className="mt-1 text-ui text-muted">{activeView.scope}</p>
+        </div>
+        {user && (
+          <Button to="/play" variant="secondary" size="sm">
+            Play a match
+          </Button>
+        )}
+      </div>
 
-      <div className="mt-6 flex flex-wrap gap-1" role="tablist">
+      <div
+        role="tablist"
+        aria-label="Leaderboard period"
+        className="relative mt-6 flex gap-6 overflow-x-auto"
+      >
+        {/* The rule sits inside the scroller, so the scroller can't clip the
+            selected tab's line where the two overlap. */}
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 h-px bg-edge"
+        />
         {VIEWS.map(({ id, label }) => (
           <button
             key={id}
+            id={tabId(id)}
             type="button"
             role="tab"
             aria-selected={view === id}
+            aria-controls={panelId}
             className={tabClass(view === id)}
             onClick={() => setView(id)}
           >
@@ -59,8 +104,13 @@ const Leaderboards = () => {
         ))}
       </div>
 
-      <div className="mt-4">
-        {needsSignIn ? (
+      <div
+        id={panelId}
+        role="tabpanel"
+        aria-labelledby={tabId(view)}
+        className="mt-6"
+      >
+        {isPersonal && !user ? (
           <SignInPrompt />
         ) : (
           <Leaderboard
@@ -69,6 +119,9 @@ const Leaderboards = () => {
             error={error}
             emptyMessage={activeView.empty}
             highlightUid={user?.uid}
+            onRetry={reload}
+            withSummary
+            personal={isPersonal}
           />
         )}
       </div>

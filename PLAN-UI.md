@@ -55,7 +55,7 @@ The first target is the landing page:
 | U1 | Done | **Gating + shared sign-in button.** Logic only, with tests: `GoogleSignInButton`, nav links shown only to signed-in users, `/play` behind `ProtectedRoute`, and the Start Training tooltip. | `src/App.jsx`, `Navbar`, `Home.jsx`, `GoogleSignInButton/`, `Tooltip/` |
 | U2 | Done | **Landing + shell restyle (taste-skill).** Hero with the image, game modes, a leaderboard social-proof section, the CTA, and Navbar, Footer, Button and Card restyled to the dealt type and composition. | `Home.jsx`, `src/components/landing/`, `src/index.css`, `Button`, `Card`, `Navbar`, `Footer` |
 | U3 | Done | **App style + Settings.** Record the "before" `inspect.mjs --app` baseline of the four app screens (Play and Profile by the agreed signed-in method). Deal the app style (`--keep palette,type`) for the user to choose. Port its tokens into `src/index.css` (panels, small labels, tabs, controls). Restyle Settings: the theme picker and the system-preference notes, laid out as a settings screen (app-screens §8). | `src/index.css`, `Settings.jsx`, `ThemePicker` |
-| U4 | Planned | **Leaderboards.** The view tabs as app tabs, the `Leaderboard` table to the app's table rules (figures right-aligned in tabular numerals, the player's own row marked, quiet dividers), and the Personal Best sign-in prompt. Every state: loading, empty per view, error and signed out. | `Leaderboards.jsx`, `Leaderboard` |
+| U4 | Done | **Leaderboards.** The view tabs as app tabs, the `Leaderboard` table to the app's table rules (figures right-aligned in tabular numerals, the player's own row marked, quiet dividers), and the Personal Best sign-in prompt. Every state: loading, empty per view, error and signed out. | `Leaderboards.jsx`, `Leaderboard` |
 | U5 | Planned | **Profile.** Settle the signed-in check first. Then `ProfileCard` and `StatTile`, the two AI insight panels (`InsightPanel`, `HardwareInsight` and `PlatformInsight`, including their loading, empty and error states), and Best Matches through U4's table. The screen's one question decides what's biggest. | `Profile.jsx`, `ProfileCard`, `StatTile`, `InsightPanel`, `HardwareInsight`, `PlatformInsight` |
 | U6 | Planned | **Play.** The mode picker, the match controls, the HUD, the idle and paused overlays on the canvas, `ResultsModal` (its save status included) and the session history. No engine changes. `Modal`'s backdrop blur and large shadow go, per the house rules. | `Play.jsx`, `ModePicker`, `GameArea`, `GameHud`, `Modal`, `ResultsModal`, `SessionHistory` |
 | U7 | Planned | **NotFound, shared states and the final pass.** NotFound in the landing direction. `LoadingScreen` and `LoadingSpinner` matched to the app style. Remove `PagePlaceholder`, which nothing imports. Then a whole-app pass: all five themes, reduced motion, increased contrast, the bundle against U2's numbers, the Vercel preview, and ARCHITECTURE.md and README.md updated. | `NotFound.jsx`, `LoadingScreen`, `LoadingSpinner`, `PagePlaceholder/`, docs |
@@ -343,6 +343,107 @@ These behaviour changes come with tests and are kept separate, so U2's diff is d
   3. Turn on reduced motion or increased contrast in the OS: the row's value changes to On without a reload.
   4. Mute sound on `/play`, then open `/settings`: Sound reads Off.
 - *2026-10-28, user report: all four browser checks passed, including the navbar's accent line signed in.*
+
+## U4 detail
+
+The *Data terminal* sheet from U3 applies, with its `list` screen pattern.
+
+1. **Notes** (app-screens §2.1–2.2), in `.taste-skill/app/notes.md`:
+   - **Inventory:** each row holds a rank, player (name, avatar), mode, score, accuracy, reaction time (nullable) and date. The public boards hold up to 100 players, one row each. Personal Best holds the player's own 10 best matches.
+   - **The one question:** "Who leads this board, and where do I stand?"
+2. **One departure:** the sheet's `list` pattern puts count cards above the list as filters. The four views are periods, not types, and counting them would take four queries, so they become **underline tabs** on a full-width rule (§4.4), with the selection line under the chosen label.
+3. **Pure helpers** in `src/utils/leaderboardFormat.js`, with tests:
+   - Formatting: scores with thousands separators, accuracy to one decimal, reaction time in ms or a grey dash, dates in ISO form.
+   - Ranks as ordinals.
+   - **`boardSummary`**, the board's finding: "A leads with 13,125 in Speed. You're 2nd of 2."
+4. **`useLeaderboard`** returns `reload`, so a failed board can offer Retry (tested).
+5. **`Leaderboard` table** (§7):
+   - Sentence-case 12px headers and quiet row rules. Figures are right-aligned and tabular. A header that sticks while scrolling the 100-row board.
+   - The finding as the table's caption.
+   - The player's own row carries a neutral "You" tag instead of a tint.
+   - Below `lg`, the secondary columns fold into a grey second line under the name.
+   - **States, all inside the frame with its header:**
+     - Loading: grey bars at the rows' real size, replacing the spinner.
+     - Empty: one sentence across the table.
+     - Error: one sentence and a Retry text button.
+6. **`Leaderboards` page:**
+   - A title row with a line naming each view's window (the UTC resets). Signed in, it adds a "Play a match" action.
+   - The underline tabs, with `tabpanel` semantics.
+   - The Personal Best sign-in prompt in the same frame.
+   - Profile keeps working through the same component. Its own layout waits for U5.
+7. **Gate:** lint, format check, tests and build; `lint.mjs --app` and `inspect.mjs --app` on `/leaderboards` at 0 FAIL; five themes, the phone, and every state seen in the browser; the §2.7 critique questions answered.
+8. Stop for review.
+
+### As built
+
+- **`utils/leaderboardFormat.js`** (new): `formatScore`, `formatAccuracy`, `formatReactionMs` (separators, null kept), `formatDay` (ISO, local), `ordinal` (`Intl.PluralRules`) and `boardSummary`. Examples:
+  - A visitor: "Ada leads with 13,125 in Speed. 3 players on this board."
+  - A ranked player: "… You're 3rd of 3."
+  - The leader: "You lead with …"
+  - Personal Best: "Your best is 13,125 in Speed."
+- **`useLeaderboard`:** the attempt count is part of the request key, so `reload()` shows the board as loading and refetches.
+- **`Leaderboard`**, split into the frame (`Leaderboard.jsx`) and `LeaderboardRow.jsx`:
+  - **Layout:**
+    - A plain `bg-surface` frame. `Card`'s `p-5` had been beating the `p-0` passed to it, which inset the old table by 20px.
+    - `table-fixed` with set widths, so spare width spreads across the columns. Round 1 had left a 440px gap after the player's name.
+  - **Header:** 12px sentence case, sticky.
+  - **Columns:** Rank, Player, Mode, Score, Accuracy, Reaction (new: the API already sent it) and Date (ISO).
+  - **The player's own row** carries a neutral "You" tag.
+  - **Folding:** Mode and Accuracy fold into the name's grey second line below `sm`, Reaction and Date below `lg`.
+  - **States:**
+    - Loading: five placeholder rows plus a caption bar, and an `sr-only` status.
+    - Empty: one sentence across the table.
+    - Error: the old messages plus Retry.
+  - **Finding:** the caption, only with `withSummary`. Profile doesn't use it yet.
+- **`Leaderboards` page:**
+  - A title row with each view's window ("… Resets Monday at 00:00 UTC.") and, signed in, a "Play a match" link.
+  - Underline tabs with `aria-controls` and a labelled `tabpanel`.
+  - **The tab rule** sits inside the scrolling tablist: on round 2's screenshots, `overflow-x-auto` had clipped the selected tab's `-mb-px` accent line.
+  - The signed-out Personal Best prompt sits in the same frame. Its button moved from the accent fill to `inverse`: the style keeps the accent to a line, and `inverse` still stands apart from the surface.
+- **Tests:** 255, up from 236:
+  - `leaderboardFormat` (10);
+  - `useLeaderboard` (3, the first tests for the hook);
+  - `Leaderboard` (from 5 to 8: Retry, loading frame, caption, the "You" tag, formatted figures);
+  - the `Leaderboards` page (3: tabs and windows, the signed-out prompt, the Play link).
+
+### U4 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (255) and `npm run build` pass. **Bundle:** entry chunk 3.48 kB gzip, `Leaderboards` 1.20 kB, `Leaderboard` 2.16 kB, CSS 8.32 kB gzip.
+- `lint.mjs --app` over the page and `Leaderboard/`: **0 FAIL, 0 WARN.**
+- `inspect.mjs --app` on `/leaderboards` (production build, live data through `vercel dev`): **0 FAIL, 3 WARN.** Measured Onest at 12/14/26px and the h1 at 26/23/22px.
+  - `unused-canvas`: the skip-link false positive (see U3).
+  - `blank-gap` and `hero-void`: the space between a two-row board and the footer, which `min-h-svh` holds at the window's foot. The board stays at its real size (app-screens §10: design for the data the account has). The baseline carried both WARNs, with a 488px gap.
+- **States in headless Chrome** (a scratchpad script with request interception):
+  - Today shows "No scores today yet." under the header.
+  - Personal Best signed out shows the prompt.
+  - A failed request shows the outage sentence and Retry.
+  - Retry with the request held shows the placeholder rows and `aria-busy="true"`.
+  - Releasing the request shows the board.
+- **All five themes:** full-page screenshots. Contrast as in U3: every text pair is 4.8:1 or more. The accent line is 3.7:1 or more on the surface, and the tab line on `--bg` is higher.
+- **Phone and tablet:** the second line carries the folded columns. At 390px it wraps to two grey lines under the name, and nothing is dropped.
+- **Critique** (§2.7):
+  - The table is the biggest block, and its caption answers the question just before the rows.
+  - The edges line up: the title, tabs, frame and footer share the 168px margins.
+  - Colour appears only on the tab line and the players' own avatars.
+  - Figures are right-aligned, tabular and separated, and a missing reaction time is a grey dash.
+- **Before and after** (`/leaderboards`):
+
+  | Measure | Before | After |
+  |---|---|---|
+  | Inspector | 0 FAIL, 4 WARN | 0 FAIL, 3 WARN (explained above) |
+  | Title | 30px everywhere, faux-bold 600 | 26/23/22px, Onest 500 |
+  | Tabs | filled pills | underline tabs, the accent line on the chosen one |
+  | Table | uppercase tracked headers, "13125", locale dates, a cyan rank on the top 3 | sentence-case headers, "13,125", ISO dates, reaction time, a grey rank |
+  | Loading | a spinner | the table's own frame with placeholder rows |
+  | Error | a tinted card, no way to retry | one sentence in the frame and Retry |
+
+- **Not run:** signed-in paths (the "You" tag, the standing sentence, Personal Best rows, the Play link) in a real browser. Profile's Best Matches through the new table. The Vercel preview.
+- **Browser checks (user),** under `npm run dev:full`:
+  1. Signed out: each tab's window line, the empty Today board, the Personal Best prompt and its sign-in.
+  2. Signed in: your row tagged "You", the caption's standing ("You're 2nd of 2." or "You lead …"), Personal Best rows with "Your best is …", and "Play a match" opening `/play`.
+  3. Profile → Best Matches still renders through the new table. Its own layout comes in U5.
+  4. Optional: stop `vercel dev` while the page is open, switch tabs to see the error, restart it, and press Retry.
+- *2026-10-28, user report: the browser checks passed, including the signed-in paths and Profile's Best Matches through the new table.*
 
 ## Verification (every gate)
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getPersonalBestScores, getTopScores } from '../services/leaderboard'
 
 /*
@@ -7,18 +7,21 @@ import { getPersonalBestScores, getTopScores } from '../services/leaderboard'
  *
  * Loading state is derived by comparing the requested key against the
  * key of the last landed result — no synchronous setState in effects.
+ * `reload()` bumps the attempt counter, part of the key, so a retry shows
+ * as loading and refetches.
  */
 export const useLeaderboard = (view, uid = null) => {
   const [result, setResult] = useState({ key: null, entries: [], error: null })
+  const [attempt, setAttempt] = useState(0)
 
   const needsAuth = view === 'personal' && !uid
-  const key = `${view}:${uid ?? ''}`
+  const key = `${view}:${uid ?? ''}:${attempt}`
 
   useEffect(() => {
     if (view === 'personal' && !uid) return undefined
 
     let cancelled = false
-    const requestKey = `${view}:${uid ?? ''}`
+    const requestKey = `${view}:${uid ?? ''}:${attempt}`
     const request =
       view === 'personal' ? getPersonalBestScores() : getTopScores(view)
 
@@ -34,14 +37,17 @@ export const useLeaderboard = (view, uid = null) => {
     return () => {
       cancelled = true
     }
-  }, [view, uid])
+  }, [view, uid, attempt])
 
-  if (needsAuth) return { entries: [], error: null, isLoading: false }
+  const reload = useCallback(() => setAttempt((n) => n + 1), [])
+
+  if (needsAuth) return { entries: [], error: null, isLoading: false, reload }
 
   const isCurrent = result.key === key
   return {
     entries: isCurrent ? result.entries : [],
     error: isCurrent ? result.error : null,
     isLoading: !isCurrent,
+    reload,
   }
 }
