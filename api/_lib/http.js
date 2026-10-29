@@ -1,6 +1,11 @@
 import { AuthError } from './verifier.js'
 
 const BAD_REQUEST = 400
+const PAYLOAD_TOO_LARGE = 413
+
+// Every JSON body today is a few hundred bytes. A route that takes more
+// (a match's event log) passes its own limit to readJson.
+const DEFAULT_MAX_BODY_BYTES = 16 * 1024
 
 // Every response is per user or must reflect a just-saved score, so
 // neither the browser nor Vercel's CDN may cache it.
@@ -23,9 +28,23 @@ export const badRequest = (message, details) =>
 export const json = (body, { status = 200, headers = {} } = {}) =>
   Response.json(body, { status, headers: { ...headers, ...NO_STORE } })
 
-export const readJson = async (request) => {
+const tooLarge = (maxBytes) =>
+  new HttpError(PAYLOAD_TOO_LARGE, 'Body too large', { maxBytes })
+
+// Parses a JSON body of at most maxBytes. A declared Content-Length over
+// the limit is refused before reading; the bytes read are checked too,
+// since the header can be absent (chunked) or wrong.
+export const readJson = async (
+  request,
+  { maxBytes = DEFAULT_MAX_BODY_BYTES } = {}
+) => {
+  if (Number(request.headers.get('content-length')) > maxBytes) {
+    throw tooLarge(maxBytes)
+  }
+  const body = await request.arrayBuffer()
+  if (body.byteLength > maxBytes) throw tooLarge(maxBytes)
   try {
-    return await request.json()
+    return JSON.parse(new TextDecoder().decode(body))
   } catch {
     throw badRequest('Body must be valid JSON')
   }

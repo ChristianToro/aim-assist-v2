@@ -473,3 +473,382 @@ The user chose the faked session over driving their own signed-in Chrome.
   - **Merge Danger:** a two-way door with a UI-wide blast radius.
 - **Also noted in the body:** the branch carries one docs-only v2 commit (`de1ac72`), and the Vercel preview of this branch is still unchecked.
 - The PR wasn't opened by the agent. This entry is uncommitted.
+
+---
+
+## Session: 2026-10-29 (second)
+
+**Objective:** Take a situation report of the repository against its plans after the UI refactor merged.
+
+### Interaction 1 — SITREP after the `refactor/UI` merge
+
+**User Prompt**
+
+> /prompt-history /sitrep
+
+**Agent Outcome**
+
+- **Read-only report**, no code changed. `main` is clean and level with `origin/main` at `e19a821` (PR #2, `refactor/UI` merged).
+- **Against plan:** PLAN-V2.md M0–M9 and PLAN-UI.md U0–U7 are all marked Done; `refactor/UI` has no commits beyond `main`.
+- **Open items found:**
+  - The Vercel preview / production check for the restyle is still listed as not run in PLAN-UI.md's U7 verification (user check 5).
+  - No plan file covers the next work. README's "Which features considered next?" list leads with server-authoritative scoring, the open action item carried in this file's header.
+- **Verification:** code and docs inspected; tests not run.
+
+### Interaction 2 — Plan for server-checked scoring, from an audit
+
+**User Prompt**
+
+> We are going to address the open action item; move the current changes onto branch `hotfix/server-checked-scoring` to leave main unchanged.
+>
+> Here is an audit report supplied by a trusted source: *(a black-box security and architecture audit of the deployed app: F1, High, `POST /api/scores` trusts client-computed scores "without … strict bounds checking"; F2, Medium, API routes lack server-side schema validation; remedies: Zod on every route and server-side telemetry verification)*
+>
+> write a plan to address the vulnerabilities
+
+**Agent Outcome**
+
+- **Branch:** `hotfix/server-checked-scoring` created from `main` with Interaction 1's uncommitted entry; `main` is unchanged.
+- **Audit checked against the code** before planning:
+  - **F1 holds**, in part: bounds exist (`scoreInput.js` and the `CHECK`s) but are mode-blind sanity limits, so 9,999,999 passes them.
+  - **F2 doesn't hold:** every route already validates its input with tested pure functions (`parseSetup` bounds DPI and enumerates polling rates).
+  - The one real validation gap found: `readJson` has no body-size limit.
+- **PLAN-SCORING.md** (new), milestones S0–S5. The server issues a match (`POST /api/matches`) and computes the score itself from the match's event log, with a shared pure `scoreEvents` in `src/game/scoring.js`. Plausibility checks come from each mode's spawn configuration plus wall-clock time since the match was issued.
+- **Rejected:**
+  - Zod: a dependency that adds no check the existing validators lack.
+  - Full deterministic replay: an engine rewrite, and a bot can still forge input.
+  - Bounds only: a cheater would just post each mode's maximum.
+  - A signed JWT ticket: a second secret, and single use still needs a table.
+- **Stated limit:** this makes impossible scores unrepresentable; it doesn't prove a human played.
+- **Open for the user at S0:** what to do with legacy rows that have no `match_id`, and whether to accept breaking old clients on deploy.
+- **Verification:** none run; this is a plan, built from reading `api/`, `src/game/` and `db/migrations/`.
+
+### Interaction 3 — S0: choices settled, docs updated; stopped at the review gate
+
+**User Prompt**
+
+> go with both recommendations; execute S0
+
+**Agent Outcome**
+
+- **Settled** in PLAN-SCORING.md's new "Settled at S0" table:
+  - **Legacy rows stay** on the boards. S5's read-only report lists any that fail the new bounds, for the user to delete in the Neon Console.
+  - **The old client's body is rejected** once S4 deploys, with no legacy submission path.
+- **CLAUDE.md:**
+  - PLAN-SCORING.md leads the document list. PLAN-UI.md stays listed, marked done, for its design rules.
+  - The workflow names `hotfix/server-checked-scoring`.
+  - The gameplay stack row no longer says the engine is unchanged from v1.
+- **PLAN-SCORING.md:** S0 is at Review, with an S0 detail and verification section.
+
+**Verification**
+
+- Docs only, so lint, tests and build weren't run.
+- `npm run format:check` passes, but `.prettierignore` excludes `*.md`, so it doesn't check these files.
+- CLAUDE.md's document links resolve.
+
+**Collaboration**
+
+- S0 stopped at the review gate. Nothing is committed: `CLAUDE.md`, `PROMPT-HISTORY.md` and the new `PLAN-SCORING.md` are uncommitted on `hotfix/server-checked-scoring`.
+
+### Interaction 4 — S0 approved and committed
+
+**User Prompt**
+
+> commit S0
+
+**Agent Outcome**
+
+- S0 is marked Done in PLAN-SCORING.md and committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S1, the shared scoring function and the client's event log, when the user says so.
+
+---
+
+## Session: 2026-10-29 (third)
+
+**Objective:** S1 of PLAN-SCORING.md: the shared scoring function and the client's match event log.
+
+### Interaction 1 — SITREP before S1
+
+**User Prompt**
+
+> /sitrep
+
+**Agent Outcome**
+
+- **Read-only report**, no code changed. The branch is clean and in sync with `origin/hotfix/server-checked-scoring`. S0 is done; S1–S5 aren't started, and the code agrees (no `scoring.js`, no `readJson` limit, migrations stop at `003`).
+- **Found:** PLAN-SCORING.md's Workflow said the branch had no upstream, but it already tracks one.
+- **Verification:** code inspected; tests not run.
+
+### Interaction 2 — S1: shared scoring and the event log; stopped at the review gate
+
+**User Prompt**
+
+> execute S1
+
+**Agent Outcome**
+
+- **`src/game/scoring.js`** (new): `targetValueAt(mode, spawnedAtMs)`, `applyEvent(scores, mode, event)` and `scoreEvents(mode, events)`. It loads in plain Node, so `/api` can import it in S4.
+- **`GameSession`** logs `{ t, kind, spawnedAt? }` for every hit, miss and expiry through `record`, which scores the event via `applyEvent`. Its game-over summary is `scoreEvents`' replay of the log, plus the log as `events`.
+- **Clicks and expiries are stamped before the frame advances time.** A hit's `t − spawnedAt` then equals its target's age, and a timed mode's `t` never passes its duration.
+- **A target's value lives only in `targetValueAt`:** `Spawner.targetValue` and `Target.value` were removed, and targets carry `spawnedAt` instead.
+- **`ScoreManager.registerHit(value, reactionMs)`** replaces `registerHit(target)`.
+- **`readJson`** has a 16 KB default limit, overridable per route, and answers 413 past it.
+- PLAN-SCORING.md: S1 is at Review, with an S1 detail section, and the stale upstream line is fixed. ARCHITECTURE.md's engine table lists `scoring.js`.
+
+**Rationale**
+
+- The live HUD and the replay share `applyEvent`, and the target value has a single definition. Client and server would otherwise each compute a score and could drift apart.
+- `targetValueAt` takes ms, not the plan's seconds, so it uses the log's own unit.
+
+**Changes**
+
+- New: [`src/game/scoring.js`](src/game/scoring.js), [`src/game/scoring.test.js`](src/game/scoring.test.js), [`src/game/GameSession.test.js`](src/game/GameSession.test.js).
+- Changed: `GameSession.js`, `ScoreManager.js` and its test, `Spawner.js`, `Target.js`, `api/_lib/http.js` and its test, `ARCHITECTURE.md`, `PLAN-SCORING.md`.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (306 tests) and `npm run build` pass.
+- Scripted Gridshot and Survival sessions (Survival past its 90 s ramp) reproduce the live HUD's figures from the log.
+- Not run: a hand-played match in the browser.
+
+**Collaboration**
+
+- Stopped at the review gate; nothing is committed.
+
+### Interaction 3 — S1 approved and committed
+
+**User Prompt**
+
+> browser check passes: result screen shows identical score as final HUD. commit S1
+
+**Agent Outcome**
+
+- S1 is marked Done in PLAN-SCORING.md. Its verification now records the user's browser check in place of "not run".
+- S1 is committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S2, the plausibility checks in `api/_lib/matchCheck.js`, when the user says so.
+
+**Verification**
+
+- The user hand-played a match in the browser: the results screen's score matched the final HUD's.
+
+### Interaction 4 — S2: plausibility checks built; paused for calibration logs
+
+**User Prompt**
+
+> Pushed, working tree is clean. Execute S2
+
+**Agent Outcome**
+
+- **`api/_lib/matchCheck.js`** (new, pure): `checkMatch({ mode, events, elapsedMs })` returns the names of the failed rules. The rules are `order`, `expiry`, `hitTiming`, `spawnRate`, `clickRate`, `reaction`, `duration`, `tooEarly`, `missLimit` and `clock`.
+- **`src/game/difficulty.js`** (new): Survival's ramp, `rampProgress` and `settingAt(mode, setting, base, ms)`, moved out of `GameSession.applyDifficulty`. `targetValueAt` uses it too, so the server checks a log against the engine's exact lifespans and spawn intervals.
+- **`spawnRate` replaces the plan's hit-count bound.** The Spawner waits a full interval after each spawn, so the hit targets' spawn times, sorted, are at least the interval in force at the later one apart. That's stricter than the count bound, and it also catches a target hit twice.
+- **`src/game/testing/playMatch.js`** (new, test-only): a scripted player, with a 0.3 s minimum reaction, that both `GameSession.test` and `matchCheck.test` use.
+- **Calibration:** a temporary dev-only `window.matchLogs` collector in `GameArea`, to be removed before review. The thresholds are still the plan's starting values.
+
+**Verification**
+
+- `matchCheck.test.js` has 22 tests: a played match in each mode passes, and each rule fails by name on a mutated or fabricated log, including a 9,999,999 one. The randomized match tests passed on 15 of 15 reruns.
+
+**Collaboration**
+
+- Waiting for the user to play real matches and export their logs.
+
+### Interaction 5 — S2 calibrated against real matches; stopped at the review gate
+
+**User Prompt**
+
+> logs saved to api/_lib/fixtures/real-matches.json
+
+**Agent Outcome**
+
+- **All six real matches** (one per mode) pass every rule.
+  - Peak click rate: 8/s against the cap of 15.
+  - Lowest average reaction: 648 ms against the floor of 120 ms (fastest single hit 366 ms).
+  - **Thresholds unchanged:** they target inhuman logs, and one player's data can't justify tightening them toward faster players.
+- **The 1 ms rounding slack is needed:** two of the real Survival match's hit spawns were 0.01 ms closer than the spawn interval.
+- **The real logs became the test fixture.** `matchCheck.test.js` passes each one, and checks that the fixture covers every mode. `api/_lib/fixtures` is in `.prettierignore`, so the file stays as exported.
+- **The temporary `window.matchLogs` collector was removed.** `GameArea.jsx` has no diff against the S1 commit.
+- **Also added:** `difficulty.test.js`; ARCHITECTURE.md lists `difficulty.js` and `matchCheck.js`; PLAN-SCORING.md has S2 at Review, with a rule table and calibration notes.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (339 tests) and `npm run build` pass.
+- The wall-clock tolerance is still uncalibrated. It needs S3's `started_at`, and is checked in S4.
+
+**Collaboration**
+
+- The user played the calibration matches and exported the logs. The thresholds come from their data.
+- Stopped at the review gate; nothing is committed.
+
+### Interaction 6 — S2 approved and committed
+
+**User Prompt**
+
+> commit S2
+
+**Agent Outcome**
+
+- S2 is marked Done in PLAN-SCORING.md and committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S3, the `matches` table and `POST /api/matches`, when the user says so.
+
+### Interaction 7 — S3: matches table and `POST /api/matches`; stopped at the review gate
+
+**User Prompt**
+
+> execute S3
+
+**Agent Outcome**
+
+- **`004_matches.sql`:** the `matches` table (uuid id, user, mode, `started_at`, `expires_at`, `submitted_at`, with `CHECK`s) and `scores.match_id`.
+  - **Deviation from the plan:** a composite foreign key `(match_id, user_id, mode)` → `matches`, in place of a plain `match_id` reference. The database itself then refuses a score whose player or mode differs from its match's.
+- **New modules:**
+  - `matchPolicy.js`: the limit, ticket lifetimes and the body parser.
+  - `rateLimit.js`: the window arithmetic, extracted from `insightPolicy.js`, which now uses it.
+  - `matchStore.js`, wired in `db.js`.
+  - `matchIssue.js`: the 20-per-10-minutes limit, a 429 with `Retry-After`.
+  - The route `api/matches.js`, and `services/matches.js` (`startMatch`), which nothing calls yet.
+- **Docs:** ARCHITECTURE.md has the route, the store and the data model. PLAN-SCORING.md has S3 at Review, with two notes for S4:
+  - `scores.js` must check the constraint name once scores carry a `match_id`.
+  - `004` must be applied to Neon before S4 deploys.
+
+**Rationale**
+
+- Elapsed time is computed from the database's clock at both issue and submit, so there's no Vercel/Neon clock skew.
+- Modes are stored as labels, like `scores`, so S4 inserts the match's own mode and the composite key holds.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (360 tests) and `npm run build` pass.
+- PGlite, in a scratch directory, ran migrations `001`–`004` on a stub `neon_auth."user"`. 18 checks passed: the `CHECK`s; the composite key rejecting another mode, another player or an unknown match; `unique` rejecting a second score for one match; a legacy null `match_id` still inserting; the 21st issue refused; deleting a user cascading cleanly.
+- Not run: the route under `npm run dev:full`, which needs `004` applied to Neon.
+
+**Collaboration**
+
+- Stopped at the review gate; nothing is committed. The migration hasn't been applied to Neon; that's the user's step.
+
+### Interaction 8 — S3 approved and committed; `004` applied to Neon
+
+**User Prompt**
+
+> 004 applied, commit S3
+
+**Agent Outcome**
+
+- The user applied `004_matches.sql` to Neon. PLAN-SCORING.md records it, and marks S3 Done.
+- S3 is committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S4, which moves `POST /api/scores` onto matches and has the client request a match on Start, when the user says so.
+
+### Interaction 9 — S4: scores computed on the server from matches; paused for the manual checks
+
+**User Prompt**
+
+> Pushed, execute S4
+
+**Agent Outcome**
+
+- **`POST /api/scores` now takes `{ matchId, events }`.** `scoreInput.js` checks the shape; `matchSubmit.js` loads the caller's match (404 / 409 / 410), runs `checkMatch` with the database's elapsed time (400 naming the rules), and scores the log under the match's own mode.
+- **One statement claims and saves.** `scoreStore.insertForMatch` claims the match and inserts the score together (`with claimed as (update …) insert … select … from claimed`), so a replay finds nothing to claim.
+  - **Deviation from the plan:** not a multi-statement transaction. Neon's HTTP driver can't run `checkMatch` inside one, so the check runs first.
+- **Client:**
+  - `useMatchSave` requests a ticket on Start, in parallel with the engine, and redeems it at game over.
+  - Restart keeps the round's ticket, so restarts don't use up the 20-per-10-minutes limit.
+  - New results statuses: `unregistered` and `rejected`.
+- `api/scores.js` maps only `scores_user_id_fkey` violations to 401.
+- ARCHITECTURE.md's routes and "Saving a match" flow are rewritten. The Security note and the README are left for S5.
+- **Known limit recorded in the plan:** a player can resubmit one of their own real logs under a fresh ticket, which duplicates a score but can't raise it.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (380 tests) and `npm run build` pass.
+- PGlite, with the real stores and handlers, passed 16 checks: a real save with the computed score (ignoring `score: 9999999`), a replay 409, foreign/unknown 404, extra hits 400 `[spawnRate]`, a too-early Gridshot 400, an expired 410, the match's mode stored, a real Survival save.
+- Pending: the user's manual checks under `npm run dev:full`.
+
+**Collaboration**
+
+- Paused for the user to run the manual checks; nothing is committed.
+
+### Interaction 10 — S4 manual checks passed; approved and committed
+
+**User Prompt**
+
+> all manual checks pass, commit S4
+
+**Agent Outcome**
+
+- **The user's manual checks passed** under `npm run dev:full`, signed in:
+  - a real match in each mode saved, with the stored score equal to the results screen's
+  - replay → 409
+  - `score: 9999999` on a fresh ticket → the computed score stored
+  - doubled hits → 400 `[spawnRate]`
+  - a Gridshot submit straight after issue → 400 `[tooEarly]`
+  - the old client's body → 400
+- S4 is marked Done in PLAN-SCORING.md with these results, and committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S5, the legacy-row report and the docs (ARCHITECTURE Security note, README next features, audit response), when the user says so.
+
+**Verification**
+
+- The user ran the manual checks. The Vercel preview and production aren't checked yet; they need the push.
+
+### Interaction 11 — S5: legacy-score report and docs; stopped at the review gate
+
+**User Prompt**
+
+> Pushed, execute S5
+
+**Agent Outcome**
+
+- **`api/_lib/scoreBound.js`:** `maxPlausibleScore(mode)` is the most a log can earn and still pass `matchCheck`. It's the smaller of the spawn-limited and click-limited hit counts, × the top target value × 2. The bounds run from 5,400 (Precision) to 93,000 (Gridshot), and 9,624,000 for Survival over a 2 h ticket.
+- **`scripts/legacyScores.js` and `npm run db:legacy-report`:** a read-only report, in a Neon `READ ONLY` transaction, of legacy scores (no `match_id`) that fail the rules a row can still be held to (`score` over the bound, `reaction` under 120 ms, `noHits`). It prints a delete statement for the user to run by hand.
+- **`AUDIT-RESPONSE.md`** (new): F1 held and is fixed; F2 didn't hold; the body-size gap is closed; the remaining risk is stated.
+- **Docs:** ARCHITECTURE.md Security and Testing; README project plan, features, next features (now "Replay-proof scoring"), engineering notes, diagram, scripts and test count; CLAUDE.md document list.
+
+**Rationale**
+
+- Legacy rows have no log, so the report holds them to bounds derived from the log rules rather than to a separate set of limits. A row is then flagged only if no passing log could have produced it.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (401 tests) and `npm run build` pass.
+- PGlite: 7 checks on the report's query (run read-only) and its verdicts for seeded legacy rows.
+- Not run: the report against Neon (the user's step).
+
+**Collaboration**
+
+- Stopped at the review gate; nothing is committed.
+
+### Interaction 12 — Legacy report run against Neon
+
+**User Prompt**
+
+> report supplied: *(output of `npm run db:legacy-report`: 25 legacy scores, 1 implausible. #32, Survival, score 1, null reaction time, fails `noHits`; with the suggested `delete … id in (32)`)*
+
+**Agent Outcome**
+
+- **Row #32 is genuinely impossible.** A null reaction time means no hits, and no hit is worth less than 100 points, so a score of 1 can't come from any match. It most likely came from a direct call to the old endpoint.
+- **Where it shows:** it's invisible on the boards, but it counts in that player's games played and average accuracy.
+- Recorded in PLAN-SCORING.md's S5 verification. Deleting it is left to the user, as settled at S0.
+
+### Interaction 13 — #32 deleted; S5 approved and committed
+
+**User Prompt**
+
+> #32 deleted, commit S5
+
+**Agent Outcome**
+
+- The user deleted legacy row #32 in the Neon Console; PLAN-SCORING.md records it.
+- S5 is marked Done and committed on `hotfix/server-checked-scoring` with this session's history. Every milestone in PLAN-SCORING.md (S0–S5) is now done.
+- **Next:** the PR body for `hotfix/server-checked-scoring` → `main`, if the user wants it.
+
+### Interaction 14 — PR body for `hotfix/server-checked-scoring` → `main`
+
+**User Prompt**
+
+> Pushed, write the PR body
+
+**Agent Outcome**
+
+- **The body:** written to the agent's scratchpad (`PR-server-checked-scoring.md`) for the user to paste when opening the PR on GitHub. It follows the `pr` skill's template:
+  - **Summary:** the request-body diff, a sequence diagram of the new save flow, and the file tree.
+  - **Evidence:** the 9,999,999 body before (201) and after (400), the user's manual checks, tests 280 → 401, the PGlite checks, and the legacy report.
+  - **Merge Danger:** a two-way door, since `004` is additive and already applied. The blast radius is score saving: stale tabs until reload, the production check of the 2 s tolerance, and the documented limits.
+- The PR wasn't opened by the agent. This entry is uncommitted.

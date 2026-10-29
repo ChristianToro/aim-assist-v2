@@ -5,7 +5,10 @@ import { findHitTarget } from './Collision'
 import { createBurst } from './Particle'
 import { FloatingText } from './FloatingText'
 import { FALLBACK_PALETTE } from './palette'
-import { lerp } from '../utils/math'
+import { applyEvent, scoreEvents } from './scoring'
+import { RAMP_FACTORS, settingAt } from './difficulty'
+
+const toMs = (seconds) => Math.round(seconds * 1000)
 
 // Sweep any list of entities with an isAlive flag, newest-safe.
 const sweepDead = (entities) => {
@@ -19,9 +22,14 @@ const sweepDead = (entities) => {
  * scoring, and a countdown. Implements the engine's scene contract.
  * Mode presets (see modes.js) fully parameterize the session.
  *
+ * Every hit, miss and expiry is recorded in an event log (see scoring.js)
+ * and scored from it, so the match's figures can be recomputed from the
+ * log alone.
+ *
  * Communication with React is one-way and event-driven:
  *   onHud(snapshot)     — on hit, miss, or displayed-second change
- *   onGameOver(summary) — once, when the match ends
+ *   onGameOver(summary) — once, when the match ends; the summary is
+ *                         scoreEvents' figures plus the log as `events`
  *
  * The one inbound channel is setPalette(), which swaps the theme colors
  * used at draw time. It deliberately isn't a rebuild: recoloring a live
@@ -43,15 +51,11 @@ export const createGameSession = ({
   const spawner = new Spawner(mode.spawner)
   const scores = new ScoreManager()
   const timer = new Timer(mode.duration)
-  // Baseline spawner values for difficulty interpolation.
-  const base = {
-    spawnInterval: spawner.spawnInterval,
-    minRadius: spawner.minRadius,
-    maxRadius: spawner.maxRadius,
-    spacing: spawner.spacing,
-    targetLifespan: spawner.targetLifespan,
-    targetValue: spawner.targetValue,
-  }
+  // Baseline spawner values for the difficulty ramp.
+  const base = Object.fromEntries(
+    Object.keys(RAMP_FACTORS).map((setting) => [setting, spawner[setting]])
+  )
+  let events = []
   let elapsed = 0
   let isOver = false
   let lastDisplayedSecond = timer.displaySeconds
@@ -68,56 +72,38 @@ export const createGameSession = ({
       ...(mode.missLimit && { lives: livesRemaining() }),
     })
 
+  // Logs an event and scores it; returns the points a hit earned.
+  const record = (event) => {
+    events.push(event)
+    return applyEvent(scores, mode, event)
+  }
+
   // Difficulty ramp (modes with a `scaling` config, e.g. Survival):
-  // as elapsed time approaches rampSeconds, targets get smaller, spawn
-  // faster and farther apart, expire sooner, and are worth more points.
+  // as the match goes on, targets get smaller, spawn faster and farther
+  // apart and expire sooner (difficulty.js). Their growing point value is
+  // scoring.js's targetValueAt, from each target's spawn time.
   const applyDifficulty = () => {
     if (!mode.scaling) return
-    const s = mode.scaling
-    const progress = elapsed / s.rampSeconds
-    spawner.spawnInterval = lerp(
-      base.spawnInterval,
-      base.spawnInterval * s.intervalFactor,
-      progress
-    )
-    spawner.minRadius = lerp(
-      base.minRadius,
-      base.minRadius * s.radiusFactor,
-      progress
-    )
-    spawner.maxRadius = lerp(
-      base.maxRadius,
-      base.maxRadius * s.radiusFactor,
-      progress
-    )
-    spawner.spacing = lerp(
-      base.spacing,
-      base.spacing * s.spacingFactor,
-      progress
-    )
-    spawner.targetLifespan = lerp(
-      base.targetLifespan,
-      base.targetLifespan * s.lifespanFactor,
-      progress
-    )
-    spawner.targetValue = Math.round(
-      lerp(base.targetValue, base.targetValue * (1 + s.valueFactor), progress)
-    )
+    const now = toMs(elapsed)
+    Object.keys(RAMP_FACTORS).forEach((setting) => {
+      spawner[setting] = settingAt(mode, setting, base[setting], now)
+    })
   }
 
   const update = (dt, size, input) => {
     if (isOver) return
 
-    elapsed += dt
-    timer.update(dt)
-    applyDifficulty()
+    // Clicks and expiries resolve against the world as last drawn, so
+    // they're stamped with its game time, before this frame advances it.
+    // A hit's reaction time (t − spawnedAt) is then its target's age.
+    const now = toMs(elapsed)
 
     // Resolve clicks first so hit targets disappear this frame.
     const clicks = input.consumeClicks()
     clicks.forEach(({ x, y }) => {
       const hit = findHitTarget(x, y, targets)
       if (hit) {
-        const points = scores.registerHit(hit)
+        const points = record({ t: now, kind: 'hit', spawnedAt: hit.spawnedAt })
         hit.destroy()
         // Under prefers-reduced-motion, keep the informative score text
         // but skip the decorative burst.
@@ -125,7 +111,7 @@ export const createGameSession = ({
         floaters.push(new FloatingText(`+${points}`, hit.x, hit.y - hit.radius))
         audio?.playHit()
       } else {
-        scores.registerMiss()
+        record({ t: now, kind: 'miss' })
         audio?.playMiss()
       }
     })
@@ -135,12 +121,16 @@ export const createGameSession = ({
     if (mode.expiryCountsAsMiss) {
       targets.forEach((target) => {
         if (target.expired) {
-          scores.registerMiss()
+          record({ t: now, kind: 'expire' })
           expiries += 1
         }
       })
       if (expiries > 0) audio?.playMiss()
     }
+
+    elapsed += dt
+    timer.update(dt)
+    applyDifficulty()
 
     // Sweep dead entities (clicked, expired, or faded out).
     sweepDead(targets)
@@ -150,7 +140,7 @@ export const createGameSession = ({
     targets.forEach((target) => target.update(dt, size))
     particles.forEach((particle) => particle.update(dt))
     floaters.forEach((floater) => floater.update(dt))
-    spawner.update(dt, size, targets)
+    spawner.update(dt, size, targets, toMs(elapsed))
 
     // Push stats to React only when something displayed changed.
     const secondChanged = timer.displaySeconds !== lastDisplayedSecond
@@ -170,7 +160,9 @@ export const createGameSession = ({
     if (timer.isFinished || outOfLives) {
       isOver = true
       audio?.playGameOver()
-      onGameOver?.(scores.summary())
+      // Replayed from the log, so the results screen shows exactly what
+      // the server will compute from the same events.
+      onGameOver?.({ ...scoreEvents(mode, events), events })
     }
   }
 
@@ -192,6 +184,7 @@ export const createGameSession = ({
     Object.assign(spawner, base) // undo any difficulty scaling
     scores.reset()
     timer.reset()
+    events = [] // a fresh array: the last summary still holds the old log
     elapsed = 0
     isOver = false
     lastDisplayedSecond = timer.displaySeconds

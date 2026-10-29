@@ -19,7 +19,7 @@ export class Target {
     y,
     radius,
     lifespan = Infinity,
-    value = 100,
+    spawnedAt = 0,
     vx = 0,
     vy = 0,
   }) {
@@ -27,7 +27,7 @@ export class Target {
     this.y = y
     this.radius = radius
     this.lifespan = lifespan
-    this.value = value
+    this.spawnedAt = spawnedAt // game-time ms; scoring derives its value
     this.vx = vx
     this.vy = vy
     this.age = 0

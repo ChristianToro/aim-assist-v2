@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import * as rateLimit from './rateLimit.js'
 
 // Fresh recommendations per player and kind in any rolling 24 hours. A
 // cached answer (same inputs as the last one) doesn't count.
@@ -7,8 +8,6 @@ export const WINDOW_MS = 24 * 60 * 60 * 1000
 
 // Fewer matches than this tell Claude too little to recommend anything.
 export const MIN_MATCHES = 5
-
-const MS_PER_SECOND = 1000
 
 const sortKeys = (value) => {
   if (Array.isArray(value)) return value.map(sortKeys)
@@ -27,14 +26,8 @@ export const inputHash = (inputs) =>
     .update(JSON.stringify(sortKeys(inputs)))
     .digest('hex')
 
-export const windowStart = (now) => new Date(now.getTime() - WINDOW_MS)
+export const windowStart = (now) => rateLimit.windowStart(now, WINDOW_MS)
 
-// Whole seconds until the oldest generation in the window ages out,
-// which frees the next slot. At least 1, for a Retry-After header.
+// When the next fresh recommendation is allowed (rateLimit.js).
 export const retryAfterSeconds = (oldestAt, now) =>
-  Math.max(
-    1,
-    Math.ceil(
-      (new Date(oldestAt).getTime() + WINDOW_MS - now.getTime()) / MS_PER_SECOND
-    )
-  )
+  rateLimit.retryAfterSeconds(oldestAt, now, WINDOW_MS)

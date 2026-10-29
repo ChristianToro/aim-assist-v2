@@ -5,45 +5,33 @@ vi.mock('./api', () => ({ apiFetch: mockApiFetch }))
 
 import { saveMatchResult, toScoreSubmission } from './scores'
 
-// A ScoreManager.summary(), with the fields the server doesn't store.
-const summary = {
-  score: 4200,
-  hits: 40,
-  misses: 6,
-  combo: 3,
-  maxCombo: 18,
-  multiplier: 1.3,
-  accuracy: 86.95652173913044,
-  averageReactionMs: 412,
-  bestReactionMs: 201,
-  worstReactionMs: 903,
-}
+const MATCH_ID = '6f1c2a9e-3b4d-4e5f-8a6b-7c8d9e0f1a2b'
+const EVENTS = [
+  { t: 900, kind: 'hit', spawnedAt: 50 },
+  { t: 1200, kind: 'miss' },
+]
 
 beforeEach(() => mockApiFetch.mockReset())
 
 describe('toScoreSubmission', () => {
-  it('keeps only the fields the server validates', () => {
-    expect(toScoreSubmission('Gridshot', summary)).toEqual({
-      mode: 'Gridshot',
-      score: 4200,
-      accuracy: 86.95652173913044,
-      reactionTime: 412,
+  it('sends the ticket and the log, never a score', () => {
+    expect(toScoreSubmission(MATCH_ID, EVENTS)).toEqual({
+      matchId: MATCH_ID,
+      events: EVENTS,
     })
-  })
-
-  it('passes a null reaction time through for a match with no hits', () => {
-    const noHits = { ...summary, averageReactionMs: null }
-    expect(toScoreSubmission('Flick', noHits).reactionTime).toBeNull()
   })
 })
 
 describe('saveMatchResult', () => {
   it('posts the submission with the session token', async () => {
-    mockApiFetch.mockResolvedValue({ id: '7', createdAt: '…' })
-    await saveMatchResult({ mode: 'Gridshot', summary })
+    const stored = { id: '7', createdAt: '…', score: 100 }
+    mockApiFetch.mockResolvedValue(stored)
+    await expect(
+      saveMatchResult({ matchId: MATCH_ID, events: EVENTS })
+    ).resolves.toEqual(stored)
     expect(mockApiFetch).toHaveBeenCalledWith('/api/scores', {
       method: 'POST',
-      body: toScoreSubmission('Gridshot', summary),
+      body: toScoreSubmission(MATCH_ID, EVENTS),
       auth: true,
     })
   })

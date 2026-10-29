@@ -52,9 +52,11 @@ Plain ES classes with no React and no DOM beyond the canvas they're given.
 | Module | Owns |
 |---|---|
 | `GameEngine` | The `requestAnimationFrame` loop and its lifecycle API (`attach`, `start`, `pause`, `resume`, `stop`, `reset`). Delta time is clamped, so a backgrounded tab can't cause one huge physics step. |
-| `GameSession` | One match of one mode: spawning, scoring, the countdown or miss limit. It implements the engine's scene contract. |
+| `GameSession` | One match of one mode: spawning, the countdown or miss limit, and the match's event log (each hit, miss and expiry, stamped in game time). It implements the engine's scene contract. |
 | `Spawner`, `Target`, `Collision` | Non-overlapping placement (rejection sampling), target motion and lifetime, and hit-testing against the full radius. |
-| `ScoreManager`, `Timer` | Score, combo multiplier, accuracy and reaction times; the match clock. |
+| `difficulty.js` | Survival's ramp as pure functions of game time: the spawner settings it changes and their value at any ms. `GameSession` ramps its spawner with them; `api/_lib/matchCheck.js` checks logs against the same values. |
+| `scoring.js` | The pure definition of a score from an event log: a target's value from its spawn time, and `scoreEvents` for a whole match. The live HUD and the results screen both use it, and it imports nothing outside `src/game` and `src/utils`, so `/api` can too. |
+| `ScoreManager`, `Timer` | Score, combo multiplier, accuracy and reaction times, fed one event at a time through `scoring.js`; the match clock. |
 | `Particle`, `FloatingText`, `AudioManager` | Hit effects, and Web Audio sound synthesized at runtime (no audio files). |
 | `Input` | A queue of clicks in canvas coordinates, consumed during `update`, so a click is handled at a fixed point in the frame. |
 | `modes.js`, `palette.js` | Modes as pure configuration; theme colors read from CSS custom properties once per theme change, never per frame. |
@@ -73,7 +75,8 @@ Every `.js` file directly under `api/` is a Vercel Function, and its path is its
 |---|---|---|
 | `GET /api/health` | none | `select 1` against Neon: 200, or 503 if the database is down. |
 | `GET /api/me` | required | The caller's uid and profile stats, derived in SQL on each request. |
-| `POST /api/scores` | required | Validates and stores one finished match. Returns 201. |
+| `POST /api/matches` | required | Issues a match when a signed-in player presses Start: `{ mode }` in, 201 `{ matchId, startedAt, expiresAt }` out. At most 20 per player in any 10 minutes (429 with `Retry-After`). |
+| `POST /api/scores` | required | Redeems a match with its event log, `{ matchId, events }`: checks it, computes the score on the server and stores it. Returns 201 with the stored figures. |
 | `GET /api/leaderboard?view=all\|daily\|weekly\|personal` | `personal` only | The top 100 (one best entry per player), or the caller's own top 10. |
 | `POST /api/insights/hardware` | required | DPI, sensitivity and polling-rate advice from Claude. The body may carry the current `{ setup }`. |
 | `POST /api/insights/platforms` | required | 3–5 shooter games, with their platforms, that suit the caller's aim. |
@@ -87,10 +90,10 @@ Modules that touch the outside world are split into a pure factory and a small w
 | Factory | Wiring | Dependency |
 |---|---|---|
 | `verifier.js`: `createVerifier({ keySet, issuer, audience })` | `auth.js`: Neon Auth's remote JWKS | `jose` |
-| `scoreStore.js`, `insightStore.js`: queries over a tagged-template `sql` | `db.js`: Neon's HTTP driver | `@neondatabase/serverless` |
+| `scoreStore.js`, `matchStore.js`, `insightStore.js`: queries over a tagged-template `sql` | `db.js`: Neon's HTTP driver | `@neondatabase/serverless` |
 | `structuredOutput.js`: `createStructuredCaller(client)` | `claude.js`: `new Anthropic()` | `@anthropic-ai/sdk` |
 
-The rest are pure functions with unit tests: request validation (`scoreInput.js`, `checks.js`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`).
+The rest are pure functions with unit tests: request validation (`scoreInput.js`, `matchPolicy.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`, `rateLimit.js`, and `matchPolicy.js`'s ticket lifetimes), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`). `matchIssue.js` (the issue limit) and `matchSubmit.js` (redeeming a match) run around the stores they're given, and their tests use in-memory ones.
 
 ### Data model (`db/migrations/`)
 
@@ -98,6 +101,8 @@ Plain SQL. `npm run db:migrate` applies the files in order, each in its own tran
 
 - **`neon_auth."user"`** is owned by Neon Auth. The app reads only `id`, `name`, `image` and `"createdAt"`; it never selects the email.
 - **`scores`** has one row per finished match: `user_id` (a foreign key to `neon_auth."user"`, deleted with the user), `mode`, `score`, `accuracy`, `reaction_time` and `created_at`. `CHECK` constraints repeat the handler's validation bounds as a second line of defence. Indexes support the all-time board, per-player bests and time windows.
+- **`matches`** has one row per match a signed-in player started: a uuid `id`, `user_id` (deleted with the user), `mode`, `started_at` (the database's clock), `expires_at` (the duration plus 30 minutes, or 2 hours for Survival) and `submitted_at`. `CHECK`s keep `expires_at` after `started_at`, and any submit inside that window.
+- **`scores.match_id`** names the match a score was computed from. It's `unique`, so a match can be redeemed only once. A composite foreign key `(match_id, user_id, mode)` makes the database refuse a score whose player or mode differs from its match's. It's null for the rows saved before matches existed, which the key doesn't check.
 - **`insights`** has one row per generated AI answer: `user_id`, `kind`, `input_hash`, `result jsonb`, `model` and `created_at`. It serves as both the cache and the rate limit.
 
 Profile stats (games played, best score, average accuracy, favourite mode) are never stored. `GET /api/me` derives them with `count`, `max`, `avg` and `mode() within group`, so two matches saved at the same moment can't lose an update.
@@ -113,7 +118,20 @@ Profile stats (games played, best score, average accuracy, favourite mode) are n
 
 ### Saving a match
 
-`GameSession` ends the match and calls `onGameOver(summary)`. `GameArea` then posts `{ mode, score, accuracy, reactionTime }` through `saveMatchResult`. `POST /api/scores` verifies the token, validates every field (and ignores any `uid` in the body), and inserts the row. The profile stats and the leaderboards pick the match up on their next read.
+The server computes every stored score itself, from the match's event log (PLAN-SCORING.md):
+
+1. **Start.** For a signed-in player, `useMatchSave` calls `POST /api/matches` in parallel with the engine starting. The `matches` row records the mode and the database's start time. A mid-match Restart keeps the round's ticket.
+2. **Play.** `GameSession` logs every hit, miss and expiry in game time (`scoring.js`). Its `onGameOver` summary is `scoreEvents`' replay of that log, so the results screen shows what the server will compute.
+3. **Submit.** `saveMatchResult` posts `{ matchId, events }`, and `POST /api/scores` handles it:
+   - verifies the token
+   - shape-checks the body (`scoreInput.js`, at most 512 KB and 10,000 events; any `score` or `uid` in it is ignored)
+   - loads the caller's match (404 if it's unknown or another player's, 409 if already submitted, 410 if expired)
+   - runs `checkMatch` with the mode's configuration and the database's elapsed time (400 naming the failed rules)
+   - scores the log with `scoreEvents`
+4. **Claim.** One statement claims the match (`submitted_at`) and inserts the computed figures under the match's own mode. Both happen or neither does, so a replayed request finds nothing to claim. The composite key from `scores` to `matches` backs this up in the database.
+5. **Status.** The results screen reports the outcome: saved; *unregistered* (no ticket); *rejected* (a 4xx from the server's checks); or an error.
+
+The profile stats and the leaderboards pick the match up on their next read.
 
 ### Leaderboards
 
@@ -140,15 +158,19 @@ The cap is soft: two requests at the same instant can both get through. That's e
 
 - **Secrets stay on the server.** `DATABASE_URL` and `ANTHROPIC_API_KEY` are read only inside `/api` and `scripts/`. `VITE_*` variables are compiled into the client bundle, so they hold only public values (`VITE_NEON_AUTH_URL`). Google OAuth credentials live in the Neon Console.
 - **Validation happens twice.** Handlers validate input and name the bad fields in a 400. SQL `CHECK` constraints back the same bounds in the database.
-- **Scores are still computed in the browser.** The server validates bounds and ownership, but it can't prove that a plausible score was really played. The README's "next" list covers what would close that gap.
+- **Request bodies are capped.** `readJson` refuses a body over 16 KB with a 413. Score submissions allow 512 KB, for the event log.
+- **Scores are computed on the server.** The browser sends a server-issued match id and the match's event log, never a score. `matchCheck.js` holds the log to the engine's own rules, human limits and the database's clock, and then the server scores it (see "Saving a match").
+  - **Not proof of a human:** a fabricated but plausible log still passes, and a player can resubmit their own real log under a fresh ticket, which duplicates a score but can't raise it.
+  - **Legacy scores:** rows saved before matches existed stay on the boards. `npm run db:legacy-report` lists any that fail the bounds a log is now held to. [AUDIT-RESPONSE.md](AUDIT-RESPONSE.md) answers the audit that prompted this.
 
 ## Testing
 
 Vitest runs in two environments. Browser code (components and hooks) runs under `jsdom`. `/api` tests opt into `node` per file. The pyramid leans on pure functions:
 
-- **Pure unit tests.** The game classes, request validation, the UTC windows, the cache key and limit, the prompts and schemas, and the client error messages.
-- **Injected dependencies.** The JWT verifier runs with keys generated in the test. The Claude caller runs with a fake client and the SDK's real error classes. The insight runner runs with an in-memory store. The services run with a stubbed `fetch`.
-- **Outside the suite.** The SQL ran on PGlite (in-process Postgres) with every migration applied, and the deployed routes were checked live with temporary users. Both are recorded per milestone in [PLAN-V2.md](PLAN-V2.md).
+- **Pure unit tests.** The game classes, the shared scoring and difficulty ramp, the event-log checks and score bound, request validation, the UTC windows, the cache key and limits, the prompts and schemas, and the client error messages.
+- **Engine-made and real logs.** A headless scripted player (`src/game/testing/playMatch.js`) plays every mode through the real `GameSession`, so the checks and the score bound are tested against logs the engine produced. One hand-played match per mode, kept in `api/_lib/fixtures/`, must pass too.
+- **Injected dependencies.** The JWT verifier runs with keys generated in the test. The Claude caller runs with a fake client and the SDK's real error classes. The insight runner and the match issue and submit flows run with in-memory stores. The services run with a stubbed `fetch`.
+- **Outside the suite.** The SQL ran on PGlite (in-process Postgres) with every migration applied, and the deployed routes were checked live with temporary users. Both are recorded per milestone in [PLAN-V2.md](PLAN-V2.md) and [PLAN-SCORING.md](PLAN-SCORING.md).
 
 ## Deployment and local development
 

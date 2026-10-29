@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless'
 import { createInsightRunner } from './insightRunner.js'
 import { createInsightStore } from './insightStore.js'
+import { createMatchStore } from './matchStore.js'
 import { createScoreStore } from './scoreStore.js'
 
 // Neon's HTTP query function: one round trip per query and no connection to
@@ -9,5 +10,7 @@ import { createScoreStore } from './scoreStore.js'
 export const sql = neon(process.env.DATABASE_URL)
 
 export const scoreStore = createScoreStore(sql)
+
+export const matchStore = createMatchStore(sql)
 
 export const insightRunner = createInsightRunner(createInsightStore(sql))

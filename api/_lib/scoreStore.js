@@ -11,12 +11,25 @@ const PERSONAL_LIMIT = 10
  * serialise as ISO strings.
  */
 export const createScoreStore = (sql) => ({
-  insert: async (uid, { mode, score, accuracy, reactionTime }) => {
+  // Claims the caller's unexpired, unsubmitted match and records its
+  // computed figures under the match's mode, in one statement: both
+  // happen or neither. Null when the match can't be claimed, so of two
+  // submits racing for one match, only the first gets a row.
+  insertForMatch: async (uid, matchId, { score, accuracy, reactionTime }) => {
     const [row] = await sql`
-      insert into scores (user_id, mode, score, accuracy, reaction_time)
-      values (${uid}, ${mode}, ${score}, ${accuracy}, ${reactionTime})
+      with claimed as (
+        update matches set submitted_at = now()
+        where id = ${matchId} and user_id = ${uid}
+          and submitted_at is null and expires_at > now()
+        returning id, user_id, mode
+      )
+      insert into scores
+        (user_id, mode, score, accuracy, reaction_time, match_id)
+      select user_id, mode, ${score}::int, ${accuracy}::real,
+             ${reactionTime}::int, id
+      from claimed
       returning id, created_at as "createdAt"`
-    return row
+    return row ?? null
   },
 
   // Profile stats, derived on every read rather than stored, so two

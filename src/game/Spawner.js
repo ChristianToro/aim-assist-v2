@@ -20,7 +20,6 @@ export class Spawner {
     maxRadius = 42,
     spacing = 14, // minimum gap between target edges
     targetLifespan = 3, // seconds before an unclicked target expires
-    targetValue = 100, // base points per hit
     targetSpeed = null, // [min, max] px/s for moving targets, or null
     maxAttempts = 30,
   } = {}) {
@@ -30,7 +29,6 @@ export class Spawner {
     this.maxRadius = maxRadius
     this.spacing = spacing
     this.targetLifespan = targetLifespan
-    this.targetValue = targetValue
     this.targetSpeed = targetSpeed
     this.maxAttempts = maxAttempts
   }
@@ -41,8 +39,9 @@ export class Spawner {
 
   // Advances the spawn timer; pushes at most one new target per interval.
   // The timer caps at one interval, so when the field is full a freed
-  // slot is refilled immediately (Gridshot-style).
-  update(dt, size, targets) {
+  // slot is refilled immediately (Gridshot-style). `now` is the game time
+  // in ms, stamped on the new target for the match's event log.
+  update(dt, size, targets, now = 0) {
     this.#sinceLastSpawn = Math.min(
       this.#sinceLastSpawn + dt,
       this.spawnInterval
@@ -50,14 +49,14 @@ export class Spawner {
     if (this.#sinceLastSpawn < this.spawnInterval) return
     if (targets.length >= this.maxTargets) return
 
-    const target = this.#trySpawn(size, targets)
+    const target = this.#trySpawn(size, targets, now)
     if (target) {
       targets.push(target)
       this.#sinceLastSpawn = 0
     }
   }
 
-  #trySpawn({ width, height }, targets) {
+  #trySpawn({ width, height }, targets, now) {
     const radius = randomInRange(this.minRadius, this.maxRadius)
     const margin = radius + this.spacing
 
@@ -86,7 +85,7 @@ export class Spawner {
           y,
           radius,
           lifespan: this.targetLifespan,
-          value: this.targetValue,
+          spawnedAt: now,
           vx,
           vy,
         })
