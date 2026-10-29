@@ -11,10 +11,13 @@ const navLinks = [
 
 const linkClass = ({ isActive }) =>
   `px-2.5 py-2 text-caption font-medium whitespace-nowrap transition-colors sm:px-3 ${
-    isActive
-      ? 'bg-surface text-heading'
-      : 'text-muted hover:bg-surface hover:text-heading'
+    isActive ? 'text-heading' : 'text-muted hover:text-heading'
   }`
+
+// The current page carries the app's one selection mark: a 1px accent
+// line exactly as wide as its label.
+const labelClass = (isActive) =>
+  `border-b pb-1 ${isActive ? 'border-accent' : 'border-transparent'}`
 
 // The page links are for signed-in players only; signed-out visitors
 // (and the session restore, where user is still null) see the wordmark
@@ -39,7 +42,9 @@ const Navbar = () => {
           <div className="flex items-center gap-1 overflow-x-auto">
             {navLinks.map(({ to, label }) => (
               <NavLink key={to} to={to} className={linkClass}>
-                {label}
+                {({ isActive }) => (
+                  <span className={labelClass(isActive)}>{label}</span>
+                )}
               </NavLink>
             ))}
           </div>

@@ -1,65 +1,87 @@
-import Card from '../components/Card/Card'
+import SettingsSection from '../components/SettingsSection/SettingsSection'
 import ThemePicker from '../components/ThemePicker/ThemePicker'
+import ThemePreview from '../components/ThemePicker/ThemePreview'
+import { readStoredMute } from '../game/AudioManager'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useTheme } from '../hooks/useTheme'
 
-// Preferences the app reads from the OS rather than exposing its own
-// toggle for — documented here so the behaviour isn't invisible.
-const SYSTEM_PREFERENCES = [
-  {
-    label: 'Reduced motion',
-    detail:
-      'With "reduce motion" enabled in your OS, interface animations collapse and hit particle bursts are skipped. Floating score text stays — it carries information.',
-  },
-  {
-    label: 'Increased contrast',
-    detail:
-      'With "increase contrast" enabled, every theme strengthens its borders and brightens secondary text.',
-  },
-  {
-    label: 'Sound',
-    detail:
-      'Sound is toggled per match from the Play page, and the choice is remembered between sessions.',
-  },
-]
+// One preference set outside this page, with its current value.
+const PreferenceRow = ({ label, isOn, detail }) => (
+  <li className="py-3 first:pt-0 last:pb-0">
+    <div className="flex items-center gap-2">
+      <h3 className="text-ui font-medium text-heading">{label}</h3>
+      <span className="bg-bg px-1.5 py-0.5 text-meta text-body">
+        {isOn ? 'On' : 'Off'}
+      </span>
+    </div>
+    <p className="mt-1 text-ui text-muted">{detail}</p>
+  </li>
+)
 
 const Settings = () => {
   const { themeId, themes, setTheme } = useTheme()
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+  const moreContrast = useMediaQuery('(prefers-contrast: more)')
+  const activeTheme = themes.find(({ id }) => id === themeId)
+
+  // These aren't controlled here, so the rows show their values instead
+  // of toggles: sound lives on the Play page, the rest in the OS.
+  const preferences = [
+    {
+      label: 'Sound',
+      isOn: !readStoredMute(),
+      detail:
+        'Turned on or off per match on the Play page, and remembered on this browser.',
+    },
+    {
+      label: 'Reduced motion',
+      isOn: reducedMotion,
+      detail:
+        'Interface animations collapse and hit particle bursts are skipped. Floating score text stays, since it carries information.',
+    },
+    {
+      label: 'Increased contrast',
+      isOn: moreContrast,
+      detail:
+        'Every theme strengthens its borders and brightens secondary text.',
+    },
+  ]
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <h1 className="text-3xl font-semibold tracking-tight text-heading">
+      <h1 className="text-title font-medium tracking-tight text-heading">
         Settings
       </h1>
-      <p className="mt-3 text-muted">
-        Themes, sound, and accessibility preferences. Your theme is saved to
-        this browser.
+      <p className="mt-1 text-ui text-muted">
+        {activeTheme.label} theme is on, saved to this browser.
       </p>
 
-      <h2 className="mt-10 text-xl font-semibold tracking-tight text-heading">
-        Color Themes
-      </h2>
-      <p className="mt-1 max-w-prose text-sm text-muted">
-        Applies to the whole app, including target and particle colors on the
-        canvas.
-      </p>
-      <div className="mt-5">
-        <ThemePicker themes={themes} value={themeId} onChange={setTheme} />
-      </div>
+      <div className="mt-8">
+        <SettingsSection
+          title="Theme"
+          description="Colours the whole app, including the targets and particles on the canvas."
+          summary={
+            <figure>
+              <ThemePreview themeId={themeId} size="lg" />
+              <figcaption className="mt-2 text-meta text-muted">
+                {activeTheme.label}, as the targets will look in a match
+              </figcaption>
+            </figure>
+          }
+        >
+          <ThemePicker themes={themes} value={themeId} onChange={setTheme} />
+        </SettingsSection>
 
-      <h2 className="mt-12 text-xl font-semibold tracking-tight text-heading">
-        System preferences
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        These follow your operating system — make the following changes through
-        your OS settings.
-      </p>
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
-        {SYSTEM_PREFERENCES.map(({ label, detail }) => (
-          <Card key={label}>
-            <h3 className="font-medium text-heading">{label}</h3>
-            <p className="mt-2 text-sm text-muted">{detail}</p>
-          </Card>
-        ))}
+        <SettingsSection
+          title="Set elsewhere"
+          description="Sound is set on the Play page. Motion and contrast follow your operating system's settings."
+        >
+          <ul className="divide-y divide-edge">
+            {preferences.map((preference) => (
+              <PreferenceRow key={preference.label} {...preference} />
+            ))}
+          </ul>
+        </SettingsSection>
       </div>
     </section>
   )

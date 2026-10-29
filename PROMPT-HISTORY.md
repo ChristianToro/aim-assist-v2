@@ -60,3 +60,71 @@ One decision is left open for the user, to settle when U5 starts. `inspect.mjs` 
 **Verification**
 
 Documentation only, with nothing to run. Checked against the repo: the pages and components each milestone names, `PagePlaceholder` having no importers, the `Modal` backdrop blur, and the taste-skill 2.1.5 `SKILL.md`, `references/app-screens.md` and `inspect.mjs` flags.
+
+### Interaction 2 — Plan committed; U3 started
+
+**User Prompt**
+
+> commit the plan and history, then start U3
+
+**Agent Outcome**
+
+- Committed the plan and the history rotation as `a17072a`.
+- **Started U3 on the taste-skill's app-screen run,** after reading `references/app-screens.md` in full:
+  - Recorded the "before" baseline: `inspect.mjs --app` on `/settings` and `/leaderboards`, and `lint.mjs --app` over all four screens (4 FAIL `micro-label`).
+  - Dealt the app style. Only two dark styles suit the brief: *Data terminal* and *True-black flat*.
+
+**Collaboration**
+
+The user chose **Data terminal** (the recommendation): every selection is a 1px accent line exactly as wide as its label, and figures are tabular.
+
+### Interaction 3 — U3: app style and Settings built
+
+**Agent Outcome**
+
+Settings is restyled as a settings screen:
+- The theme list has live previews, and the active theme is shown large beside it.
+- A "Set elsewhere" panel shows the current values of sound, reduced motion and increased contrast.
+- The style's selection line is on the chosen theme and on the navbar's active link.
+
+The full record (departures, as built, contrast table, before and after) is in [PLAN-UI.md](PLAN-UI.md#u3-detail).
+
+**Rationale**
+
+- **Kept U2's top bar** instead of the dealt icon rail. It's the shared shell, and four destinations don't need a rail.
+- **Kept U2's square corners** instead of the sheet's 6px and pill radii, since `Button` and `Card` are shared with the landing page.
+- **No mono face.** A script read Onest's GSUB table and found `tnum`, so figures can be tabular without a new dependency.
+- **Light `--muted` darkened** from `#71717a` to `#6b6b74`. It measured 4.4:1 on `--bg`, and the new layout puts muted text on the ground.
+- **Current values are read, not toggled.** The OS preferences come from a new `useMediaQuery` hook, and sound from `readStoredMute()`, now exported by `AudioManager`, which uses it too.
+
+**Changes**
+
+- New:
+  - [`src/components/SettingsSection/SettingsSection.jsx`](src/components/SettingsSection/SettingsSection.jsx)
+  - [`src/components/ThemePicker/ThemePreview.jsx`](src/components/ThemePicker/ThemePreview.jsx)
+  - [`src/hooks/useMediaQuery.js`](src/hooks/useMediaQuery.js) and its test
+  - [`src/pages/Settings.test.jsx`](src/pages/Settings.test.jsx)
+- Edited:
+  - `src/pages/Settings.jsx`, `ThemePicker.jsx`, `Navbar.jsx` and `game/AudioManager.js`;
+  - `src/index.css` (the app type scale) and `src/styles/themes.css` (light `--muted`);
+  - `ARCHITECTURE.md`, `README.md` and `PLAN-UI.md`.
+
+**Verification**
+
+- `npm run lint`, `format:check`, `test` (236, up from 231) and `build` pass.
+- `lint.mjs --app`: 0 FAIL, 0 WARN.
+- `inspect.mjs --app` on `/settings` (production build): 0 FAIL, 1 WARN. The WARN is `unused-canvas`, a false positive: the inspector measures the text of the visually hidden skip link.
+- **Headless Chrome,** with a scratchpad script on the skill's CDP helper: all five themes screenshotted and the contrast of every pair computed. Arrow-key theme selection checked with the focus ring.
+- **Not run:** the navbar's accent line signed in, and the Vercel preview.
+
+### Interaction 4 — U3 approved and committed
+
+**User Prompt**
+
+> Browser checks passed. Mark U3 done, and commit it with the history
+
+**Agent Outcome**
+
+- All four of U3's browser checks passed in the user's browser. That covers the navbar's accent line signed in, which headless Chrome couldn't reach.
+- U3 is marked Done in PLAN-UI.md and committed on `refactor/UI` with Interactions 2–4.
+- U4 (Leaderboards) is next, once the user says to start it.

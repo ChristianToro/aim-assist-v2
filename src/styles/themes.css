@@ -63,7 +63,7 @@
   --edge: #e4e4e7;
   --edge-strong: #d4d4d8;
   --body: #3f3f46;
-  --muted: #71717a;
+  --muted: #6b6b74; /* 4.8:1 on --bg (zinc-500 was 4.4) */
   --heading: #18181b;
   --accent: #0891b2;
   --accent-strong: #0e7490;

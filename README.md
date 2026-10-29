@@ -55,7 +55,7 @@ The approach was to plan the architecture completely before writing any code. A 
 | AI | Anthropic API (Claude Opus 5.5), structured JSON output, server-side only |
 | Hosting | Vercel, with GitHub Actions running lint, tests, and build |
 | Build | Vite 8 (Rolldown) |
-| Quality | ESLint 10, Prettier, Vitest + React Testing Library (231 tests) |
+| Quality | ESLint 10, Prettier, Vitest + React Testing Library (236 tests) |
 
 ## AI Tools Used
 

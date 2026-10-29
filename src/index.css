@@ -10,7 +10,8 @@
 @import './styles/themes.css';
 
 /* Type: Unbounded for display (always uppercase), Onest for text. Five
-   size steps cover every page; nothing else sets a font size. */
+   size steps cover the landing page, and four app steps (title down to
+   meta) cover the screens players work in; nothing else sets a font size. */
 @theme {
   --font-sans: 'Onest', system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Unbounded', 'Onest', system-ui, sans-serif;
@@ -24,6 +25,17 @@
   --text-head--line-height: 1;
   --text-display: clamp(3.25rem, 9vw, 8.75rem);
   --text-display--line-height: 0.86;
+
+  /* App screens (taste-skill "data terminal"): working type, never display
+     size. Onest is loaded at 400/500, so app titles use 500. */
+  --text-title: clamp(1.375rem, 1.2rem + 0.5vw, 1.625rem);
+  --text-title--line-height: 1.2;
+  --text-label: 1rem;
+  --text-label--line-height: 1.5;
+  --text-ui: 0.875rem;
+  --text-ui--line-height: 1.43;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.33;
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);

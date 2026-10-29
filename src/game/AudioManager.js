@@ -1,5 +1,15 @@
 const STORAGE_KEY = 'aim-assist:muted'
 
+// The saved sound choice, also shown on the Settings page.
+export const readStoredMute = () => {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === 'true'
+  } catch {
+    // Storage unavailable (private mode) — default to sound on.
+    return false
+  }
+}
+
 /*
  * AudioManager — gameplay sound effects, synthesized with the Web Audio
  * API (no audio assets to load). The AudioContext is created lazily on
@@ -10,15 +20,7 @@ export class AudioManager {
   #ctx = null
   #master = null
 
-  muted = false
-
-  constructor() {
-    try {
-      this.muted = localStorage.getItem(STORAGE_KEY) === 'true'
-    } catch {
-      // Storage unavailable (private mode) — default to sound on.
-    }
-  }
+  muted = readStoredMute()
 
   // Returns the new muted state.
   toggleMute() {

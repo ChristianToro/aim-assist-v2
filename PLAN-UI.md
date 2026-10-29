@@ -54,7 +54,7 @@ The first target is the landing page:
 | U0 | Done | **Skill install + docs.** Install the plugin (user step). Write this plan and update CLAUDE.md. Ignore `.taste-skill/`. Record the "before" inspector baseline. The user adds the hero image. | `PLAN-UI.md`, `CLAUDE.md`, `.gitignore` |
 | U1 | Done | **Gating + shared sign-in button.** Logic only, with tests: `GoogleSignInButton`, nav links shown only to signed-in users, `/play` behind `ProtectedRoute`, and the Start Training tooltip. | `src/App.jsx`, `Navbar`, `Home.jsx`, `GoogleSignInButton/`, `Tooltip/` |
 | U2 | Done | **Landing + shell restyle (taste-skill).** Hero with the image, game modes, a leaderboard social-proof section, the CTA, and Navbar, Footer, Button and Card restyled to the dealt type and composition. | `Home.jsx`, `src/components/landing/`, `src/index.css`, `Button`, `Card`, `Navbar`, `Footer` |
-| U3 | Planned | **App style + Settings.** Record the "before" `inspect.mjs --app` baseline of the four app screens (Play and Profile by the agreed signed-in method). Deal the app style (`--keep palette,type`) for the user to choose. Port its tokens into `src/index.css` (panels, small labels, tabs, controls). Restyle Settings: the theme picker and the system-preference notes, laid out as a settings screen (app-screens §8). | `src/index.css`, `Settings.jsx`, `ThemePicker` |
+| U3 | Done | **App style + Settings.** Record the "before" `inspect.mjs --app` baseline of the four app screens (Play and Profile by the agreed signed-in method). Deal the app style (`--keep palette,type`) for the user to choose. Port its tokens into `src/index.css` (panels, small labels, tabs, controls). Restyle Settings: the theme picker and the system-preference notes, laid out as a settings screen (app-screens §8). | `src/index.css`, `Settings.jsx`, `ThemePicker` |
 | U4 | Planned | **Leaderboards.** The view tabs as app tabs, the `Leaderboard` table to the app's table rules (figures right-aligned in tabular numerals, the player's own row marked, quiet dividers), and the Personal Best sign-in prompt. Every state: loading, empty per view, error and signed out. | `Leaderboards.jsx`, `Leaderboard` |
 | U5 | Planned | **Profile.** Settle the signed-in check first. Then `ProfileCard` and `StatTile`, the two AI insight panels (`InsightPanel`, `HardwareInsight` and `PlatformInsight`, including their loading, empty and error states), and Best Matches through U4's table. The screen's one question decides what's biggest. | `Profile.jsx`, `ProfileCard`, `StatTile`, `InsightPanel`, `HardwareInsight`, `PlatformInsight` |
 | U6 | Planned | **Play.** The mode picker, the match controls, the HUD, the idle and paused overlays on the canvas, `ResultsModal` (its save status included) and the session history. No engine changes. `Modal`'s backdrop blur and large shadow go, per the house rules. | `Play.jsx`, `ModePicker`, `GameArea`, `GameHud`, `Modal`, `ResultsModal`, `SessionHistory` |
@@ -246,6 +246,103 @@ These behaviour changes come with tests and are kept separate, so U2's diff is d
   2. Signed in: both Start Training buttons open `/play`.
   3. The warm-up target in each theme (Settings → theme).
   4. Play, Leaderboards, Profile and Settings still look right with the restyled Button, Card, Navbar and Footer.
+
+## U3 detail
+
+`taste-skill:design-taste-frontend` runs the **app-screen run** (`references/app-screens.md`, read in full), not the page run.
+
+1. **"Before" baseline.**
+   - `inspect.mjs --app` against the production build (`vite preview`, with `/api` proxied to `vercel dev`) for `/settings` and `/leaderboards`, into `.taste-skill/app-before/`.
+   - `lint.mjs --app` over the four screens' pages and components. Play and Profile can't be inspected signed out, so their baseline is the lint alone. Their screenshots wait on the U5 decision.
+2. **Deal the app style:** `draw.mjs --app --kind community --theme dark --screens settings,list,detail,home --keep palette,type --options 3`. Dark, because four of the five themes are dark and Dark is the default. **The user chooses.** The run notes go in `.taste-skill/app/notes.md`.
+3. **Deal the sheet** for the chosen style, then write the notes (app-screens §2.1–2.3):
+   - Settings' data inventory.
+   - Settings' one question.
+   - The face and the signature element chosen from the sheet.
+4. **Tokens** in `src/index.css`, mapped onto the existing theme roles, so all five themes carry them. They cover app type sizes (title 24, section 16, body 14, small 12), panel padding and gap, control height, and the style's selection mark. No new colours: any new role is derived from `themes.css`.
+5. **Settings restyle** (app-screens §8.2): label column beside panel on desktop, stacked on the phone. `ThemePicker` follows the style's selection rule and shows what the setting produces, since each option is already a preview of its theme. The system-preference notes become rows.
+6. **Gate:** lint, format check, tests and build; `lint.mjs --app` and `inspect.mjs --app` on `/settings` at 0 FAIL; screenshots reviewed in all five themes; the critique questions in app-screens §2.7 answered.
+7. Stop for review.
+
+### Style (the user's choice)
+
+- **Dealt:** the deal gave two dark styles, not three: *Data terminal* and *True-black flat*. The user chose **Data terminal** (seed `974519014`).
+  - **The move:** every selection is a 1px accent line exactly as wide as its label, on the nearest edge.
+  - Numbers stay white or grey, tabular, with their sign in the text.
+- **Departures from the sheet,** each for a stated reason:
+  - **Shell:** the sheet dealt an icon rail. U2's top bar stays (the "no sidebar" archetype: a few destinations over a centred column). It's the shared shell, the landing page uses it, and four destinations don't need a rail. The move goes on its active link instead.
+  - **Radius:** the sheet's 6px cards and pill controls give way to U2's square corners. `Button` and `Card` are shared with the landing page, and one product decides its radius once.
+  - **Card tone:** the style's cards are darker than the ground. The kept palette puts surfaces one step lighter, with no border or glow.
+  - **Weight:** Onest is loaded at 400 and 500 only, so app titles use 500. The old 600 headings were faux bold, synthesized by the browser.
+- **Face:** the selection line is each theme's own `--accent`. Figures use Onest's `tnum` (its GSUB table has it), so there's no mono and no new dependency. The signature element is the target in the theme's `--target-*` rings.
+- **Settings' one question:** "Which theme am I playing in, and what will the targets look like?" The answer comes first: the title row's line names the theme, and the largest block is the active theme's preview.
+
+### As built
+
+- **Tokens** (`src/index.css`): an app type scale beside the page scale. `title` 22–26, `label` 16, `ui` 14 and `meta` 12px.
+- **`SettingsSection`** (new): a label column (title, description, optional summary) beside a `bg-surface` panel, 352 + 48 + 704 = 1104px on desktop, stacked below `lg`. Areas are split by a full-width rule.
+- **`ThemePicker`:** a radio list of rows instead of a card grid, each a preview, the name and a description. The chosen name carries the accent line; hovering an unchosen one shows the line in `edge-strong`. `ThemePreview` moved to its own file, with a `lg` size for the summary.
+- **`Settings`:**
+  - The title row: "Settings", then "<Theme> theme is on, saved to this browser."
+  - **Theme:** the summary column shows the active theme at large size ("as the targets will look in a match").
+  - **Set elsewhere:** Sound, Reduced motion and Increased contrast, each with an On/Off value. The OS preferences come from the new `useMediaQuery` (`useSyncExternalStore`, so it updates live). Sound comes from `readStoredMute()`, now exported from `AudioManager`, which uses it too.
+- **`Navbar`:** the active link loses its `bg-surface` fill (a filled pill tab is off-style) and takes the accent line under its label.
+- **Light theme `--muted`** goes from `#71717a` to `#6b6b74`. On `--bg` it measured 4.4:1, under the 4.5:1 floor, and the new layout puts muted text on the ground; it's now 4.8:1.
+- **Tests:** 236, up from 231: `useMediaQuery` (2) and `Settings` (3: the theme line, the OS values, the saved sound).
+- **Docs:** ARCHITECTURE.md's hooks row and README's test count.
+
+### U3 verification
+
+- **Baseline, `inspect.mjs --app`** (2026-10-28):
+  - `/settings`: **0 FAIL, 2 WARN.** `unused-canvas` (the content stops 168px short of the right edge at 1440) and `app-title-size` (a 30px h1 on a phone).
+  - `/leaderboards`: **0 FAIL, 4 WARN.** `blank-gap` and `hero-void` (a 488px empty stretch under a two-row board), `unused-canvas` and `app-title-size`.
+  - Measured: Onest at 10/12/14/16/20/30px on Settings, a `#09090b` ground, `#18181b` surfaces.
+- **Baseline, `lint.mjs --app`** over the four screens: **4 FAIL, 4 WARN.**
+  - FAIL `micro-label`: the uppercase tracked headers in `Leaderboard`, `StatTile`, `HardwareInsight` and `SessionHistory`.
+  - WARN `glass`: the backdrop blur in `GameArea`'s overlay and in `Modal`.
+  - WARN `shadow`: `Modal`'s `shadow-2xl`.
+  - WARN `em-dash`: 12 em dashes across the files.
+- **Screenshots reviewed:** Settings is a 3-column grid of theme cards with a cyan active ring, then three note cards. Leaderboards is a filled pill tab row over a table with uppercase headers and scores without thousands separators ("13125").
+- **After:**
+  - `npm run lint`, `npm run format:check`, `npm test` (236) and `npm run build` pass. **Bundle:** entry chunk 3.47 kB gzip (3.44 before), `Settings` 1.83 kB (1.36 before), CSS 8.12 kB gzip (7.80 before).
+  - `lint.mjs --app` over Settings, `ThemePicker`, `SettingsSection` and `Navbar`: **0 FAIL, 0 WARN.**
+  - `inspect.mjs --app` on `/settings` (production build): **0 FAIL, 1 WARN.** Measured Onest at 12/14/16/26px and the h1 at 26/23/22px.
+    - The WARN, `unused-canvas` ("starts 15px from the sidebar"), is a false positive. The inspector measures the text box of the visually hidden "Skip to content" link, which spills past its 1px `sr-only` box at x≈16. The canvas is centred, with 168px margins on both sides. The baseline carried the same WARN.
+  - **All five themes,** full-page screenshots in headless Chrome. Contrast:
+
+    | Pair | Dark | Light | Cyberpunk | Terminal | Aimlabs |
+    |---|---|---|---|---|---|
+    | heading on surface | 17.7 | 17.7 | 18.1 | 17.2 | 16.4 |
+    | muted on surface | 6.9 | 5.3 | 6.6 | 8.1 | 6.7 |
+    | muted on bg | 7.8 | 4.8 | 7.3 | 9.1 | 7.4 |
+    | badge (body on bg) | 13.5 | 9.5 | 14.8 | 17.0 | 12.8 |
+    | accent line on surface (non-text, 3:1) | 9.8 | 3.7 | 6.8 | 8.2 | 6.7 |
+
+  - **Keyboard:** focusing the checked radio and pressing ↓ selected the next theme. The theme changed, the accent line moved, and the row showed the focus ring.
+  - **Critique** (app-screens §2.7):
+    - The biggest block answers the question, and every block ends on the canvas edges.
+    - Colour appears only on the selection line and inside the theme previews.
+    - Round 1's one fix: the "Set elsewhere" rows took the theme list's dividers (one divider treatment per screen).
+    - Left as is: about 200px of open label column under the summary preview beside the taller theme panel.
+  - **Before and after** (`/settings`):
+
+    | Measure | Before | After |
+    |---|---|---|
+    | Inspector | 0 FAIL, 2 WARN | 0 FAIL, 1 WARN (false positive) |
+    | Title | 30px at every width, faux-bold 600 | 26/23/22px, Onest 500 |
+    | Sizes | 10/12/14/16/20/30 | 12/14/16/26 |
+    | Theme choice | a 3 + 2 card grid, cyan ring on the active card | one radio list, the accent line on the chosen name, the active theme shown large |
+    | Preferences | three static note cards | three rows with their live On/Off values |
+
+- **Not run:**
+  - The navbar's accent line in a real browser. The links only show signed in. The `Navbar` tests still pass.
+  - The Vercel preview (after a push).
+- **Browser checks (user),** under `npm run dev:full`:
+  1. `/settings` in each theme: the chosen name is underlined in the accent, and the big preview matches.
+  2. Signed in: the current page's nav link is underlined in the accent, with no filled background.
+  3. Turn on reduced motion or increased contrast in the OS: the row's value changes to On without a reload.
+  4. Mute sound on `/play`, then open `/settings`: Sound reads Off.
+- *2026-10-28, user report: all four browser checks passed, including the navbar's accent line signed in.*
 
 ## Verification (every gate)
 
