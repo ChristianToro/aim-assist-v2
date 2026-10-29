@@ -21,12 +21,15 @@ export const matchTtlSeconds = (mode) =>
 // Matches are stored under the mode's display label, like scores.
 const MODES_BY_LABEL = new Map(GAME_MODES.map((mode) => [mode.label, mode]))
 
+// A stored match's mode configuration, from its label.
+export const modeByLabel = (label) => MODES_BY_LABEL.get(label)
+
 /*
  * Validates a POST /api/matches body, { mode: <label> }. Returns { mode }
  * holding the mode's configuration, or { invalid: ['mode'] }. Any other
  * key is ignored: the player comes from the token alone.
  */
 export const parseMatchRequest = (body) => {
-  const mode = isPlainObject(body) ? MODES_BY_LABEL.get(body.mode) : undefined
+  const mode = isPlainObject(body) ? modeByLabel(body.mode) : undefined
   return mode ? { mode } : { invalid: ['mode'] }
 }

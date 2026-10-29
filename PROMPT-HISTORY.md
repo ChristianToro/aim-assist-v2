@@ -736,3 +736,54 @@ The user chose the faked session over driving their own signed-in Chrome.
 - The user applied `004_matches.sql` to Neon. PLAN-SCORING.md records it, and marks S3 Done.
 - S3 is committed on `hotfix/server-checked-scoring` with this session's history.
 - **Next:** S4, which moves `POST /api/scores` onto matches and has the client request a match on Start, when the user says so.
+
+### Interaction 9 — S4: scores computed on the server from matches; paused for the manual checks
+
+**User Prompt**
+
+> Pushed, execute S4
+
+**Agent Outcome**
+
+- **`POST /api/scores` now takes `{ matchId, events }`.** `scoreInput.js` checks the shape; `matchSubmit.js` loads the caller's match (404 / 409 / 410), runs `checkMatch` with the database's elapsed time (400 naming the rules), and scores the log under the match's own mode.
+- **One statement claims and saves.** `scoreStore.insertForMatch` claims the match and inserts the score together (`with claimed as (update …) insert … select … from claimed`), so a replay finds nothing to claim.
+  - **Deviation from the plan:** not a multi-statement transaction. Neon's HTTP driver can't run `checkMatch` inside one, so the check runs first.
+- **Client:**
+  - `useMatchSave` requests a ticket on Start, in parallel with the engine, and redeems it at game over.
+  - Restart keeps the round's ticket, so restarts don't use up the 20-per-10-minutes limit.
+  - New results statuses: `unregistered` and `rejected`.
+- `api/scores.js` maps only `scores_user_id_fkey` violations to 401.
+- ARCHITECTURE.md's routes and "Saving a match" flow are rewritten. The Security note and the README are left for S5.
+- **Known limit recorded in the plan:** a player can resubmit one of their own real logs under a fresh ticket, which duplicates a score but can't raise it.
+
+**Verification**
+
+- `npm run lint`, `npm run format:check`, `npm test` (380 tests) and `npm run build` pass.
+- PGlite, with the real stores and handlers, passed 16 checks: a real save with the computed score (ignoring `score: 9999999`), a replay 409, foreign/unknown 404, extra hits 400 `[spawnRate]`, a too-early Gridshot 400, an expired 410, the match's mode stored, a real Survival save.
+- Pending: the user's manual checks under `npm run dev:full`.
+
+**Collaboration**
+
+- Paused for the user to run the manual checks; nothing is committed.
+
+### Interaction 10 — S4 manual checks passed; approved and committed
+
+**User Prompt**
+
+> all manual checks pass, commit S4
+
+**Agent Outcome**
+
+- **The user's manual checks passed** under `npm run dev:full`, signed in:
+  - a real match in each mode saved, with the stored score equal to the results screen's
+  - replay → 409
+  - `score: 9999999` on a fresh ticket → the computed score stored
+  - doubled hits → 400 `[spawnRate]`
+  - a Gridshot submit straight after issue → 400 `[tooEarly]`
+  - the old client's body → 400
+- S4 is marked Done in PLAN-SCORING.md with these results, and committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S5, the legacy-row report and the docs (ARCHITECTURE Security note, README next features, audit response), when the user says so.
+
+**Verification**
+
+- The user ran the manual checks. The Vercel preview and production aren't checked yet; they need the push.

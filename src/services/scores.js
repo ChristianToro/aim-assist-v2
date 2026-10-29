@@ -1,18 +1,14 @@
 import { apiFetch } from './api'
 
-// The POST /api/scores body for a finished match (ScoreManager.summary).
-// Name, avatar, owner and timestamp all come from the server.
-export const toScoreSubmission = (mode, summary) => ({
-  mode,
-  score: summary.score,
-  accuracy: summary.accuracy,
-  reactionTime: summary.averageReactionMs,
-})
+// The POST /api/scores body: the match's ticket and its event log. The
+// server computes the score from the log, so none is sent.
+export const toScoreSubmission = (matchId, events) => ({ matchId, events })
 
-// Persists a finished match; profile stats update with it on the server.
-export const saveMatchResult = ({ mode, summary }) =>
+// Saves a finished match; resolves to the stored { id, createdAt, score,
+// accuracy, reactionTime }. Profile stats update with it on the server.
+export const saveMatchResult = ({ matchId, events }) =>
   apiFetch('/api/scores', {
     method: 'POST',
-    body: toScoreSubmission(mode, summary),
+    body: toScoreSubmission(matchId, events),
     auth: true,
   })

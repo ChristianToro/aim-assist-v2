@@ -1,11 +1,10 @@
-import { useState } from 'react'
 import Button from '../Button/Button'
 import GameCanvas from '../GameCanvas/GameCanvas'
 import GameHud from '../GameHud/GameHud'
 import ResultsModal from '../ResultsModal/ResultsModal'
 import { useGameSession } from '../../hooks/useGameSession'
 import { useAuth } from '../../hooks/useAuth'
-import { saveMatchResult } from '../../services/scores'
+import { useMatchSave } from '../../hooks/useMatchSave'
 
 // The scrim over the canvas between and within matches: opaque enough to
 // read on, with no blur (glass is off-style, and the canvas is still).
@@ -22,19 +21,12 @@ const CanvasOverlay = ({ children }) => (
  */
 const GameArea = ({ mode, onMatchFinished }) => {
   const { user } = useAuth()
-  // null | 'saving' | 'saved' | 'error' — 'signed-out' derived at render.
-  const [saveStatus, setSaveStatus] = useState(null)
+  // 'signed-out' is derived at render; useMatchSave covers the rest.
+  const { saveStatus, beginMatch, saveMatch } = useMatchSave({ mode, user })
 
   const handleGameOver = (result) => {
     onMatchFinished?.({ ...result, mode: mode.label, finishedAt: new Date() })
-    if (!user) return
-    setSaveStatus('saving')
-    saveMatchResult({ mode: mode.label, summary: result })
-      .then(() => setSaveStatus('saved'))
-      .catch((error) => {
-        console.error('Failed to save match:', error)
-        setSaveStatus('error')
-      })
+    saveMatch(result.events)
   }
 
   const {
@@ -51,7 +43,13 @@ const GameArea = ({ mode, onMatchFinished }) => {
   } = useGameSession({ mode, showFps: true, onGameOver: handleGameOver })
 
   const handleStart = () => {
-    setSaveStatus(null)
+    beginMatch()
+    start()
+  }
+
+  // Mid-match, so the round's match ticket carries over (useMatchSave).
+  const handleRestart = () => {
+    beginMatch({ restart: true })
     start()
   }
 
@@ -76,7 +74,7 @@ const GameArea = ({ mode, onMatchFinished }) => {
               <Button variant="secondary" size="sm" onClick={togglePause}>
                 {isPaused ? 'Resume' : 'Pause'}
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleStart}>
+              <Button variant="ghost" size="sm" onClick={handleRestart}>
                 Restart
               </Button>
             </>

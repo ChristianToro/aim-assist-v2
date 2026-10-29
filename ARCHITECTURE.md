@@ -75,8 +75,8 @@ Every `.js` file directly under `api/` is a Vercel Function, and its path is its
 |---|---|---|
 | `GET /api/health` | none | `select 1` against Neon: 200, or 503 if the database is down. |
 | `GET /api/me` | required | The caller's uid and profile stats, derived in SQL on each request. |
-| `POST /api/matches` | required | Issues a match when a signed-in player presses Start: `{ mode }` in, 201 `{ matchId, startedAt, expiresAt }` out. At most 20 per player in any 10 minutes (429 with `Retry-After`). Not called by the client until S4 of PLAN-SCORING.md. |
-| `POST /api/scores` | required | Validates and stores one finished match. Returns 201. |
+| `POST /api/matches` | required | Issues a match when a signed-in player presses Start: `{ mode }` in, 201 `{ matchId, startedAt, expiresAt }` out. At most 20 per player in any 10 minutes (429 with `Retry-After`). |
+| `POST /api/scores` | required | Redeems a match with its event log, `{ matchId, events }`: checks it, computes the score on the server and stores it. Returns 201 with the stored figures. |
 | `GET /api/leaderboard?view=all\|daily\|weekly\|personal` | `personal` only | The top 100 (one best entry per player), or the caller's own top 10. |
 | `POST /api/insights/hardware` | required | DPI, sensitivity and polling-rate advice from Claude. The body may carry the current `{ setup }`. |
 | `POST /api/insights/platforms` | required | 3–5 shooter games, with their platforms, that suit the caller's aim. |
@@ -93,7 +93,7 @@ Modules that touch the outside world are split into a pure factory and a small w
 | `scoreStore.js`, `matchStore.js`, `insightStore.js`: queries over a tagged-template `sql` | `db.js`: Neon's HTTP driver | `@neondatabase/serverless` |
 | `structuredOutput.js`: `createStructuredCaller(client)` | `claude.js`: `new Anthropic()` | `@anthropic-ai/sdk` |
 
-The rest are pure functions with unit tests: request validation (`scoreInput.js`, `matchPolicy.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`, `rateLimit.js`, and `matchPolicy.js`'s ticket lifetimes), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`). `matchIssue.js` applies the match issue limit around the store it's given, and its tests use an in-memory store.
+The rest are pure functions with unit tests: request validation (`scoreInput.js`, `matchPolicy.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`, `rateLimit.js`, and `matchPolicy.js`'s ticket lifetimes), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`). `matchIssue.js` (the issue limit) and `matchSubmit.js` (redeeming a match) run around the stores they're given, and their tests use in-memory ones.
 
 ### Data model (`db/migrations/`)
 
@@ -118,7 +118,20 @@ Profile stats (games played, best score, average accuracy, favourite mode) are n
 
 ### Saving a match
 
-`GameSession` ends the match and calls `onGameOver(summary)`. `GameArea` then posts `{ mode, score, accuracy, reactionTime }` through `saveMatchResult`. `POST /api/scores` verifies the token, validates every field (and ignores any `uid` in the body), and inserts the row. The profile stats and the leaderboards pick the match up on their next read.
+The server computes every stored score itself, from the match's event log (PLAN-SCORING.md):
+
+1. **Start.** For a signed-in player, `useMatchSave` calls `POST /api/matches` in parallel with the engine starting. The `matches` row records the mode and the database's start time. A mid-match Restart keeps the round's ticket.
+2. **Play.** `GameSession` logs every hit, miss and expiry in game time (`scoring.js`). Its `onGameOver` summary is `scoreEvents`' replay of that log, so the results screen shows what the server will compute.
+3. **Submit.** `saveMatchResult` posts `{ matchId, events }`, and `POST /api/scores` handles it:
+   - verifies the token
+   - shape-checks the body (`scoreInput.js`, at most 512 KB and 10,000 events; any `score` or `uid` in it is ignored)
+   - loads the caller's match (404 if it's unknown or another player's, 409 if already submitted, 410 if expired)
+   - runs `checkMatch` with the mode's configuration and the database's elapsed time (400 naming the failed rules)
+   - scores the log with `scoreEvents`
+4. **Claim.** One statement claims the match (`submitted_at`) and inserts the computed figures under the match's own mode. Both happen or neither does, so a replayed request finds nothing to claim. The composite key from `scores` to `matches` backs this up in the database.
+5. **Status.** The results screen reports the outcome: saved; *unregistered* (no ticket); *rejected* (a 4xx from the server's checks); or an error.
+
+The profile stats and the leaderboards pick the match up on their next read.
 
 ### Leaderboards
 

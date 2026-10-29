@@ -8,6 +8,9 @@ const SAVE_STATUS_TEXT = {
   saving: 'Saving score…',
   saved: 'Saved to your profile.',
   error: "Couldn't save this score. Check your connection.",
+  unregistered:
+    "This match couldn't be registered when it started, so its score wasn't saved.",
+  rejected: "The server couldn't verify this match, so its score wasn't saved.",
 }
 
 const Row = ({ label, children }) => (

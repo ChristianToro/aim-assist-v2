@@ -69,7 +69,7 @@ What this buys, honestly stated:
 | S1 | Done | **Shared scoring and the event log (client only).** `src/game/scoring.js` (`targetValueAt`, `scoreEvents`) with tests. `GameSession` records the event log and its summary comes from `scoreEvents`; a test plays a scripted session and checks the log reproduces its live score. `readJson` gains a byte limit. No API change yet, so the app keeps working. | `src/game/scoring.js`, `GameSession.js`, `ScoreManager.js`, `api/_lib/http.js` |
 | S2 | Done | **Plausibility checks.** `api/_lib/matchCheck.js`, pure, with tests per rule and per mode (a real log passes; a 9,999,999 log, a too-fast log, a too-early submit and a non-ascending log each fail by name). Calibrate the thresholds against logs from the user's own matches under `npm run dev:full`. | `api/_lib/matchCheck.js`, `api/_lib/matchCheck.test.js` |
 | S3 | Done | **Matches table and `POST /api/matches`.** Migration `004_matches.sql` (`matches`, `scores.match_id`, `CHECK`s), `matchStore` with the issue limit, the route, and `services/matches.js`. Unused by the client until S4. | `db/migrations/004_matches.sql`, `api/matches.js`, `api/_lib/matchStore.js` |
-| S4 | Planned | **`POST /api/scores` on matches.** Body `{ matchId, events }`. In one transaction: claim the match (owner, mode, unexpired, unsubmitted), run `matchCheck`, insert the computed figures with `match_id`. `scoreInput.js` becomes the body shape check. `GameArea` requests the match on Start and posts the log; the save status covers a missing or rejected ticket. | `api/scores.js`, `api/_lib/scoreInput.js`, `GameArea.jsx`, `services/scores.js` |
+| S4 | Done | **`POST /api/scores` on matches.** Body `{ matchId, events }`. In one transaction: claim the match (owner, mode, unexpired, unsubmitted), run `matchCheck`, insert the computed figures with `match_id`. `scoreInput.js` becomes the body shape check. `GameArea` requests the match on Start and posts the log; the save status covers a missing or rejected ticket. | `api/scores.js`, `api/_lib/scoreInput.js`, `GameArea.jsx`, `services/scores.js` |
 | S5 | Planned | **Legacy data and docs.** The read-only report of legacy rows that fail the new bounds (`scripts/`). ARCHITECTURE.md (routes, data model, the score flow, Security's "Scores are still computed in the browser"), README's next-features list, and an audit-response note. | `scripts/`, `ARCHITECTURE.md`, `README.md` |
 
 ## S0 detail
@@ -207,6 +207,64 @@ What this buys, honestly stated:
   - **Limit:** through the real store, the 21st match in 10 minutes gets a 429, and another player is unaffected.
   - **Deletion:** deleting a user removes their matches and scores without a key error.
 - **Not run:** the route itself under `npm run dev:full`, which needs `004` applied to Neon. Its first real use is in S4's manual checks.
+
+## S4 detail
+
+1. **`scoreInput.js` is now the shape check** for `{ matchId, events }`:
+   - `matchId` must be a uuid (lowercased).
+   - `events` is an array of at most 10,000 events. Each event has a known `kind`, and its `t` (and a hit's `spawnedAt`) is a whole ms between 0 and the longest ticket lifetime.
+   - Unknown fields are dropped, so a `score` or `uid` in the body never reaches the checks.
+   - The old client's body fails here with a 400 `['matchId', 'events']`, as settled at S0.
+   - It exports `MAX_SUBMISSION_BYTES` (512 KB), which `api/scores.js` passes to `readJson`.
+2. **Stores:**
+   - `matchStore.find(uid, matchId)` returns `{ mode, elapsedMs, submitted, expired }` on the database's clock. It returns null when the match is unknown or another player's.
+   - `scoreStore.insertForMatch(uid, matchId, figures)` claims the match and inserts the score in **one statement** (`with claimed as (update matches … returning …) insert into scores … select … from claimed`): both happen or neither. It returns null when the match can't be claimed, so of two racing submits only one gets a row.
+   - The old `scoreStore.insert` is gone.
+
+   **Changed from the plan's "in one transaction":** Neon's HTTP driver can't run JavaScript (`checkMatch`) inside a transaction. So the read and the check come first, and the claim is atomic with the insert. A failed check therefore doesn't spend the ticket. That's harmless, since a ticket is good for one save either way.
+3. **`api/_lib/matchSubmit.js`**, `submitMatch({ matchStore, scoreStore }, { uid, matchId, events })`:
+   - Refusals: 404 for an unknown or foreign match, 409 for one already submitted, 410 for an expired one, and 400 `Implausible match { invalid }` for a log that fails `checkMatch`.
+   - Otherwise it runs `scoreEvents` under the **match's** mode, then `insertForMatch`; a null there is a 409.
+   - It returns `{ id, createdAt, score, accuracy, reactionTime }`.
+4. **`api/scores.js`:** auth → `readJson` (512 KB) → `parseScoreSubmission` → `submitMatch`, returning 201.
+   - A foreign-key violation now maps to 401 only when it's on `scores_user_id_fkey`.
+   - A deleted user's matches cascade away, so their token now gets a 404 at the lookup rather than a 401.
+5. **Client:**
+   - `saveMatchResult({ matchId, events })` sends no score.
+   - **`useMatchSave` (new hook):**
+     - `beginMatch()` requests a ticket on Start, in parallel with the engine, and only when signed in.
+     - `beginMatch({ restart: true })` keeps the round's ticket, so the Restart button doesn't eat into the issue limit.
+     - A failed ticket request is forgotten, so the next Restart asks again.
+     - `saveMatch(events)` redeems the ticket.
+   - **New save statuses:** `unregistered` (no ticket), and `rejected` (a 400, 404, 409 or 410 from the server). `ResultsModal` words both.
+   - `GameArea` uses the hook, and its Restart button calls `beginMatch({ restart: true })`.
+6. **ARCHITECTURE.md:** the routes table and the "Saving a match" flow are rewritten. Security's "Scores are still computed in the browser" and the README's next-features entry are left for S5, as planned.
+
+**Known limit, found while writing the manual checks:** a player can submit one of their own real logs again under a fresh ticket of the same mode, which stores the same score twice. It can't raise their best score or their place on the one-entry-per-player boards. Rejecting a reused log (for example, a unique hash of the log) is a possible follow-up. The plan's stated limit already covers it: a plausible log isn't proof of a fresh human match.
+
+### S4 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (64 files, 380 tests) and `npm run build` pass.
+- New and changed unit tests:
+  - `scoreInput.test.js`: shape rules, field dropping, and the old body rejected.
+  - `matchSubmit.test.js` (in-memory stores, real fixture logs): the server's figures stored; the match's mode used; 404, 409, 410; extra hits rejected as `[spawnRate]`; a too-early submit; a lost race.
+  - `useMatchSave.test.js` (mocked services): the ticket and save flow; signed out; Restart keeping the ticket; a fresh ticket per round; a failed ticket reported as unregistered and retried on Restart; 4xx shown as rejected, a network failure as an error.
+  - `services/scores.test.js`.
+- **PGlite**, migrations `001`–`004`, with the real stores, `submitMatch` and `parseScoreSubmission`, passed 16 checks:
+  - `find` returns the mode, elapsed time and flags, and hides another player's match.
+  - A real Flick log saves with the server's score, ignoring `score: 9999999`; the row holds the computed figures and `match_id`; the match is marked submitted.
+  - A replay gets 409 and stores nothing.
+  - Another player's ticket and a never-issued id get 404.
+  - Doubled hits get 400 `[spawnRate]`; a Gridshot submit 5 s after issue gets 400 `[tooEarly, clock]`; an expired match gets 410.
+  - The stored mode is the match's own; a real Survival log saves; profile stats count the saved rows.
+- **The user's manual checks under `npm run dev:full`, signed in, all passed:**
+  - A real match in each mode saved, and the stored score equalled the results screen's. Every real save passing also shows the 2 s wall-clock tolerance is enough locally.
+  - Replaying a request got a 409.
+  - A fresh ticket with `score: 9999999` added stored the computed score.
+  - Doubled hits got 400 `[spawnRate]`.
+  - A Gridshot submit straight after issue got 400 `[tooEarly]`.
+  - The old client's body got 400 `[matchId, events]`.
+- **Not run here:** the Vercel preview and production, which need the user's push. The 2 s tolerance against production latency is still to be watched there.
 
 ## Verification (every gate)
 
