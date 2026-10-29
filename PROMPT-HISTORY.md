@@ -147,3 +147,35 @@ A tiebreak was first written as `order by created_at desc, id desc`. In Postgres
 - `npm run lint`, `npm run format:check`, `npm test` (436 tests, up from 409) and `npm run build` pass.
 - Browser: the production build with the U7 faked session and stubbed reads (scratchpad `insight-shots.mjs`), in Dark and Light at 1440 and Dark at 390. It opened on the latest answers, the keyboard picked an older one, there was no sideways scroll and no console errors.
 - Not run: against Neon (I3). Approved and committed at the user's "commit I2".
+
+### Interaction 5 — Final pass and PR body (I3)
+
+**User Prompt**
+
+> Pushed and migrated, execute I3
+
+**Agent Outcome**
+
+- **Live checks against Neon** (read only, nothing printed from `.env.local`):
+  - `005_insight_context.sql` is recorded.
+  - All 12 stored answers pass `parseAdvice`, so the history drops none.
+  - Under `vercel dev`, both routes' `GET` and `POST` answer 401 without a token.
+- **taste-skill `lint.mjs --app`** on the changed UI: 0 FAIL, 0 WARN.
+- **README:** the AI insights feature line mentions past answers, and the project plan gains a *Past insights* paragraph.
+- **PR body:** written to the agent's scratchpad (`PR-insights.md`) for the user to paste. It has a route/table/component diff, tests 401 → 436, the PGlite and Neon checks, and a two-way-door Merge Danger with a Profile blast radius.
+
+**Verification**
+
+- Lint, format check, tests (436) and build pass.
+- Not done by the agent: the real signed-in look at Profile, since Google sign-in can't be automated here (PLAN-UI.md). That's left to the user.
+
+### Interaction 6 — Signed-in check passed; I3 committed
+
+**User Prompt**
+
+> I ran a dev server, signed in and sent an update with a new dpi. The new entry has "for 850 dpi", and the picker lists all generated responses. success. commit I3
+
+**Agent Outcome**
+
+- PLAN-INSIGHTS.md records the user's report, and I3 is marked Done and committed. Every milestone (I0–I3) is now done.
+- **Next:** the user pushes and opens the PR with the body in the scratchpad (`PR-insights.md`).

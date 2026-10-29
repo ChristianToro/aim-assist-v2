@@ -46,7 +46,7 @@ Every recommendation Claude generates is already saved: `insights` has one row p
 | I0 | Done | **Plan + docs.** This plan with the two choices settled. CLAUDE.md's document list and workflow point at it. The prompt history is rotated (854 lines). | `PLAN-INSIGHTS.md`, `CLAUDE.md`, `PROMPT-HISTORY.md` |
 | I1 | Done | **Server: store the inputs, list the history.** Migration `005_insight_context.sql`. `insightStore` gains `history(uid, kind, limit)` and saves `context`. The runner returns `id` and `context`. `requestInsight` passes `context` to the store. Each insight route adds a `GET`, and a pure `historyEntries(rows, parseAdvice)` drops rows that don't parse. Tests: the runner with its in-memory store, `historyEntries`, and a throwaway PGlite check of the migration and the query. ARCHITECTURE.md's routes and data model. | `db/migrations/005_insight_context.sql`, `api/_lib/insightStore.js`, `api/_lib/insightRunner.js`, `api/_lib/insightRequest.js`, `api/insights/*.js` |
 | I2 | Done | **Client: open on the latest answer, pick older ones.** `services/insights.js` list calls, a read hook for the history, `InsightPanel`'s picker and "Generated …" footer for a saved entry, and `HardwareInsight`'s setup line. A fresh answer goes to the top of the list. Tests for the service, the hook, the panel and Profile. ARCHITECTURE.md's data-fetching paragraph. | `src/services/insights.js`, `src/hooks/`, `src/components/InsightPanel/`, `src/components/HardwareInsight/`, `src/components/PlatformInsight/` |
-| I3 | Planned | **Final pass.** Run against Neon with `005` applied: the user checks the page and supplies screenshots, then the taste-skill app-screen checks follow (`lint.mjs`). README's features list, and the PR body. | `README.md`, `ARCHITECTURE.md` |
+| I3 | Done | **Final pass.** Run against Neon with `005` applied: the user checks the page and supplies screenshots, then the taste-skill app-screen checks follow (`lint.mjs`). README's features list, and the PR body. | `README.md`, `ARCHITECTURE.md` |
 
 ## I0 detail
 
@@ -104,6 +104,28 @@ Every recommendation Claude generates is already saved: `insights` has one row p
   - Two ↓ presses on the focused picker showed the legacy entry, which has no setup line.
   - At 390 there's no sideways scroll, and the console has no errors.
 - Not run: real `GET`s against Neon, which is I3.
+
+## I3 detail
+
+1. Live checks against Neon, all read only:
+   - `005` is recorded.
+   - Every stored answer still parses.
+   - The routes under `vercel dev` refuse a request without a token.
+2. taste-skill `lint.mjs --app` over the changed UI. `inspect.mjs` can't sign in with Google, as settled in PLAN-UI.md, so the rendered check is I2's faked-session screenshots plus the user's real sign-in.
+3. README: the AI insights feature line, and a *Past insights* paragraph in the project plan.
+4. The PR body for `improvement/insights` → `main`, written to the agent's scratchpad for the user to paste.
+
+### I3 verification (2026-10-29)
+
+- The user applied `005` (`npm run db:migrate`). A read-only query confirmed:
+  - `schema_migrations` lists `001`–`005`.
+  - `insights.context` is a nullable `jsonb`.
+  - The 12 existing rows have no `context` yet, as expected for answers saved before `005`.
+- All 12 stored answers (7 hardware, 5 platforms, across 2 players) pass their kind's `parseAdvice`, so the history skips none. The busiest account has 5 hardware and 3 platforms answers, so its picker will show.
+- `vercel dev`: `GET` and `POST` on both insight routes answer 401 without a token, and `/api/health` reports the database up.
+- `lint.mjs --app` on `InsightPanel/`, `HardwareInsight/`, `PlatformInsight/`, `Profile.jsx` and `styles/field.js`: 0 FAIL, 0 WARN.
+- Lint, format check, tests (436) and build pass.
+- *2026-10-29, user report:* under `npm run dev:full`, signed in, an Update with a new DPI produced an entry reading "For 850 DPI", and the picker listed every generated answer.
 
 ## Verification
 
