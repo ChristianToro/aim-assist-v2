@@ -179,3 +179,22 @@ A tiebreak was first written as `order by created_at desc, id desc`. In Postgres
 
 - PLAN-INSIGHTS.md records the user's report, and I3 is marked Done and committed. Every milestone (I0–I3) is now done.
 - **Next:** the user pushes and opens the PR with the body in the scratchpad (`PR-insights.md`).
+
+### Interaction 7 — PR body for `improvement/insights` → `main`
+
+**User Prompt**
+
+> Pushed, log the PR body in the prompt history
+
+**Agent Outcome**
+
+- **The body:** written in I3 to the agent's scratchpad (`PR-insights.md`) for the user to paste when opening the PR on GitHub. It follows the `pr` skill's template:
+  - **Summary:** diffs of the two routes (`GET` added; `POST` gains `id` and `context`), the `insights.context` column, and the Profile component tree (`useInsightHistory`, `useInsight(request, history.add)`, `InsightPicker`, the setup line). It also notes that old shapes are dropped on read.
+  - **Evidence:**
+    - Before and after (empty panels, then panels open on saved answers), with the faked-session screenshots or the user's own.
+    - Tests 401 → 436, with the new cases listed.
+    - The 15 PGlite checks, including the `insights.id` tie order.
+    - The read-only Neon checks (`005` recorded, all 12 rows parse, 401 without a token).
+    - taste-skill lint at 0 FAIL, 0 WARN.
+  - **Merge Danger:** a two-way door, since `005` is additive and already applied, and the `POST` response only gains fields. The blast radius is Profile: two capped, indexed `GET`s on load, and a failed `GET` that leaves Generate usable.
+- The branch is pushed (`improvement/insights` tracks `origin/improvement/insights`). The PR wasn't opened by the agent. This entry was committed at the user's "commit it".
