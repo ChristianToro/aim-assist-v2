@@ -473,3 +473,89 @@ The user chose the faked session over driving their own signed-in Chrome.
   - **Merge Danger:** a two-way door with a UI-wide blast radius.
 - **Also noted in the body:** the branch carries one docs-only v2 commit (`de1ac72`), and the Vercel preview of this branch is still unchecked.
 - The PR wasn't opened by the agent. This entry is uncommitted.
+
+---
+
+## Session: 2026-10-29 (second)
+
+**Objective:** Take a situation report of the repository against its plans after the UI refactor merged.
+
+### Interaction 1 — SITREP after the `refactor/UI` merge
+
+**User Prompt**
+
+> /prompt-history /sitrep
+
+**Agent Outcome**
+
+- **Read-only report**, no code changed. `main` is clean and level with `origin/main` at `e19a821` (PR #2, `refactor/UI` merged).
+- **Against plan:** PLAN-V2.md M0–M9 and PLAN-UI.md U0–U7 are all marked Done; `refactor/UI` has no commits beyond `main`.
+- **Open items found:**
+  - The Vercel preview / production check for the restyle is still listed as not run in PLAN-UI.md's U7 verification (user check 5).
+  - No plan file covers the next work. README's "Which features considered next?" list leads with server-authoritative scoring, the open action item carried in this file's header.
+- **Verification:** code and docs inspected; tests not run.
+
+### Interaction 2 — Plan for server-checked scoring, from an audit
+
+**User Prompt**
+
+> We are going to address the open action item; move the current changes onto branch `hotfix/server-checked-scoring` to leave main unchanged.
+>
+> Here is an audit report supplied by a trusted source: *(a black-box security and architecture audit of the deployed app: F1, High, `POST /api/scores` trusts client-computed scores "without … strict bounds checking"; F2, Medium, API routes lack server-side schema validation; remedies: Zod on every route and server-side telemetry verification)*
+>
+> write a plan to address the vulnerabilities
+
+**Agent Outcome**
+
+- **Branch:** `hotfix/server-checked-scoring` created from `main` with Interaction 1's uncommitted entry; `main` is unchanged.
+- **Audit checked against the code** before planning:
+  - **F1 holds**, in part: bounds exist (`scoreInput.js` and the `CHECK`s) but are mode-blind sanity limits, so 9,999,999 passes them.
+  - **F2 doesn't hold:** every route already validates its input with tested pure functions (`parseSetup` bounds DPI and enumerates polling rates).
+  - The one real validation gap found: `readJson` has no body-size limit.
+- **PLAN-SCORING.md** (new), milestones S0–S5. The server issues a match (`POST /api/matches`) and computes the score itself from the match's event log, with a shared pure `scoreEvents` in `src/game/scoring.js`. Plausibility checks come from each mode's spawn configuration plus wall-clock time since the match was issued.
+- **Rejected:**
+  - Zod: a dependency that adds no check the existing validators lack.
+  - Full deterministic replay: an engine rewrite, and a bot can still forge input.
+  - Bounds only: a cheater would just post each mode's maximum.
+  - A signed JWT ticket: a second secret, and single use still needs a table.
+- **Stated limit:** this makes impossible scores unrepresentable; it doesn't prove a human played.
+- **Open for the user at S0:** what to do with legacy rows that have no `match_id`, and whether to accept breaking old clients on deploy.
+- **Verification:** none run; this is a plan, built from reading `api/`, `src/game/` and `db/migrations/`.
+
+### Interaction 3 — S0: choices settled, docs updated; stopped at the review gate
+
+**User Prompt**
+
+> go with both recommendations; execute S0
+
+**Agent Outcome**
+
+- **Settled** in PLAN-SCORING.md's new "Settled at S0" table:
+  - **Legacy rows stay** on the boards. S5's read-only report lists any that fail the new bounds, for the user to delete in the Neon Console.
+  - **The old client's body is rejected** once S4 deploys, with no legacy submission path.
+- **CLAUDE.md:**
+  - PLAN-SCORING.md leads the document list. PLAN-UI.md stays listed, marked done, for its design rules.
+  - The workflow names `hotfix/server-checked-scoring`.
+  - The gameplay stack row no longer says the engine is unchanged from v1.
+- **PLAN-SCORING.md:** S0 is at Review, with an S0 detail and verification section.
+
+**Verification**
+
+- Docs only, so lint, tests and build weren't run.
+- `npm run format:check` passes, but `.prettierignore` excludes `*.md`, so it doesn't check these files.
+- CLAUDE.md's document links resolve.
+
+**Collaboration**
+
+- S0 stopped at the review gate. Nothing is committed: `CLAUDE.md`, `PROMPT-HISTORY.md` and the new `PLAN-SCORING.md` are uncommitted on `hotfix/server-checked-scoring`.
+
+### Interaction 4 — S0 approved and committed
+
+**User Prompt**
+
+> commit S0
+
+**Agent Outcome**
+
+- S0 is marked Done in PLAN-SCORING.md and committed on `hotfix/server-checked-scoring` with this session's history.
+- **Next:** S1, the shared scoring function and the client's event log, when the user says so.
