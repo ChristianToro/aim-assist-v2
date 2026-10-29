@@ -1,5 +1,6 @@
 import { Link, NavLink } from 'react-router-dom'
 import AuthControls from '../AuthControls/AuthControls'
+import { useAuth } from '../../hooks/useAuth'
 
 const navLinks = [
   { to: '/play', label: 'Play' },
@@ -15,32 +16,41 @@ const linkClass = ({ isActive }) =>
       : 'text-muted hover:bg-surface hover:text-heading'
   }`
 
-const Navbar = () => (
-  <header className="sticky top-0 z-10 border-b border-edge bg-bg/80 backdrop-blur">
-    <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
-      <Link
-        to="/"
-        className="flex shrink-0 items-center gap-2 text-base font-semibold tracking-tight text-heading sm:text-lg"
-      >
-        <span aria-hidden="true" className="text-accent">
-          ◎
-        </span>
-        <span className="hidden min-[420px]:inline">Aim Assist</span>
-      </Link>
+// The page links are for signed-in players only; signed-out visitors
+// (and the session restore, where user is still null) see the wordmark
+// and the sign-in button.
+const Navbar = () => {
+  const { user } = useAuth()
 
-      <div className="flex items-center gap-1 overflow-x-auto">
-        {navLinks.map(({ to, label }) => (
-          <NavLink key={to} to={to} className={linkClass}>
-            {label}
-          </NavLink>
-        ))}
-      </div>
+  return (
+    <header className="sticky top-0 z-10 border-b border-edge bg-bg/80 backdrop-blur">
+      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
+        <Link
+          to="/"
+          className="flex shrink-0 items-center gap-2 text-base font-semibold tracking-tight text-heading sm:text-lg"
+        >
+          <span aria-hidden="true" className="text-accent">
+            ◎
+          </span>
+          <span className="hidden min-[420px]:inline">Aim Assist</span>
+        </Link>
 
-      <div className="shrink-0">
-        <AuthControls />
-      </div>
-    </nav>
-  </header>
-)
+        {user && (
+          <div className="flex items-center gap-1 overflow-x-auto">
+            {navLinks.map(({ to, label }) => (
+              <NavLink key={to} to={to} className={linkClass}>
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        )}
+
+        <div className="shrink-0">
+          <AuthControls />
+        </div>
+      </nav>
+    </header>
+  )
+}
 
 export default Navbar

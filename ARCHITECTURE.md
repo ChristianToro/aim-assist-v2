@@ -31,7 +31,7 @@ React owns everything around gameplay: routing, menus, auth state, settings, the
 
 | Folder | Role |
 |---|---|
-| `pages/` | One component per route. Each is code-split with `lazy()`; `/profile` sits behind `ProtectedRoute`. |
+| `pages/` | One component per route. Each is code-split with `lazy()`; `/play` and `/profile` sit behind `ProtectedRoute`, and the navbar shows page links only to signed-in players. |
 | `components/` | Small presentational pieces (`Leaderboard`, `ProfileCard`, `InsightPanel`, …) plus the game bridge (`GameArea`, `GameCanvas`, `GameHud`). |
 | `hooks/` | Stateful logic: `useAuth`, `useLeaderboard`, `useUserProfile`, `useInsight`, and `useGameSession`, which owns one engine instance. |
 | `contexts/` | `AuthProvider` (the Neon Auth session, mapped to `{ uid, displayName, photoURL }`) and `ThemeProvider`. |

@@ -1,6 +1,22 @@
 import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
+import Tooltip from '../components/Tooltip/Tooltip'
 import { GAME_MODES } from '../game/modes'
+import { useAuth } from '../hooks/useAuth'
+
+// /play needs a signed-in player, so signed out the button explains how
+// to get one instead of leading to a redirect.
+const StartTrainingButton = () => {
+  const { user } = useAuth()
+
+  if (user) return <Button to="/play">Start Training</Button>
+
+  return (
+    <Tooltip content="Continue with Google to start playing">
+      {(triggerProps) => <Button {...triggerProps}>Start Training</Button>}
+    </Tooltip>
+  )
+}
 
 const Home = () => (
   <>
@@ -14,7 +30,7 @@ const Home = () => (
         global leaderboards. No install required.
       </p>
       <div className="mt-8 flex items-center justify-center gap-4">
-        <Button to="/play">Start Training</Button>
+        <StartTrainingButton />
         <Button to="/leaderboards" variant="secondary">
           Leaderboards
         </Button>

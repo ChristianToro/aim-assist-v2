@@ -14,22 +14,29 @@ const Profile = lazy(() => import('./pages/Profile'))
 const Settings = lazy(() => import('./pages/Settings'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
+// The route table on its own, so tests can mount it in a MemoryRouter.
+// Playing and the profile need a signed-in player; the boards and
+// settings stay public.
+export const AppRoutes = () => (
+  <Routes>
+    <Route element={<Layout />}>
+      <Route index element={<Home />} />
+      <Route path="leaderboards" element={<Leaderboards />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="play" element={<Play />} />
+        <Route path="profile" element={<Profile />} />
+      </Route>
+      <Route path="settings" element={<Settings />} />
+      <Route path="*" element={<NotFound />} />
+    </Route>
+  </Routes>
+)
+
 const App = () => (
   <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route index element={<Home />} />
-            <Route path="play" element={<Play />} />
-            <Route path="leaderboards" element={<Leaderboards />} />
-            <Route element={<ProtectedRoute />}>
-              <Route path="profile" element={<Profile />} />
-            </Route>
-            <Route path="settings" element={<Settings />} />
-            <Route path="*" element={<NotFound />} />
-          </Route>
-        </Routes>
+        <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
   </ThemeProvider>

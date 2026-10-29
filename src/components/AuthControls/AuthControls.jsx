@@ -1,31 +1,17 @@
 import Button from '../Button/Button'
+import GoogleSignInButton from '../GoogleSignInButton/GoogleSignInButton'
 import { useAuth } from '../../hooks/useAuth'
-import { signInWithGoogle, signOutUser } from '../../services/auth'
+import { signOutUser } from '../../services/auth'
 
 // Navbar auth section: Google sign-in when signed out; avatar +
-// sign-out when signed in (per CLAUDE.md, Google is the only provider).
+// sign-out when signed in.
 const AuthControls = () => {
   const { user, isLoading } = useAuth()
-
-  const handleSignIn = async () => {
-    // Success navigates away to Google, so only a failure returns here.
-    try {
-      await signInWithGoogle()
-    } catch (error) {
-      console.error('Sign-in failed:', error)
-    }
-  }
 
   // Reserve width during session restore to avoid layout shift.
   if (isLoading) return <div className="w-24" aria-hidden="true" />
 
-  if (!user) {
-    return (
-      <Button variant="secondary" size="sm" onClick={handleSignIn}>
-        Continue with Google
-      </Button>
-    )
-  }
+  if (!user) return <GoogleSignInButton variant="secondary" size="sm" />
 
   return (
     <div className="flex items-center gap-2">

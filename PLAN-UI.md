@@ -40,7 +40,7 @@ The first target is the landing page:
 | # | Status | Milestone | Key files |
 |---|---|---|---|
 | U0 | Done | **Skill install + docs.** Install the plugin (user step). Write this plan and update CLAUDE.md. Ignore `.taste-skill/`. Record the "before" inspector baseline. The user adds the hero image. | `PLAN-UI.md`, `CLAUDE.md`, `.gitignore` |
-| U1 | Planned | **Gating + shared sign-in button.** Logic only, with tests: `GoogleSignInButton`, nav links shown only to signed-in users, `/play` behind `ProtectedRoute`, and the Start Training tooltip. | `src/App.jsx`, `Navbar`, `Home.jsx`, `GoogleSignInButton/`, `Tooltip/` |
+| U1 | Done | **Gating + shared sign-in button.** Logic only, with tests: `GoogleSignInButton`, nav links shown only to signed-in users, `/play` behind `ProtectedRoute`, and the Start Training tooltip. | `src/App.jsx`, `Navbar`, `Home.jsx`, `GoogleSignInButton/`, `Tooltip/` |
 | U2 | Planned | **Landing + shell restyle (taste-skill).** Hero with the image, game modes, a leaderboard social-proof section, the CTA, and Navbar, Footer, Button and Card restyled to the dealt type and composition. | `Home.jsx`, `src/components/landing/`, `src/index.css`, `Leaderboard.jsx` |
 
 ## U0 detail
@@ -89,24 +89,50 @@ These behaviour changes come with tests and are kept separate, so U2's diff is d
    - That handler is currently duplicated in `AuthControls.jsx` and in `SignInPrompt` in `pages/Leaderboards.jsx`, and the CTA would add a third copy.
    - Both current callers switch to the new component.
 2. **Navbar:** render `navLinks` only when `useAuth()` has a `user`. While `isLoading`, render none, so links don't flash and then disappear. `AuthControls` doesn't change.
-3. **Route gate** (`src/App.jsx`): `<Route path="play">` moves inside the existing `<ProtectedRoute />` element, next to `profile`. Signed-out deep links redirect to `/`.
+3. **Route gate** (`src/App.jsx`): `<Route path="play">` moves inside the existing `<ProtectedRoute />` element, next to `profile`. Signed-out deep links redirect to `/`. The route table is now exported as `AppRoutes`, so a test can mount it in a `MemoryRouter`. `App` still wraps it in the providers and `BrowserRouter`.
 4. **Start Training** (`Home.jsx`):
    - **Signed in:** the existing `Button to="/play"`.
    - **Signed out:** a `<button>` that opens a tooltip reading "Continue with Google to start playing".
-     - It toggles on click, and also shows on hover and focus.
+     - It opens on click, hover and focus. *Built:* a click opens it rather than toggling it. With hover also opening it, a toggle would close it on the first click with a mouse.
      - It closes on Escape, on blur or on an outside click.
      - It's wired up with `aria-describedby` and `role="tooltip"`.
    - The tooltip is a small `src/components/Tooltip/` component, positioned with CSS only. No popper library.
 5. **Tests** (Vitest and Testing Library):
    - **Harness:**
-     - Components are wrapped in `AuthContext.Provider` (from `src/contexts/authContext.js`) and a `MemoryRouter`.
+     - Components are wrapped in `AuthContext.Provider` (from `src/contexts/authContext.js`) and a `MemoryRouter`, through the shared helper `src/test/renderWithAuth.jsx`.
      - `services/auth` is mocked with `vi.mock`, as `api.test.js` already does, so the Neon SDK isn't initialized.
    - **`Navbar`:** links are hidden when signed out or loading, and all four show when signed in.
    - **`Home`:** signed out, Start Training shows the tooltip and Escape hides it. Signed in, it links to `/play`.
    - **`GoogleSignInButton`:** a click calls `signInWithGoogle`, and a rejection is caught.
    - **Routing:** signed out, `/play` renders Home.
+   - **`Tooltip`** (added while building): hidden at first and tied to its trigger as the accessible description; opens on click, focus and hover; closes on Escape, an outside press, blur and the pointer leaving.
 6. **Unchanged:** `GameArea`'s derived `'signed-out'` save status. It still covers a sign-out in the middle of a match.
-7. Stop for review.
+7. `ARCHITECTURE.md`: the `pages/` row now says `/play` is protected too, and the nav links are for signed-in players only.
+8. Stop for review.
+
+### U1 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` and `npm run build` pass.
+  - **Tests:** 205, up from 193. The 12 new tests are 2 for `GoogleSignInButton`, 4 for `Tooltip`, 3 for `Navbar`, 2 for `Home` and 1 for `AppRoutes`.
+  - **Bundle:** the entry chunk is 3.33 kB gzip (3.30 before), and `Home` is 1.18 kB.
+- **Signed out, in headless Chrome** against the production build (`vite preview`), with JS run before the DOM dump:
+  - On `/`, the navbar has no Play, Leaderboards, Profile or Settings links. It shows only the wordmark and "Continue with Google". The one `/leaderboards` link left is the hero's button.
+  - The hidden `role="tooltip"` element is in place next to Start Training.
+  - `/play` redirects to Home (its `h1` is "Train your aim, …").
+- **Not run here:**
+  - The tooltip opening in a real browser. The unit tests cover it in jsdom.
+  - Every signed-in path, which needs Google sign-in.
+- *2026-10-28, user report:*
+  - *Signed out: no links in the navbar, Start Training shows the message on hover, and `/play` reroutes to Home.*
+  - *Signed in: the links appear.*
+  - *Second report: signed in, Start Training opens `/play`. The tooltip closes when the pointer leaves. Signed out, `/leaderboards` and `/settings` work. The Personal Best button starts Google sign-in.*
+  - *Not reported: closing with Escape or an outside click. The `Tooltip` unit tests cover both.*
+  - *The user saw only one "Continue with Google", the navbar's. That's expected: the other one is on `/leaderboards` → Personal Best, which a signed-out visitor reaches through the hero's Leaderboards button or the URL, now that the nav link is hidden. U2's CTA adds one to Home.*
+- **Browser checks (user),** under `npm run dev:full`:
+  1. Signed out: no page links in the navbar. Hovering, focusing or clicking Start Training shows "Continue with Google to start playing". Escape or a click elsewhere hides it.
+  2. Signed out: typing `/play` lands on Home. `/leaderboards` and `/settings` still open.
+  3. Signed in: all four links show, and Start Training opens `/play`.
+  4. Both "Continue with Google" buttons (the navbar, and Leaderboards → Personal Best) still start sign-in.
 
 ## U2 detail
 

@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
+import GoogleSignInButton from '../components/GoogleSignInButton/GoogleSignInButton'
 import Leaderboard from '../components/Leaderboard/Leaderboard'
 import { useAuth } from '../hooks/useAuth'
 import { useLeaderboard } from '../hooks/useLeaderboard'
-import { signInWithGoogle } from '../services/auth'
 
 const VIEWS = [
   { id: 'all', label: 'All Time', empty: 'No scores yet — be the first!' },
@@ -24,25 +23,12 @@ const tabClass = (isActive) =>
       : 'text-muted hover:bg-surface hover:text-heading'
   }`
 
-const SignInPrompt = () => {
-  const handleSignIn = async () => {
-    // Success navigates away to Google, so only a failure returns here.
-    try {
-      await signInWithGoogle()
-    } catch (error) {
-      console.error('Sign-in failed:', error)
-    }
-  }
-
-  return (
-    <Card className="flex flex-col items-center gap-4 py-12 text-center">
-      <p className="text-muted">Sign in to track your personal best scores.</p>
-      <Button variant="secondary" onClick={handleSignIn}>
-        Continue with Google
-      </Button>
-    </Card>
-  )
-}
+const SignInPrompt = () => (
+  <Card className="flex flex-col items-center gap-4 py-12 text-center">
+    <p className="text-muted">Sign in to track your personal best scores.</p>
+    <GoogleSignInButton variant="secondary" />
+  </Card>
+)
 
 const Leaderboards = () => {
   const { user } = useAuth()

@@ -535,3 +535,91 @@ The baseline came from the production build, not the dev server: the skill says 
 **Changes**
 
 - New: [`src/assets/hero-img.webp`](src/assets/hero-img.webp), added without the executable bit the file had on disk.
+
+The user pushed the amended commit (`87528cf`).
+
+### Interaction 6 — U1: sign-in gating, Start Training tooltip, shared Google button
+
+**User Prompt**
+
+> pushed, start U1
+
+**Agent Outcome**
+
+Signed-out visitors now see only the wordmark and "Continue with Google" in the navbar. `/play` sits behind `ProtectedRoute`. On Home, a signed-out visitor's Start Training opens a tooltip: "Continue with Google to start playing". The duplicated sign-in handler is now one `GoogleSignInButton`.
+
+**Implementation**
+
+- [`src/components/Tooltip/Tooltip.jsx`](src/components/Tooltip/Tooltip.jsx): `Tooltip({ content, children })`. `children` is a render prop that receives `{ 'aria-describedby', onClick }`.
+  - It opens on hover, focus or click.
+  - It closes on Escape, a `pointerdown` outside it, blur or `mouseleave`.
+  - It's positioned with CSS only.
+- [`src/components/GoogleSignInButton/GoogleSignInButton.jsx`](src/components/GoogleSignInButton/GoogleSignInButton.jsx): Button props pass through, and the label defaults to "Continue with Google".
+- [`src/App.jsx`](src/App.jsx): `AppRoutes` is exported, and `play` moved under `ProtectedRoute`.
+
+**Rationale**
+
+- **Click opens, it doesn't toggle.** Hover already opens the tooltip, so with a mouse a toggling click would close it straight away. Touch screens get the click, and an outside tap closes it.
+- **A render prop for the trigger.** The trigger receives its props explicitly, instead of the tooltip cloning a child element and guessing what it is.
+- **`AppRoutes` split from `App`.** The route gate can be tested in a `MemoryRouter` without the real `BrowserRouter` or the Neon session provider.
+
+**Changes**
+
+- New:
+  - `Tooltip/` and `GoogleSignInButton/`, each with a test;
+  - `Navbar.test.jsx`, `pages/Home.test.jsx` and `App.test.jsx`;
+  - `src/test/renderWithAuth.jsx`, which sets a fixed `AuthContext` and a `MemoryRouter`.
+- Edited:
+  - `Navbar.jsx`: links shown only with a `user`;
+  - `AuthControls.jsx` and `pages/Leaderboards.jsx`: they use `GoogleSignInButton`;
+  - `pages/Home.jsx`: `StartTrainingButton`;
+  - `App.jsx`;
+  - `ARCHITECTURE.md`: the `pages/` row;
+  - `PLAN-UI.md`: U1 is In review, with its verification.
+
+**Verification**
+
+- Lint, format check and build pass, and the tests pass: 205, up from 193. The entry chunk is 3.33 kB gzip.
+- In headless Chrome on the production build, signed out:
+  - `/` shows no page links in the navbar;
+  - the hidden tooltip element is present;
+  - `/play` redirects to Home.
+- Not run:
+  - the tooltip opening in a real browser (it's covered in jsdom);
+  - every signed-in path, which needs Google. Those are listed as user browser checks in PLAN-UI.
+
+### Interaction 7 — U1 browser checks reported
+
+**User Prompt**
+
+> signed out: the nav bar has no links; the start training button on hover shows the message; typing route play reroutes to home
+>
+> signed in: links appear in the nav bar.
+>
+> there is only one "continue with Google" button, at the upper right in the nav bar
+
+**Agent Outcome**
+
+The report was recorded under U1 verification in PLAN-UI.md.
+
+- **"Only one Continue with Google":** that's the expected signed-out state on Home. The second button is on `/leaderboards` → Personal Best, which is now reached through the hero's Leaderboards button or the URL. U2's CTA adds a sign-in button to Home.
+- **Not reported:**
+  - Start Training opening `/play` when signed in;
+  - closing the tooltip with Escape or an outside click;
+  - `/leaderboards` and `/settings` staying public.
+
+A follow-up report confirmed most of these:
+
+> signed in, start training opens `/play`, the tooltip closes when off hover; leaderboard and setting work when signed out; personal best button starts Google sign in
+
+That leaves only Escape and the outside click untested in a real browser. The `Tooltip` unit tests cover both.
+
+### Interaction 8 — U1 approved and committed
+
+**User Prompt**
+
+> commit U1
+
+**Agent Outcome**
+
+U1 was marked Done in PLAN-UI.md and committed on `refactor/UI`. U2, the taste-skill restyle, starts when the user says so.
