@@ -458,3 +458,18 @@ The user chose the faked session over driving their own signed-in Chrome.
 - The user reported that U7's browser checks passed.
 - U7 is marked Done in PLAN-UI.md and committed on `refactor/UI` with this session's history. Every milestone, U0–U7, is now done.
 - **Left to the user:** pushing `refactor/UI`, then checking the Vercel preview.
+
+### Interaction 3 — PR body for `refactor/UI` → `main`
+
+**User Prompt**
+
+> write the PR body for refactor/UI into main; I will conduct it via the browser
+
+**Agent Outcome**
+
+- **The body:** written to the agent's scratchpad (`PR-refactor-UI.md`) for the user to paste when opening the PR on GitHub. It follows the `pr` skill's template:
+  - **Summary:** the route-gate diff, the two styles, the file tree and the two new font dependencies.
+  - **Evidence:** before and after inspector results, with the local screenshot paths to drag in. Tests went from 193 to 280, and the bundle compares against `main`.
+  - **Merge Danger:** a two-way door with a UI-wide blast radius.
+- **Also noted in the body:** the branch carries one docs-only v2 commit (`de1ac72`), and the Vercel preview of this branch is still unchecked.
+- The PR wasn't opened by the agent. This entry is uncommitted.
