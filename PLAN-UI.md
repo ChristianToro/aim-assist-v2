@@ -27,8 +27,20 @@ The first target is the landing page:
 | Access | Hide the nav links, and gate **`/play` only** behind `ProtectedRoute`. `/leaderboards` and `/settings` stay reachable by URL. The navbar's "Continue with Google" stays. |
 | Theming | `--keep palette`: the 5 themes and the canvas colors stay. The skill deals **typography and composition**. |
 | Imagery | The user's hero image plus UI fragments built in HTML. No stock photos, so the skill's picture-floor rule is waived with `--allow`. |
-| Scope | The landing page plus the shared shell (Navbar, Footer, Button, Card). The other pages get restyled in later milestones. |
+| Scope | The landing page plus the shared shell (Navbar, Footer, Button, Card). The other pages get restyled in later milestones (U3–U7, below). |
 | Skill install | A user-level Claude Code plugin. It stays out of the repo and adds no npm dependency. |
+
+### The other pages (added 2026-10-28, after U2)
+
+| Topic | Choice |
+|---|---|
+| Kind of work | Play, Leaderboards, Profile and Settings are **app screens**: they're worked in, not read. The skill gives them their own run (`references/app-screens.md`), its own draw (`draw.mjs --app`) and its own house rules (quiet borders, small labels and repeated panels are fine there) and checks them with `inspect.mjs --app`. NotFound is a **page**, so it takes U2's *Loud and flat* direction. |
+| Style | One app style for all four screens, dealt once at U3 with `draw.mjs --app --kind <kind> --keep palette,type --options 3`, for the user to choose from (as at U2). `--keep palette,type` holds the five themes and U2's Unbounded and Onest, which is the skill's rule for a product whose site and app share one palette and typeface. |
+| Order | Settings → Leaderboards → Profile → Play, from least to most risk. Settings proves the app tokens on the simplest screen. Leaderboards brings in the `Leaderboard` table, which Profile reuses. Play goes last because its overlays, HUD and results sit beside the canvas. |
+| Canvas | The engine in `src/game/` doesn't change. Play's restyle covers only the React around it: `ModePicker`, `GameArea`'s controls and overlays, `GameHud`, `ResultsModal` and `SessionHistory`. The canvas keeps taking its colours from `themes.css`. |
+| Data | The screens keep their real data, from the existing hooks and `/api`. The app run's "write a dataset" step becomes a written inventory of each screen's real objects and magnitudes. Fixture data goes only in tests. |
+| States | Every block gets its loading, empty and error states (app-screens §11), and every row and control gets hover, selected, focus and disabled. The hooks already expose `isLoading` and `error`. |
+| Signed-in screens | **Open, settled when U5 starts.** `inspect.mjs` can't sign in with Google, and Play and Profile sit behind `ProtectedRoute`. *Recommended:* `lint.mjs` on their source, Testing Library for their states, and screenshots by the user from a real sign-in at 1440, 768 and 390. *Alternative:* a dev-only route that renders them with a fixture user. It would let the inspector run, but it's code that ships in the repo only to serve a tool. |
 
 ## Workflow
 
@@ -42,6 +54,11 @@ The first target is the landing page:
 | U0 | Done | **Skill install + docs.** Install the plugin (user step). Write this plan and update CLAUDE.md. Ignore `.taste-skill/`. Record the "before" inspector baseline. The user adds the hero image. | `PLAN-UI.md`, `CLAUDE.md`, `.gitignore` |
 | U1 | Done | **Gating + shared sign-in button.** Logic only, with tests: `GoogleSignInButton`, nav links shown only to signed-in users, `/play` behind `ProtectedRoute`, and the Start Training tooltip. | `src/App.jsx`, `Navbar`, `Home.jsx`, `GoogleSignInButton/`, `Tooltip/` |
 | U2 | Done | **Landing + shell restyle (taste-skill).** Hero with the image, game modes, a leaderboard social-proof section, the CTA, and Navbar, Footer, Button and Card restyled to the dealt type and composition. | `Home.jsx`, `src/components/landing/`, `src/index.css`, `Button`, `Card`, `Navbar`, `Footer` |
+| U3 | Planned | **App style + Settings.** Record the "before" `inspect.mjs --app` baseline of the four app screens (Play and Profile by the agreed signed-in method). Deal the app style (`--keep palette,type`) for the user to choose. Port its tokens into `src/index.css` (panels, small labels, tabs, controls). Restyle Settings: the theme picker and the system-preference notes, laid out as a settings screen (app-screens §8). | `src/index.css`, `Settings.jsx`, `ThemePicker` |
+| U4 | Planned | **Leaderboards.** The view tabs as app tabs, the `Leaderboard` table to the app's table rules (figures right-aligned in tabular numerals, the player's own row marked, quiet dividers), and the Personal Best sign-in prompt. Every state: loading, empty per view, error and signed out. | `Leaderboards.jsx`, `Leaderboard` |
+| U5 | Planned | **Profile.** Settle the signed-in check first. Then `ProfileCard` and `StatTile`, the two AI insight panels (`InsightPanel`, `HardwareInsight` and `PlatformInsight`, including their loading, empty and error states), and Best Matches through U4's table. The screen's one question decides what's biggest. | `Profile.jsx`, `ProfileCard`, `StatTile`, `InsightPanel`, `HardwareInsight`, `PlatformInsight` |
+| U6 | Planned | **Play.** The mode picker, the match controls, the HUD, the idle and paused overlays on the canvas, `ResultsModal` (its save status included) and the session history. No engine changes. `Modal`'s backdrop blur and large shadow go, per the house rules. | `Play.jsx`, `ModePicker`, `GameArea`, `GameHud`, `Modal`, `ResultsModal`, `SessionHistory` |
+| U7 | Planned | **NotFound, shared states and the final pass.** NotFound in the landing direction. `LoadingScreen` and `LoadingSpinner` matched to the app style. Remove `PagePlaceholder`, which nothing imports. Then a whole-app pass: all five themes, reduced motion, increased contrast, the bundle against U2's numbers, the Vercel preview, and ARCHITECTURE.md and README.md updated. | `NotFound.jsx`, `LoadingScreen`, `LoadingSpinner`, `PagePlaceholder/`, docs |
 
 ## U0 detail
 
@@ -241,3 +258,10 @@ These behaviour changes come with tests and are kept separate, so U2's diff is d
   - A manual check of all 5 themes and of reduced motion.
   - The bundle compared to v2's numbers (entry chunk 3.3 kB gzip).
   - After a push, a check on the Vercel preview deploy for `refactor/UI`.
+- **U3–U6 (app screens):**
+  - `lint.mjs` on the changed source passes with 0 FAIL.
+  - `inspect.mjs --app` passes with 0 FAIL at all three widths on every screen it can reach. Play and Profile are checked the way U5 settles.
+  - Every block's loading, empty and error states, and each control's focus state, are seen in the browser, and covered by tests where they're logic.
+  - All 5 themes are checked on the screen, and the contrast of every new text and fill pair is computed.
+  - The before-and-after table is filled in, as in U2.
+- **U7:** the U2 checks, run once more across the whole app.

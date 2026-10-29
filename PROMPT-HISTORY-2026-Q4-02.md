@@ -1,0 +1,775 @@
+# Prompt History
+
+This document records meaningful development interactions between the user and
+AI coding agents working on this project. It focuses on requests, outcomes,
+implementation decisions, verification, and human-agent collaboration rather
+than preserving a raw conversation transcript.
+
+Generated code is included verbatim when reasonably concise. Extensive
+implementations are referenced through their canonical repository files.
+
+> This file is an engineering collaboration record, not a source of truth for
+> application behavior. The repository itself remains authoritative.
+
+> Prior history: [PROMPT-HISTORY-2026-Q4.md](PROMPT-HISTORY-2026-Q4.md) (v2 sessions through M5),
+> and [Prototype/V1-PROMPT-HISTORY.md](Prototype/V1-PROMPT-HISTORY.md), the v1 prototype's log.
+
+---
+
+## Session: 2026-10-27 (continued)
+
+**Objective:** Continues the session that began in [PROMPT-HISTORY-2026-Q4.md](PROMPT-HISTORY-2026-Q4.md): the pre-M5 status check, then M5 (data API). The archive was rotated at about 800 lines, mid-session, so numbering continues from Interaction 4.
+
+### Interaction 4 — M5 approved and committed
+
+**User Prompt**
+
+> commit M5 and the doc changes
+
+**Agent Outcome**
+
+M5 was marked Done in PLAN-V2 and committed on `release/v2.0`, together with the M5 detail and verification and the history updates. The history file had reached about 800 lines, so it was archived with `git mv` as `PROMPT-HISTORY-2026-Q4.md`, and this file was started in its place. PLAN-V2's reference to the Neon Auth comparison (Interaction 8) now links to the archive.
+
+**Verification**
+
+Lint, format check, tests and build were last run at the review gate (Interaction 2), and no code has changed since. The signed-in checks of Interaction 3 cover the committed code.
+
+### Interaction 5 — Milestone 6: client on `/api`, Firebase removed
+
+**User Prompt**
+
+> pushed, begin execution of M6
+
+**Agent Outcome**
+
+The user pushed M5. M6 was detailed in PLAN-V2 and implemented, and it stops at the review gate (status: In review), uncommitted. The browser now reaches data only through `/api`, via one helper, `apiFetch`. Firebase is gone from the code, config, dependencies and bundle. README's Firebase sections are left for M9, as planned.
+
+**Rationale**
+
+- **One fetch helper with a typed error.** `ApiError.status` lets `Leaderboard.jsx` word a 401 differently from an outage, which replaces the Firestore-code messages. A signed-out authenticated call fails before any request is made.
+- **No uid arguments.** The service functions drop their `uid` and `user` parameters, because the server reads identity from the token. Keeping them would suggest the client chooses whose data it gets. The hooks still key their state by `uid`, so a different account never sees the previous one's result.
+- **`toScoreSubmission` is pure** and tested without mocks. The fetch wrappers are tested by mocking `./api` (or `fetch` and `./auth` for the helper itself), which is the only practical seam for I/O.
+- **`src/utils/dates.js` was deleted.** Its day and week keys existed only for Firestore's equality filters, and `/api` now computes the UTC windows.
+
+**Changes**
+
+- New: [`src/services/api.js`](src/services/api.js), with `api.test.js`, `scores.test.js` and `leaderboard.test.js`.
+- Rewritten: `src/services/{users,scores,leaderboard}.js` and `users.test.js`.
+- Edited:
+  - `useUserProfile` and `useLeaderboard`: no uid passed to the services;
+  - `GameArea`: no `user` passed when saving;
+  - `Leaderboard.jsx` and its test: ISO dates and HTTP error messages;
+  - `ProfileCard`: ISO dates;
+  - `Footer`, `SessionHistory`: text and comment;
+  - `vite.config.js`: Firebase chunk removed;
+  - `.env.example`, `.gitignore`, `CLAUDE.md`: Firebase notes removed.
+- Deleted: `src/firebase/config.js`, `firebase.json`, `.firebaserc`, `firestore.rules`, `firestore.indexes.json` and `src/utils/dates{,.test}.js`, plus the `firebase` dependency.
+- [`PLAN-V2.md`](PLAN-V2.md): M6 is In review, and the M6 detail, user steps and verification sections are added.
+
+**Verification**
+
+- Lint and format check pass. `npm test` passes with 116 tests, up from 109, and `npm run build` succeeds.
+- The JS bundle is 156 kB gzip in total, with no Firebase chunk. A grep found no Firebase, Firestore or `googleapis` strings in `dist/`, and no `@firebase` packages in the lockfile.
+- Under `vercel dev`, `/leaderboards` returns HTML, and the new service and component modules are served as `text/javascript`.
+- **Not run:** the in-browser flow with Google sign-in. It needs the user. The five browser checks are listed in PLAN-V2's M6 verification, alongside the open M4 checks.
+
+### Interaction 6 — M6 approved and committed
+
+**User Prompt**
+
+> browser checks pass; commit M6 and the doc changes
+
+**Agent Outcome**
+
+The user reported that the browser checks pass, which covers M6's five checks: the signed-out boards, the saved match, the entry appearing once per board, the profile stats, and a second match. M6 was marked Done in PLAN-V2, with the user's report recorded, and committed on `release/v2.0`. Firebase is now fully removed from the v2 code.
+
+**Verification**
+
+The user ran the browser checks. The M4 checks that are still open (reload, Safari or blocked third-party cookies, sign-out) weren't explicitly reported, so PLAN-V2 keeps them open. Lint, format check, tests and build last ran at the review gate (Interaction 5), and no code has changed since.
+
+### Interaction 7 — Milestone 7: AI hardware recommendations
+
+**User Prompt**
+
+> pushed, begin execution of M7
+
+**Agent Outcome**
+
+The user pushed M6. The `claude-api` skill was consulted first, as PLAN-V2 asks, and M7 was then detailed and built. It stops at the review gate (status: In review), uncommitted.
+
+`POST /api/insights/hardware` turns the caller's per-mode stats, plus an optional current DPI and polling rate, into a structured recommendation from Claude: a summary, then DPI, sensitivity and polling rate, each with a rationale. It sits on a reusable cache-and-rate-limit runner backed by a new `insights` table (migration `003`), which M8 will reuse.
+
+The live parts are blocked on the user. `.env.local` has no `ANTHROPIC_API_KEY` (checked by variable name only), and `003` isn't applied on Neon.
+
+**Rationale**
+
+- **Model and request shape come from the skill, not memory.**
+  - `claude-opus-5-5`, with `thinking` omitted (always on; disabling it returns a 400) and `effort: 'medium'` set explicitly.
+  - Structured outputs with a plain JSON schema, which avoids a `zod` dependency.
+  - `fallbacks: 'default'` for refusals, enabled because the skill makes it the default for this model.
+  - SDK 1.3.0's types confirmed `fallbacks: 'default'` and `json_schema` output, and that the client constructs without a key.
+- **The cache and the rate limit share one table.** The cache key is a sha256 of `{ PROMPT_VERSION, modeStats, setup }`, so an answer is reused until the player plays again, changes their setup, or the prompt changes. A cached answer doesn't count toward the 5-per-day cap and is still served while the player is at the cap. The cap is soft under concurrency, which is enough to bound cost.
+- **Optional current setup.** The game has no DPI or sensitivity settings of its own, so without the player's current values the advice can only be absolute. The schema can't carry numeric bounds, so `parseAdvice` re-checks the DPI range and the polling-rate enum, and an out-of-range answer returns 502 rather than being shown.
+- **Factory plus wiring again** (`structuredOutput.js` / `claude.js`), so the Claude-call handling is tested with a fake client and the SDK's real error classes, without network.
+
+**Changes**
+
+- New:
+  - `db/migrations/003_insights.sql`;
+  - `api/insights/hardware.js`;
+  - `api/_lib/{insightPolicy,insightRunner,insightStore,structuredOutput,claude,hardwareAdvice}.js`, with tests for every pure or injectable one.
+- Edited:
+  - `api/_lib/scoreStore.js`: `modeStats`;
+  - `api/_lib/db.js`: wires `insightRunner`;
+  - `api/_lib/http.js`: `HttpError` can carry headers, used for `Retry-After`;
+  - `.env.example`: `ANTHROPIC_API_KEY`;
+  - `package.json` and the lockfile: `@anthropic-ai/sdk@^1.3.0`.
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - M7 is In review;
+  - the SDK dependency is justified;
+  - M7 detail, user steps, cost bound and verification are added.
+
+**Verification**
+
+- Lint, format check and build pass. `npm test` passes with 154 tests, up from 116.
+- PGlite with `001`–`003` passed 15 checks:
+  - `modeStats` shape;
+  - the `003` constraints;
+  - the runner and store end to end: generate, cached repeat, 5 fresh then 429 with `Retry-After`, cached answer while limited, the limit lifting after 24 hours, per-kind and per-player counting, and the cascade on user deletion.
+- The M5 PGlite checks still pass.
+- Under `vercel dev`, the new route returns 401 with no token or a forged one, and 405 for GET.
+- **Not run:** `003` on Neon and any real Claude call. Both wait on the key and the migration.
+
+### Interaction 8 — M7 live check against Neon and Claude
+
+**User Prompt**
+
+> Key was added, pulled, and I rain the db migrate command. Live check is approved - run it and report back
+
+**Agent Outcome**
+
+`schema_migrations` listed `001`–`003`, and `ANTHROPIC_API_KEY` was present (checked by length, never printed). A scratch script under `vercel dev` did the following:
+
+1. Signed up a temporary user and got its JWT.
+2. Posted matches through `POST /api/scores`.
+3. Exercised `POST /api/insights/hardware`, which made two real Claude calls.
+4. Deleted the user.
+
+10 of 11 checks passed as scripted:
+
+- The 422s at 0 and 4 matches, and the 400 on a bad setup.
+- A fresh recommendation in 12.2 s: 800 DPI, 1:1 pointer speed with acceleration off, 1000 Hz. The rationales were grounded in the per-mode numbers.
+- A fresh answer for the 1600 DPI / 500 Hz setup in 15.4 s: keep 1600, raise the polling rate to 1000 Hz.
+- 2 rows saved, and the cleanup was complete.
+
+The failed check was the cached repeat. The response was served from cache: 762 ms, no new row. The script compared it as a JSON string, though, and Postgres `jsonb` reorders object keys. A PGlite run of the same runner and store confirmed the cached answer deep-equals the fresh one and has the same `generatedAt`.
+
+**Rationale**
+
+The key-order difference was left in the code, because consumers read the answer by key. If byte-identical fresh and cached answers matter, `save` could return the stored `result`, making both paths come back in `jsonb` order.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - the M7 verification records the live results, the explanation of the failed check, and the 12–15 s latency to plan for in M8's UI;
+  - the open live-check item is replaced.
+- Uncommitted, together with the rest of M7.
+
+**Verification**
+
+- As above. Token usage and cost per call weren't captured.
+- The user's `vercel env pull` re-added `.env*` to the end of `.gitignore`, the same line removed in M2. It comes after `!.env.example` and would ignore that file if it were ever untracked. It was flagged to the user, not changed.
+
+### Interaction 9 — M7 approved and committed
+
+**User Prompt**
+
+> remove the .gitignore line and commit M7
+
+**Agent Outcome**
+
+The `.env*` line that `vercel env pull` appended was removed, which leaves `.gitignore` identical to the committed version. M7 was marked Done in PLAN-V2 and committed on `release/v2.0`, with the doc updates. The cached-answer key order was left as is: the user didn't ask for the change.
+
+**Verification**
+
+`git check-ignore --no-index -v` shows `.env` and `.env.local` ignored, and `.env.example` matched only by its `!.env.example` exception. Lint, format check, tests and build last ran at the review gate (Interaction 7). Since then only docs have changed, plus `.gitignore` going back to its committed state.
+
+### Interaction 10 — Vercel flags the Neon variables as visible secrets
+
+**User Prompt**
+
+> on the vercel dashboard, in environment variables tab, all variables affiliated with postgress, neon auth, and database are labeled as "needs attention" - each have this message flag: POSTGRES_PRISMA_URL looks like a secret, but its value is visible to anyone with access. Consider rotating at the source and saving as Secret.
+
+Follow-up: "yes, add it to M9 and commit".
+
+**Agent Outcome**
+
+Vercel's current docs were checked:
+
+- Environment variables are now either Config (readable) or Secret (write-only).
+- Integration-created variables can't be switched to Secret in place. The documented path is to disconnect, rotate, then reconnect with Development deselected and Sensitive enabled.
+
+From the variable names in `.env.local` (values never printed), the agent split the flagged variables into real secrets (the eight variables that carry the database password) and false positives (host, user and database names, the project id, and the Neon Auth URLs). A fresh build's `dist/` contains no connection strings or API keys.
+
+**Rationale**
+
+- The exposure is limited to members of the Vercel team, not the public. The fix also costs `vercel env pull` its database credentials for local development.
+- So it was recorded as a pre-launch step rather than done now. It pairs with a separate Neon development branch, which also keeps local testing off production data.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md):
+  - the M9 row links to a new "Pre-launch user steps (M9)" section;
+  - that section holds the existing own-Google-OAuth-client step, plus the credentials step: which variables are secrets, the four-step fix, the local-development consequences, and `ANTHROPIC_API_KEY`'s type.
+
+**Collaboration**
+
+The user reported the dashboard flag. The agent recommended no immediate change if the user is the only member of the Vercel team, with the hardening deferred to before the launch. The user chose to add it to M9 and commit.
+
+### Interaction 11 — Milestone 8: game recommendations and the Profile insights UI
+
+**User Prompt**
+
+> pushed, begin execution of M8
+
+**Agent Outcome**
+
+The original request ("recommend gaming platforms based on their score") was ambiguous, so the agent asked two questions before building. The user chose:
+
+- game and genre picks (3–5 shooters with their platforms), the recommended option, over PC-vs-console advice;
+- showing both insights on Profile.
+
+M8 was then detailed in PLAN-V2 and built. It stops at the review gate (status: In review), uncommitted.
+
+- **Server.**
+  - `POST /api/insights/platforms` is added.
+  - M7's route logic moved into a shared `requestInsight`, so each insight kind is just a module: prompt, schema, `buildPrompt`, `parseAdvice`.
+  - The mode reference and the type guards are shared.
+  - The hardware cache key and prompt are unchanged.
+- **Client.**
+  - `ApiError.details`, an insights service, and pure error-message and setup-form helpers.
+  - An on-demand `useInsight` hook.
+  - An `InsightPanel` frame, with `HardwareInsight` and `PlatformInsight` in a new "AI Insights" section on Profile.
+
+**Rationale**
+
+- **Asked first.** "Platforms" changed the schema and the prompt, and the trainer measures only mouse aim, so titles that suit the player's skills were the better-grounded reading. The decision was the user's.
+- **On-demand, not on mount.** Every fresh answer is a paid Claude call, so the panels wait for a click. A cached answer is labelled as cached, so a player knows to play more matches for a new one.
+- **`parseAdvice` enforces the array rules.** Structured outputs can't constrain array length, so the pick count and uniqueness are checked server-side, and a bad answer becomes a 502, not a broken UI.
+
+**Changes**
+
+- New:
+  - server: `api/insights/platforms.js`, `api/_lib/{insightRequest,platformAdvice,modeReference,checks}.js` and `platformAdvice.test.js`;
+  - client: `src/services/insights.js`, `src/hooks/useInsight.js`, `src/utils/{insightErrors,mouseSetup}.js` and `src/components/{InsightPanel,HardwareInsight,PlatformInsight}/`;
+  - tests: `insights.test.js`, `insightErrors.test.js`, `mouseSetup.test.js` and `InsightPanel.test.jsx`.
+- Edited:
+  - `api/insights/hardware.js`, now on `requestInsight`;
+  - `api/_lib/hardwareAdvice.js` and `scoreInput.js`, now using the shared guards and mode reference;
+  - `hardwareAdvice.test.js`: `buildPrompt` takes `{ setup }`;
+  - `src/services/api.js` and its test: `details`;
+  - `src/pages/Profile.jsx`.
+- [`PLAN-V2.md`](PLAN-V2.md): M8 is In review, with its scope, detail and verification.
+
+**Verification**
+
+- Lint, format check and build pass. `npm test` passes with 193 tests, up from 154.
+- No-cost live check under `vercel dev` against Neon with a temporary user (deleted afterwards), 8/8:
+  - the 401 and 422 paths on `platforms`;
+  - the 422 and 400 paths on `hardware` after the refactor;
+  - no `insights` rows written;
+  - cleanup complete.
+- The Profile modules are served under `vercel dev`.
+- **Not run:** a real platforms answer from Claude, and the UI in a browser. Both need the user's sign-in or approval for the API spend.
+
+**Collaboration**
+
+The user chose the meaning of "gaming platforms" and the scope of the Profile UI.
+
+### Interaction 12 — M8 approved and committed
+
+**User Prompt**
+
+> browser checks pass; commit M8 and the doc changes
+
+**Agent Outcome**
+
+The user reported that the browser checks pass: both panels generating, the cached repeat, a fresh hardware answer with a setup entered, and the inline invalid-DPI message. These ran signed in, so they include real Claude answers for both kinds. M8 was marked Done in PLAN-V2, with the report recorded, and committed on `release/v2.0`.
+
+**Verification**
+
+The user ran the browser checks. The agent didn't see the generated answers, so their content isn't recorded here. Lint, format check, tests and build last ran at the review gate (Interaction 11), and no code has changed since.
+
+### Interaction 13 — Milestone 9: ARCHITECTURE.md and the README for v2
+
+**User Prompt**
+
+> pushed, begin execution of M9
+
+**Agent Outcome**
+
+The user pushed M8. M9 was detailed and done, and it stops at the review gate (status: In review), uncommitted.
+
+- **A new root `ARCHITECTURE.md`**, written from the code as built: the three rules, a section per layer, the `/api` routes, the factory-plus-wiring pattern, the data model, the request flows (sign-in, saving a match, leaderboards, AI insights), security, testing and deployment.
+- **The README:**
+  - updated for v2: live demo, stack, setup, scripts, architecture, AI tools and engineering notes;
+  - an honest rewrite of the anti-cheat item;
+  - the Problem and Value sections kept in the user's voice, with typos fixed.
+- **`CLAUDE.md`** now points at the new architecture doc.
+
+**Rationale**
+
+- **Described, not copied.** v1's architecture doc was a pre-build spec that named modules which never existed (`Renderer.js`, `useGame`, a `settings` collection). So the new doc describes what the code does, and its claims were checked against the source files.
+- **Anti-cheat stated as it is.** The README now says what v2 fixed (server validation, identity from the token, `CHECK` constraints) and what it didn't: scores are still computed in the browser. It names the next step, a server-signed match token.
+
+**Changes**
+
+- New: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+- Rewritten: [`README.md`](README.md).
+- Edited:
+  - [`CLAUDE.md`](CLAUDE.md): the document list;
+  - [`PLAN-V2.md`](PLAN-V2.md): M9 is In review, with its detail and verification.
+
+**Verification**
+
+- A link-check script over the five root docs found 0 broken relative links or anchors.
+- The live demo returns 200.
+- The test count, bundle sizes, routes, limits and model id were checked against the repo.
+- Lint, format check, tests (193) and build pass.
+- The pre-launch user steps (own Google OAuth client, credentials stored as Secrets) remain open and are recorded under PLAN-V2's pre-launch section.
+
+### Interaction 14 — M9 approved and committed
+
+**User Prompt**
+
+> commit M9 and the doc changes
+
+**Agent Outcome**
+
+M9 was marked Done in PLAN-V2 and committed on `release/v2.0`, which completes every v2 milestone (M0–M9). Still open, outside the repo: the pre-launch user steps (own Google OAuth client, database credentials stored as Vercel Secrets) and the M4 browser checks the user hasn't reported (reload, Safari or blocked third-party cookies, sign-out).
+
+**Verification**
+
+The docs were committed as reviewed. Lint, format check, tests (193) and build last ran at the review gate (Interaction 13), and nothing has changed since.
+
+### Interaction 15 — CI moved to Node 24
+
+*Logged retroactively on 2026-10-28 from commit `ed8295c`. The original prompt wasn't recorded.*
+
+**Agent Outcome**
+
+CI was failing `npm ci` on every push since `e5799de`. The lockfile is written by npm 11 (Node 24, as in local dev), which leaves out an optional peer (`ajv`, under `@neondatabase/auth`) that npm 10 (Node 22) expects to find. CI now runs on Node 24, and the README's Node requirement matches.
+
+**Changes**
+
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml): `node-version` 22 → 24, with a comment saying why.
+- [`README.md`](README.md): the Node requirement.
+
+**Verification**
+
+Not recorded in this file. The fix was committed as `ed8295c`, before the PR #1 merge.
+
+---
+
+## Session: 2026-10-28
+
+**Objective:** Situation report on the repository against PLAN-V2 after the v2 merge.
+
+### Interaction 1 — SITREP after the v2.0 merge
+
+**User Prompt**
+
+> /prompt-history /sitrep
+
+**Agent Outcome**
+
+A read-only SITREP. `release/v2.0` was merged into `main` through PR #1 (`47f242a`), and `main` is level with `origin/main`. All ten milestones (M0–M9) are Done in PLAN-V2, and the code backs that up: the `/api` routes, migrations `001`–`003`, `src/services/*` calling `/api`, and no Firebase references left in `src/`, `api/` or `package.json`. Still open, outside the repo:
+
+- the pre-launch steps: your own Google OAuth client, and the Neon credentials stored as Vercel Secrets (with the key rotated);
+- the M4 browser checks (reload, Safari or blocked third-party cookies, sign-out).
+
+Two small doc gaps also turned up. PLAN-V2's pre-launch section still says "M9 is detailed when it starts", and commit `ed8295c` (CI on Node 24) has no entry in this file.
+
+**Verification**
+
+Git state, the docs and the file layout were inspected. Tests weren't run.
+
+### Interaction 2 — Moved to `refactor/UI`; doc gaps and pre-launch items closed
+
+**User Prompt**
+
+> instead of making these changes on main; revert, and place the sitrep onto a new branch: "refactor/UI".
+>
+> Fix the two doc gaps. A google OAuth was obtained and being used, Neon credentials are secrets. M4 browser checks conducted
+
+**Agent Outcome**
+
+- Created `refactor/UI` from `main`, bringing the uncommitted SITREP entry with it. `main` is back to clean, and the new branch has no upstream.
+- Fixed the two doc gaps:
+  - Removed PLAN-V2's stale "M9 is detailed when it starts" line.
+  - Added Interaction 15 to the previous session, a retroactive entry for `ed8295c`.
+- Recorded what the user reported in PLAN-V2:
+  - both pre-launch steps are done (the user's own Google OAuth client is in use, and the Neon credentials are Secrets), noted on the M9 row, in M9 verification and in the pre-launch section;
+  - the M4 browser checks were conducted, closing checks 2–6, with the matching note in M6 updated.
+
+**Changes**
+
+- [`PLAN-V2.md`](PLAN-V2.md): the M9 row, M4 and M6 verification, M9 verification, and the pre-launch section.
+- [`PROMPT-HISTORY.md`](PROMPT-HISTORY.md): previous session Interaction 15, and this entry.
+
+**Verification**
+
+Docs only. The pre-launch and M4 items are recorded as the user reported them and weren't checked independently. The credential rotation and the `ANTHROPIC_API_KEY` Secret type weren't mentioned, so they're not marked.
+
+**Collaboration**
+
+The user found `main` still showing the two modified files in another terminal. Uncommitted edits sit in the shared working tree, not on a branch, so the user approved committing them on `refactor/UI`, which leaves `main` clean.
+
+Committed as `de1ac72`. The user pushed it.
+
+### Interaction 3 — UI refactor plan (taste-skill), U0 started
+
+**User Prompt**
+
+> Task: the UI will be adjusted using Leonxlnx's taste-skill:
+> https://github.com/Leonxlnx/taste-skill/blob/main/README.md
+>
+> Lay out the steps to integrate this skill.
+>
+> The landing page will change as follows:
+> - The nav bar buttons will be hidden for unauthenticated users.
+> - The start Training button for an unauthenticated users will create a tooltip that instructs users to "continue with Google" to start playing
+> - I have a hero image to use of a simulated game to be included.
+> - the leaderboard will be displayed as a social proof section
+> - the CTA bottom section will provide a button for login, along with a quote "are you ready to step your game up?"
+
+**Agent Outcome**
+
+- Planned in plan mode, after reading the skill's README and `SKILL.md`. The skill:
+  - deals an art direction (`draw.mjs`);
+  - checks pages in headless Chrome at 1440/768/390 (`inspect.mjs`);
+  - wants at least 4 real pictures and at least 8 moving elements;
+  - bans ornaments such as icon-topped cards and eyebrow labels;
+  - can keep a brand palette with `--keep`.
+- The approved plan is now [`PLAN-UI.md`](PLAN-UI.md), with three milestones:
+  - **U0:** skill install and docs.
+  - **U1:** gating logic and the shared `GoogleSignInButton`, with tests.
+  - **U2:** the taste-skill restyle of the landing page and the shell.
+- U0 so far: PLAN-UI.md written, CLAUDE.md updated (the doc list, the workflow on `refactor/UI`, a "UI design" section), and `.taste-skill/` added to `.gitignore`.
+- Waiting on the user before the baseline step:
+  - the plugin install;
+  - the hero image in `src/assets/`.
+
+**Rationale**
+
+- **Gating split from the restyle.** U1 lands the behaviour changes with tests, so U2's diff is design only.
+- **Themes kept.** `--keep palette` preserves the five themes, which also color the canvas targets, while the skill picks the type and composition.
+- **No stock photos.** The user's hero image and HTML UI fragments are the only imagery, and the skill's picture-floor rule is waived.
+
+**Changes**
+
+- New: [`PLAN-UI.md`](PLAN-UI.md).
+- Edited: [`CLAUDE.md`](CLAUDE.md) and [`.gitignore`](.gitignore).
+
+**Verification**
+
+Docs only so far. Node 24 and `/usr/bin/google-chrome` are present, which the skill's scripts need. The baseline `inspect.mjs` run waits for the plugin install.
+
+**Collaboration**
+
+The user chose all four options:
+
+- gate `/play` only, and keep `/leaderboards` and `/settings` reachable by URL;
+- keep the palette and let the skill deal new type;
+- the hero image plus HTML fragments, with no sourced images;
+- the landing page plus the shared shell as the first scope.
+
+### Interaction 4 — Skill installed, hero added, "before" baseline (U0 in review)
+
+**User Prompt**
+
+> skill has been installed (local scope only), and the asset added (using suggested name)
+
+**Agent Outcome**
+
+- The plugin (`taste-skill` 2.1.5) is enabled in `.claude/settings.local.json`, which the user's global git ignore excludes.
+- The hero image is `src/assets/hero-sim.png`: a 1319×1192 PNG of 1.2 MB, a Gridshot screenshot in the default cyan theme.
+- Baseline, following the skill's redesign workflow, on the production build (`vite preview`):
+  - `inspect.mjs --out .taste-skill/before`: 6 FAIL (hairline, outlined-box, few-pictures, focal-point, still-page, headline-lines at 390 px) and 1 WARN (no-footage).
+  - `lint.mjs` on the landing page and shell: 5 FAIL, 2 WARN.
+- PLAN-UI.md now has the U0 verification, and U0 is marked In review.
+
+**Rationale**
+
+The baseline came from the production build, not the dev server: the skill says to inspect what ships, and the current home page makes no `/api` calls, so `vercel dev` wasn't needed.
+
+**Changes**
+
+- [`PLAN-UI.md`](PLAN-UI.md): U0 is In review, with its verification section.
+- `src/assets/hero-sim.png`: added by the user, then replaced (see Interaction 5).
+
+**Verification**
+
+- The baseline screenshots (desktop and mobile) were opened and reviewed.
+- `npm run build` passes, with the entry chunk unchanged at 3.30 kB gzip.
+- Noted for U2:
+  - No image converter is installed, so shrinking the 1.2 MB PNG needs a tool.
+  - The image's cyan matches only the default theme.
+
+### Interaction 5 — WebP hero swapped in; U0 committed
+
+**User Prompt**
+
+> a webp version replaced the previous image. commit U0 with the hero image
+
+**Agent Outcome**
+
+- The PNG is gone. In its place is `src/assets/hero-img.webp`.
+- PLAN-UI.md now names the new file, and U0 is marked Done.
+- U0 was committed on `refactor/UI`.
+- **Wrong image, fixed before the push.**
+  - The first WebP was a different frame: 1174×1061, 18 KB, with no motion trails or cursor.
+  - The user said "The wrong image was converted" and replaced it with the right one: 1319×1192, 38 KB, with motion trails and the cursor.
+  - The commit hadn't been pushed (`git log origin/refactor/UI..HEAD` listed only it), so U0 was amended rather than followed by a fix-up commit.
+
+**Changes**
+
+- New: [`src/assets/hero-img.webp`](src/assets/hero-img.webp), added without the executable bit the file had on disk.
+
+The user pushed the amended commit (`87528cf`).
+
+### Interaction 6 — U1: sign-in gating, Start Training tooltip, shared Google button
+
+**User Prompt**
+
+> pushed, start U1
+
+**Agent Outcome**
+
+Signed-out visitors now see only the wordmark and "Continue with Google" in the navbar. `/play` sits behind `ProtectedRoute`. On Home, a signed-out visitor's Start Training opens a tooltip: "Continue with Google to start playing". The duplicated sign-in handler is now one `GoogleSignInButton`.
+
+**Implementation**
+
+- [`src/components/Tooltip/Tooltip.jsx`](src/components/Tooltip/Tooltip.jsx): `Tooltip({ content, children })`. `children` is a render prop that receives `{ 'aria-describedby', onClick }`.
+  - It opens on hover, focus or click.
+  - It closes on Escape, a `pointerdown` outside it, blur or `mouseleave`.
+  - It's positioned with CSS only.
+- [`src/components/GoogleSignInButton/GoogleSignInButton.jsx`](src/components/GoogleSignInButton/GoogleSignInButton.jsx): Button props pass through, and the label defaults to "Continue with Google".
+- [`src/App.jsx`](src/App.jsx): `AppRoutes` is exported, and `play` moved under `ProtectedRoute`.
+
+**Rationale**
+
+- **Click opens, it doesn't toggle.** Hover already opens the tooltip, so with a mouse a toggling click would close it straight away. Touch screens get the click, and an outside tap closes it.
+- **A render prop for the trigger.** The trigger receives its props explicitly, instead of the tooltip cloning a child element and guessing what it is.
+- **`AppRoutes` split from `App`.** The route gate can be tested in a `MemoryRouter` without the real `BrowserRouter` or the Neon session provider.
+
+**Changes**
+
+- New:
+  - `Tooltip/` and `GoogleSignInButton/`, each with a test;
+  - `Navbar.test.jsx`, `pages/Home.test.jsx` and `App.test.jsx`;
+  - `src/test/renderWithAuth.jsx`, which sets a fixed `AuthContext` and a `MemoryRouter`.
+- Edited:
+  - `Navbar.jsx`: links shown only with a `user`;
+  - `AuthControls.jsx` and `pages/Leaderboards.jsx`: they use `GoogleSignInButton`;
+  - `pages/Home.jsx`: `StartTrainingButton`;
+  - `App.jsx`;
+  - `ARCHITECTURE.md`: the `pages/` row;
+  - `PLAN-UI.md`: U1 is In review, with its verification.
+
+**Verification**
+
+- Lint, format check and build pass, and the tests pass: 205, up from 193. The entry chunk is 3.33 kB gzip.
+- In headless Chrome on the production build, signed out:
+  - `/` shows no page links in the navbar;
+  - the hidden tooltip element is present;
+  - `/play` redirects to Home.
+- Not run:
+  - the tooltip opening in a real browser (it's covered in jsdom);
+  - every signed-in path, which needs Google. Those are listed as user browser checks in PLAN-UI.
+
+### Interaction 7 — U1 browser checks reported
+
+**User Prompt**
+
+> signed out: the nav bar has no links; the start training button on hover shows the message; typing route play reroutes to home
+>
+> signed in: links appear in the nav bar.
+>
+> there is only one "continue with Google" button, at the upper right in the nav bar
+
+**Agent Outcome**
+
+The report was recorded under U1 verification in PLAN-UI.md.
+
+- **"Only one Continue with Google":** that's the expected signed-out state on Home. The second button is on `/leaderboards` → Personal Best, which is now reached through the hero's Leaderboards button or the URL. U2's CTA adds a sign-in button to Home.
+- **Not reported:**
+  - Start Training opening `/play` when signed in;
+  - closing the tooltip with Escape or an outside click;
+  - `/leaderboards` and `/settings` staying public.
+
+A follow-up report confirmed most of these:
+
+> signed in, start training opens `/play`, the tooltip closes when off hover; leaderboard and setting work when signed out; personal best button starts Google sign in
+
+That leaves only Escape and the outside click untested in a real browser. The `Tooltip` unit tests cover both.
+
+### Interaction 8 — U1 approved and committed
+
+**User Prompt**
+
+> commit U1
+
+**Agent Outcome**
+
+U1 was marked Done in PLAN-UI.md and committed on `refactor/UI`. U2, the taste-skill restyle, starts when the user says so.
+
+### Interaction 9 — U2: the landing page and shell restyled with taste-skill
+
+**User Prompt**
+
+> pushed, start U2
+
+**Agent Outcome**
+
+The landing page was rebuilt with the taste-skill run: an argument, a dealt direction, the build, then the inspector and critique loop. The shell was restyled to match. The final gate ran on the production build: **0 FAIL**, plus one defended WARN (no footage), against 6 FAIL in the U0 baseline. Every as-built decision and measurement is in PLAN-UI.md (U2 detail and verification).
+
+- **Direction:** *Loud and flat* (seed `1164839022`), with Unbounded 800 and Onest, the palette kept, and the footer redrawn as a single quiet line.
+- **Sections:**
+  - a waterline hero, where the h1 changes ink at the seam;
+  - the six modes at poster scale, with facts generated from `modes.js`;
+  - the live top five written as one sentence, with a cycling lit name;
+  - "Are you ready to step your game up?" with a warm-up target panel.
+- **Shell:** square, filled buttons; borderless cards; a plain non-sticky navbar; a one-line footer.
+
+**Rationale**
+
+- **The waterline as a pseudo-element.** Line two's `::after` repaints its lower half. The blueprint's two stacked copies made the inspector's hit-test report the headline as covered, and they duplicated the text.
+- **Accent fields use `accent-strong`.** The Light theme's `on-accent` on `accent` is 3.7:1. `accent-strong` clears 4.5:1 in all five themes.
+- **Fonts are self-hosted, trimmed to their subsets.** This avoids a third-party request. Unbounded only sets our own ASCII copy, so it's Latin only, while Onest keeps Latin Extended for players' names. The CSS went from 12.6 kB gzip with every subset to 7.8 kB.
+- **The size steps are named `caption` and `copy`.** Tailwind's `text-body` would collide with the existing `text-body` colour utility.
+
+**Changes**
+
+- New:
+  - `src/components/landing/` (Hero, ModeList, BoardSentence, ClosingCall, WarmupTarget, StartTrainingButton, and two tests);
+  - `hooks/useReveal.js`, `useCycle.js` and `useWarmupTarget.js`;
+  - `utils/modeFacts.js` and `reactionTarget.js`, with tests.
+- Edited:
+  - `src/index.css` and `main.jsx`: type, motion and the font imports;
+  - `Button`, `Card`, `Navbar`, `Footer`, `Tooltip`, `Layout`;
+  - `pages/Home.jsx`, `pages/Leaderboards.jsx`;
+  - the `Home` and `App` tests;
+  - `package.json` and the lockfile: `@fontsource/unbounded` 5.3.0 and `@fontsource/onest` 5.3.1;
+  - `ARCHITECTURE.md`, `README.md` (stack row, test count, entry chunk) and `PLAN-UI.md`: U2 is In review.
+
+**Verification**
+
+- Lint, format check, tests (225, up from 205) and build pass. The entry chunk is 3.36 kB gzip.
+- taste-skill `lint.mjs` reports 0 FAIL. `inspect.mjs` on the production build, with `/api` proxied to `vercel dev`, reports 0 FAIL, and the screenshots at 1440, 768 and 390 were reviewed after the last change.
+- In headless Chrome:
+  - all five themes were captured;
+  - the tooltip shows on hover and hides after Escape plus moving away;
+  - a hit on the warm-up target records a reaction time and moves it;
+  - with reduced motion, nothing stays hidden.
+- Not run: signed-in paths (they need Google) and the Vercel preview.
+- Found: the all-time leader has 9,999,999 in Survival. That's almost certainly not a real score, and it now appears as social proof. It was raised with the user.
+
+**Collaboration**
+
+- The user chose *Loud and flat* over the recommended *Product performs*, and approved the warm-up target as the live thing.
+- The assistant settled the clashes between the sheet and this project by the skill's own precedence:
+  - the hero image is kept, beside the headline and never over it;
+  - the margins follow the app container;
+  - the footer is redrawn, because the dealt one needed a phone or email the project doesn't publish.
+
+### Interaction 10 — U2 browser checks; landing sign-in now lands on `/play`
+
+**User Prompt**
+
+> browser checks: signed out, all passed.
+>
+> when a user clicks Start training, one authenticated, they should land on the `/play` page, instead of the landing page.
+>
+> other pages look right.
+
+**Agent Outcome**
+
+- **Clarified first.** The request could mean three different flows, so the assistant asked which. The user chose: signing in from the landing page (the navbar's or the closing panel's "Continue with Google") returns the player to `/play`. Start Training keeps its signed-out tooltip.
+- **How it works:**
+  - `signInWithGoogle({ returnTo })` builds the absolute callback with a new pure `utils/callbackUrl.js`.
+  - `GoogleSignInButton` takes `returnTo`.
+  - The closing panel passes `/play`. `AuthControls` passes `/play` only on `/`, so sign-in from any other page still returns there.
+- **Checked before building:** whether `/play`'s `ProtectedRoute` would bounce the returning player home. The SDK source (`adapter-core`) exchanges the verifier inside the first `getSession` call, which `useSession` reports as pending, so the route waits.
+
+**Changes**
+
+- New: [`src/utils/callbackUrl.js`](src/utils/callbackUrl.js), with a test.
+- Edited:
+  - `services/auth.js`, `GoogleSignInButton.jsx`, `AuthControls.jsx` and `landing/ClosingCall.jsx`;
+  - tests for `GoogleSignInButton`, `Navbar` (landing vs. other pages) and `Home` (the closing button passes `/play`);
+  - `ARCHITECTURE.md` (the sign-in flow), `README.md` (test count) and `PLAN-UI.md`.
+
+**Verification**
+
+- Lint, format check, tests (231, up from 225) and build pass. The entry chunk is 3.44 kB gzip.
+- The user reported that all the signed-out checks passed and the other pages look right.
+- Not run: a real Google sign-in that lands on `/play`. It's listed as an open user check in PLAN-UI.
+
+### Interaction 11 — Landing sign-in confirmed; the exploited score removed
+
+**User Prompt**
+
+> I manually purged that exploited score entry from the Neon Console--that issue will be addressed later on.
+>
+> the `Continue with Google` buttons on the landing page route to `/play`, and the button from leaderboards keeps me there
+
+**Agent Outcome**
+
+- The real Google sign-in checks passed and are now recorded in PLAN-UI.md's U2 verification. Every U2 browser check has now been reported as passing.
+- The user deleted the 9,999,999 Survival row by hand. Stopping exploited scores is deferred. The README's anti-cheat note already names the fix: a server-signed match token.
+
+### Interaction 12 — Anti-cheat logged as an action item
+
+**User Prompt**
+
+> cite this anti-cheat fix note within prompt-history as an action item to be addressed
+
+**Agent Outcome**
+
+Recorded the action item below.
+
+> **ACTION ITEM — Anti-cheat: server-authoritative score submission** *(open, raised 2026-10-28)*
+>
+> **Why:**
+>
+> - A signed-in player posted **9,999,999** in Survival to the all-time board, and it appeared as the leader in the landing page's social-proof sentence. The user deleted it by hand in the Neon Console.
+> - It passed every existing check. `MAX_SCORE` is `10_000_000` in [`api/_lib/scoreInput.js`](api/_lib/scoreInput.js), and the `scores.score` CHECK in [`db/migrations/001_init.sql`](db/migrations/001_init.sql) is `between 0 and 10000000`.
+> - The score is computed in the browser, so the server can only check bounds and ownership.
+>
+> **The fix,** cited from [README.md](README.md), *Server-authoritative scoring*:
+>
+> > The server now validates every score's bounds, ties it to the signed-in player's verified token, and backs both with database constraints, but the score itself is still computed in the browser, so a signed-in player can post a plausible fake. Closing that fully means the server issuing a signed match token at start and checking the submitted match against it (duration, plausible hit rate). With a server in place, that's now a feature to build, not a hosting limitation.
+>
+> **Possible steps:**
+>
+> 1. **Quick win:** replace the single 10,000,000 cap with a reachable cap per mode, derived from each mode's config in `src/game/modes.js` (duration, spawn rate, target value, combo multiplier). Enforce it in `scoreInput.js`, and as a SQL backstop if practical. Survival has no time limit (`duration: Infinity`), so it needs its own rule, such as a cap tied to its difficulty ramp or a minimum match length.
+> 2. **The full fix:** a `POST /api/matches` endpoint issues a signed, short-lived match token (mode, start time, uid) when a round starts. `POST /api/scores` then requires the token and rejects a submission whose duration or implied hit rate is implausible.
+> 3. Rate-limit score submissions per player. That gap was noted in PLAN-V2 (M5, "Known gap").
+> 4. Optionally, a moderation path for removing a bad row without the Neon Console.
+>
+> **Where:** a later milestone, after the UI refactor. It belongs in a plan document when it starts.
+
+**Changes**
+
+- `PROMPT-HISTORY.md`: this entry.
+
+### Interaction 13 — U2 approved and committed
+
+**User Prompt**
+
+> Mark U2 done, and commit it along with the history entry
+
+**Agent Outcome**
+
+U2 was marked Done in PLAN-UI.md and committed on `refactor/UI`, together with Interactions 9–13, which completes U0–U2. The anti-cheat action item (Interaction 12) stays open.
