@@ -6,6 +6,9 @@ vi.mock('./services/auth', () => ({
   signInWithGoogle: vi.fn(),
   signOutUser: vi.fn(),
 }))
+vi.mock('./hooks/useLeaderboard', () => ({
+  useLeaderboard: () => ({ entries: [], error: null, isLoading: false }),
+}))
 
 import { AppRoutes } from './App'
 

@@ -41,7 +41,7 @@ The first target is the landing page:
 |---|---|---|---|
 | U0 | Done | **Skill install + docs.** Install the plugin (user step). Write this plan and update CLAUDE.md. Ignore `.taste-skill/`. Record the "before" inspector baseline. The user adds the hero image. | `PLAN-UI.md`, `CLAUDE.md`, `.gitignore` |
 | U1 | Done | **Gating + shared sign-in button.** Logic only, with tests: `GoogleSignInButton`, nav links shown only to signed-in users, `/play` behind `ProtectedRoute`, and the Start Training tooltip. | `src/App.jsx`, `Navbar`, `Home.jsx`, `GoogleSignInButton/`, `Tooltip/` |
-| U2 | Planned | **Landing + shell restyle (taste-skill).** Hero with the image, game modes, a leaderboard social-proof section, the CTA, and Navbar, Footer, Button and Card restyled to the dealt type and composition. | `Home.jsx`, `src/components/landing/`, `src/index.css`, `Leaderboard.jsx` |
+| U2 | Done | **Landing + shell restyle (taste-skill).** Hero with the image, game modes, a leaderboard social-proof section, the CTA, and Navbar, Footer, Button and Card restyled to the dealt type and composition. | `Home.jsx`, `src/components/landing/`, `src/index.css`, `Button`, `Card`, `Navbar`, `Footer` |
 
 ## U0 detail
 
@@ -127,7 +127,7 @@ These behaviour changes come with tests and are kept separate, so U2's diff is d
   - *Signed in: the links appear.*
   - *Second report: signed in, Start Training opens `/play`. The tooltip closes when the pointer leaves. Signed out, `/leaderboards` and `/settings` work. The Personal Best button starts Google sign-in.*
   - *Not reported: closing with Escape or an outside click. The `Tooltip` unit tests cover both.*
-  - *The user saw only one "Continue with Google", the navbar's. That's expected: the other one is on `/leaderboards` → Personal Best, which a signed-out visitor reaches through the hero's Leaderboards button or the URL, now that the nav link is hidden. U2's CTA adds one to Home.*
+  - *The user saw only one "Continue with Google", the navbar's. That's expected: the other one is on `/leaderboards` → Personal Best, which a signed-out visitor reaches through the hero's Leaderboards button or the URL, now that the nav link is hidden. U2's CTA adds one to Home. (U2 later replaced the hero's button with the board section's link and the footer link.)*
 - **Browser checks (user),** under `npm run dev:full`:
   1. Signed out: no page links in the navbar. Hovering, focusing or clicking Start Training shows "Continue with Google to start playing". Escape or a click elsewhere hides it.
   2. Signed out: typing `/play` lands on Home. `/leaderboards` and `/settings` still open.
@@ -136,46 +136,99 @@ These behaviour changes come with tests and are kept separate, so U2's diff is d
 
 ## U2 detail
 
-`taste-skill:design-taste-frontend` runs in **redesign mode**. It keeps the stack (React and Tailwind 4) and the content, and changes things in the order type, color, frame, states, then components.
+`taste-skill:design-taste-frontend` ran in **redesign mode**. It kept the stack (React and Tailwind 4) and the content, and changed things in the order type, color, frame, states, then components.
 
-- **Draw:** `draw.mjs --brief "<aim trainer brief>" --sections hero,features,social-proof,cta --options 3 --keep palette`. The user picks one of the three dealt directions before the build starts.
-- **Assets:**
-  - The user's hero image is declared with `--have`.
-  - Nothing is fetched with `assets.mjs`.
-  - `--allow` waives only the picture-floor rule.
-- **Tokens:**
-  - The dealt type system goes into `src/index.css` under `@theme`, as `--font-display` and `--font-body`.
-  - Colors keep using the semantic utilities from `styles/themes.css`, so all 5 themes keep working.
-  - The skill's `base.css` and `base.js` aren't imported. Their rules are ported into Tailwind tokens and CSS.
-- **Web font:** if the dealt face isn't a system font, it's self-hosted with one `@fontsource-variable/<face>` package. That avoids a third-party font request, and only the weights used are bundled. The justification is recorded here when it's added.
+### Direction (the user's choice)
 
-The landing sections are small components under `src/components/landing/`:
+- **Dealt:** `draw.mjs --sector consumer-app --sections features,proof,cta,footer --have product-ui --keep palette --options 3` dealt three directions: *Product performs*, *Loud and flat* and *The page is the object*.
+  - The user chose **Loud and flat** (seed `1164839022`): flat saturated fields, the heaviest type, short blunt statements.
+  - The user also approved the one "live thing": a warm-up target.
+- **Sheet:**
+  - Hero "Waterline headline". Unbounded 800 (uppercase display) with Onest 400/500 (text). The palette is kept.
+  - Sections: capabilities at poster scale, names as one sentence, first step already open.
+  - Motion: masked headline.
+- **One redraw:** the footer went from "Contact as the headline" to `footer-single-quiet-line`. The project publishes no phone or email, and the footer is the shared shell on Play, Profile and Settings, where a 90svh close would be wrong.
+- **Settled conflicts** (house rules > direction > type and palette > blueprints):
+  - The hero blueprint says "no image", but the direction calls for a tilted picture and the user supplied the hero screenshot. The screenshot sits tilted 4° in the lower field at the right, cropped by the hero's bottom edge, and never over the headline.
+  - The headline is flush left (direction), not centred (blueprint), and aligned to the app's `max-w-6xl` container, so the margins match the navbar and every other section.
+  - The proof sentence is a statement at 36px or less (the house rule), not a 76px run.
+- **Idea:** the target's ring colours, each theme's own `--target-*`, become the poster's flat fields and the one live target.
 
-1. **Hero:**
-   - A headline of two lines at most, a subline, and Start Training with its U1 behaviour.
-   - The hero image, with `width`/`height` set, `fetchpriority="high"` and descriptive alt text.
-2. **Game modes:** the existing `GAME_MODES` content, restyled. No icon-topped cards.
-3. **Social proof** (`LeaderboardShowcase`):
-   - **Data:** `useLeaderboard('all')` (public, no token), with the top 5 taken on the client from the existing top-100 response, so the API doesn't change.
-   - **Display:** `Leaderboard.jsx` with a new `compact` prop that hides the Mode and Date columns.
-   - **States:** an empty board reads "No scores yet — be the first." On an error the section hides, since a landing page shouldn't show an outage banner.
-4. **CTA:** "Are you ready to step your game up?" with `GoogleSignInButton` when signed out, and a Start Training link when signed in.
+### As built
 
-**Shell:**
+- **Type and tokens** (`src/index.css`):
+  - `--font-sans` (Onest) and `--font-display` (Unbounded; `.font-display` sets 800, uppercase, -0.03em).
+  - Five size steps cover the page: `caption` 13–14, `copy` 17–19, `lead` 22–36, `head` 22–48 and `display` 52–140 px. They're named `caption` and `copy` because `text-body` is already the body colour utility.
+  - Motion tokens, plus CSS for the masked line reveal, `.waterline`, reveal-on-scroll, the hero picture's slow drift and the mode-list hover.
+- **New dependencies:** `@fontsource/unbounded` 5.3.0 and `@fontsource/onest` 5.3.1, pinned exactly.
+  - **Why:** self-hosted, so there's no third-party font request (the sheet's Google Fonts link would add one).
+  - **Footprint:** only the weights and subsets used are imported: Unbounded 800 Latin, and Onest 400/500 Latin and Latin Extended (players' names). About 77 KB of woff2 on disk, and a browser downloads only the files whose `unicode-range` a page uses.
+- **`src/components/landing/`:**
+  - `Hero`: waterline fields at `--seam-y` (46% of the screen below the nav on phones, 50% from `sm`). The h1 sits so the middle of line two is on the seam, and line two's `::after` repaints its lower half in `--on-accent`. So there's no second copy of the text, and the reveal carries the repaint with it.
+  - `ModeList`: six names at poster scale, each with its description and `modeFacts(mode)`. That's a pure function, so the numbers can't drift from `modes.js`.
+  - `BoardSentence`: social proof from `useLeaderboard('all')`, written as "Leading the board: A with 3,100 and B with 2,850." `useCycle` lights one name every 2 s. It shows a loading line and an empty-board line, and hides itself on an error.
+  - `ClosingCall`: "Are you ready to step your game up?" on an accent field, with the `WarmupTarget` panel (`data-ui`). The panel's button is `GoogleSignInButton` when signed out and Start Training when signed in.
+  - `WarmupTarget` and `useWarmupTarget`: a DOM button in the theme's ring colours. A hit records the last and best reaction time (pure helpers in `utils/reactionTarget.js`) and moves the target.
+  - `StartTrainingButton`, moved out of `Home.jsx`.
+  - `pages/Home.jsx` composes the four sections, and `useReveal` handles the reveal-on-scroll.
+- **Accent fields use `accent-strong`:**
+  - In the Light theme, `on-accent` on `accent` is only 3.7:1, below AA for the 22px phone-size sentences.
+  - `accent-strong` clears 4.5:1 in all five themes: Dark 8.2, Light 5.4, Cyberpunk 5.7, Terminal 6.4, Aimlabs 5.1.
+- **Shell:**
+  - `Button`: square, with flat fills. Secondary is now `bg-surface` rather than an outline, and there's a new `inverse` variant for accent fields. The variant and size API is unchanged.
+  - `Card`: a one-tone-step fill with no border.
+  - `Navbar`: a plain bar with no border, blur or sticky positioning. The wordmark is in the display face.
+  - `Footer`: one quiet line with what this is, Leaderboards and Settings, and the year.
+  - `Tooltip`: square corners.
+  - `Layout`: `min-h-svh`.
+  - `pages/Leaderboards.jsx`: the Personal Best sign-in button is now primary, since a secondary button now has the same fill as the Card around it.
+- **Removed from Home:** the hero's "Leaderboards" button. Signed-out visitors reach `/leaderboards` through "See every leaderboard" in the board section and through the footer.
+- **Sign-in from the landing page lands on `/play`** (the user's request at the U2 gate):
+  - **How:** `signInWithGoogle({ returnTo })` builds Neon's absolute callback with `utils/callbackUrl.js`, which is pure and tested. `GoogleSignInButton` takes `returnTo`.
+  - **Where:** the closing panel's button passes `/play`. The navbar's button passes `/play` only on `/`; anywhere else the player returns to the page they were on.
+  - **Why it's safe:** the SDK exchanges the returned verifier inside its first `getSession` call, which `useSession` reports as pending, so `ProtectedRoute` on `/play` shows its spinner and doesn't redirect home.
+- **Tests** (231, up from 205; 225 before the `returnTo` change):
+  - New: `modeFacts`, `reactionTarget`, `BoardSentence` (sentence, cycling, empty, error) and `WarmupTarget`.
+  - Updated: `Home` (tooltip, closing sign-in, two Start Training links when signed in, six modes, one h1), with `useLeaderboard` mocked in `Home` and `App` tests.
 
-- Navbar, Footer, Button and Card follow the dealt type and composition.
-- `Button` keeps its variant and size API, so other pages don't change.
-- Motion uses CSS transform and opacity only. The global `prefers-reduced-motion` rule in `index.css` covers it.
+### U2 verification
 
-**Skill gate:**
+- `npm run lint`, `npm run format:check`, `npm test` (231) and `npm run build` pass.
+  - **Bundle:** entry chunk 3.44 kB gzip (3.33 before), `Home` 3.58 kB, CSS 7.80 kB gzip (6.29 before), `react-vendor` and `auth-vendor` unchanged.
+- **taste-skill `lint.mjs`** over the landing page and shell: 0 FAIL, 0 WARN.
+  - Two lines carry `taste-skill-ignore`: the tooltip's overlay shadow, and the warm-up panel's dialog frame (a `data-ui` fragment).
+- **taste-skill `inspect.mjs`:**
+  - **Final gate:** run on the production build (`vite preview`, with `/api` proxied to `vercel dev` so the board shows live data), with `--allow few-pictures` (the U2 imagery decision). Result: **0 FAIL, 1 WARN** (`no-footage`: no honest clip of the product exists).
+  - **Measured:** Unbounded 800 and Onest, sizes 14/19/36/48/130 px, the headline on 2 lines at 1440, 768 and 390.
+- **Rounds:**
+  - **Inspector rounds 1–3** fixed the hero button falling below the first screen, the off-centre margins, covered text (the two-copy waterline technique and the sticky nav), the closing line wrapping to 3–4 lines, the hero sentence under 18px on phones, and display weight 400 (preflight resets heading weights).
+  - **Critique rounds 1 and 2** fixed a dead block of accent colour in the close, mode descriptions squeezed into a third-width column on tablet, and an empty left column in the close.
+  - Screenshots at 1440, 768 and 390 were reviewed after the last change.
+- **Before and after:**
 
-- `lint.mjs` over the changed files.
-- `inspect.mjs http://localhost:3000` at 1440/768/390, with 0 FAIL.
-- At most three rounds of screenshot critique.
-- A before-and-after comparison against the U0 baseline.
-- A check of all 5 themes through ThemePicker.
+  | Measure | Before (U0) | After |
+  |---|---|---|
+  | Inspector | 6 FAIL, 1 WARN | 0 FAIL, 1 WARN |
+  | Hero type | system-ui 48 px (3.3vw), 3 lines at 390 | Unbounded 130 px (9vw), 2 lines everywhere |
+  | Faces | system-ui | Onest, Unbounded |
+  | Page | 1 screen, 97 words, 0 images | 3.9 screens, 219 words, the hero screenshot and the warm-up panel |
 
-Stop for review.
+- **All five themes,** full-page screenshots in headless Chrome: the fields, waterline, panel and target rings take each theme's colours. Text contrast was computed for every pair the page uses (table above).
+- **Real browser, headless Chrome:**
+  - Hovering Start Training shows "Continue with Google to start playing", and Escape plus moving away hides it.
+  - One hit on the warm-up target recorded a reaction time and moved the target.
+  - With reduced motion on, no `[data-reveal]` element stays hidden, and the page logs no console errors.
+- **Not run:**
+  - Signed-in paths in a real browser (they need Google).
+  - The Vercel preview deploy (after a push).
+- **Data note for the user:** the all-time board's leader has **9,999,999** in Survival. That's almost certainly not a real score, and the landing page now shows it as social proof. *The user deleted the row in the Neon Console (2026-10-28). Preventing exploited scores is deferred to later work; see README's anti-cheat note on server-signed match tokens.*
+- *2026-10-28, user report: the signed-out checks all passed, and the other pages look right. The user asked that signing in from the landing page lands on `/play`, which is now built and tested in jsdom. Not yet checked with a real Google sign-in.*
+- *2026-10-28, user report: with a real Google sign-in, both "Continue with Google" buttons on the landing page land on `/play`, and the navbar's button on `/leaderboards` returns there.*
+- **Browser checks (user),** under `npm run dev:full`:
+  1. Signed out: the tooltip, the board sentence cycling, "See every leaderboard", and the closing "Continue with Google" starting sign-in.
+  2. Signed in: both Start Training buttons open `/play`.
+  3. The warm-up target in each theme (Settings → theme).
+  4. Play, Leaderboards, Profile and Settings still look right with the restyled Button, Card, Navbar and Footer.
 
 ## Verification (every gate)
 

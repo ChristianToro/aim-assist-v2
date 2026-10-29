@@ -623,3 +623,153 @@ That leaves only Escape and the outside click untested in a real browser. The `T
 **Agent Outcome**
 
 U1 was marked Done in PLAN-UI.md and committed on `refactor/UI`. U2, the taste-skill restyle, starts when the user says so.
+
+### Interaction 9 — U2: the landing page and shell restyled with taste-skill
+
+**User Prompt**
+
+> pushed, start U2
+
+**Agent Outcome**
+
+The landing page was rebuilt with the taste-skill run: an argument, a dealt direction, the build, then the inspector and critique loop. The shell was restyled to match. The final gate ran on the production build: **0 FAIL**, plus one defended WARN (no footage), against 6 FAIL in the U0 baseline. Every as-built decision and measurement is in PLAN-UI.md (U2 detail and verification).
+
+- **Direction:** *Loud and flat* (seed `1164839022`), with Unbounded 800 and Onest, the palette kept, and the footer redrawn as a single quiet line.
+- **Sections:**
+  - a waterline hero, where the h1 changes ink at the seam;
+  - the six modes at poster scale, with facts generated from `modes.js`;
+  - the live top five written as one sentence, with a cycling lit name;
+  - "Are you ready to step your game up?" with a warm-up target panel.
+- **Shell:** square, filled buttons; borderless cards; a plain non-sticky navbar; a one-line footer.
+
+**Rationale**
+
+- **The waterline as a pseudo-element.** Line two's `::after` repaints its lower half. The blueprint's two stacked copies made the inspector's hit-test report the headline as covered, and they duplicated the text.
+- **Accent fields use `accent-strong`.** The Light theme's `on-accent` on `accent` is 3.7:1. `accent-strong` clears 4.5:1 in all five themes.
+- **Fonts are self-hosted, trimmed to their subsets.** This avoids a third-party request. Unbounded only sets our own ASCII copy, so it's Latin only, while Onest keeps Latin Extended for players' names. The CSS went from 12.6 kB gzip with every subset to 7.8 kB.
+- **The size steps are named `caption` and `copy`.** Tailwind's `text-body` would collide with the existing `text-body` colour utility.
+
+**Changes**
+
+- New:
+  - `src/components/landing/` (Hero, ModeList, BoardSentence, ClosingCall, WarmupTarget, StartTrainingButton, and two tests);
+  - `hooks/useReveal.js`, `useCycle.js` and `useWarmupTarget.js`;
+  - `utils/modeFacts.js` and `reactionTarget.js`, with tests.
+- Edited:
+  - `src/index.css` and `main.jsx`: type, motion and the font imports;
+  - `Button`, `Card`, `Navbar`, `Footer`, `Tooltip`, `Layout`;
+  - `pages/Home.jsx`, `pages/Leaderboards.jsx`;
+  - the `Home` and `App` tests;
+  - `package.json` and the lockfile: `@fontsource/unbounded` 5.3.0 and `@fontsource/onest` 5.3.1;
+  - `ARCHITECTURE.md`, `README.md` (stack row, test count, entry chunk) and `PLAN-UI.md`: U2 is In review.
+
+**Verification**
+
+- Lint, format check, tests (225, up from 205) and build pass. The entry chunk is 3.36 kB gzip.
+- taste-skill `lint.mjs` reports 0 FAIL. `inspect.mjs` on the production build, with `/api` proxied to `vercel dev`, reports 0 FAIL, and the screenshots at 1440, 768 and 390 were reviewed after the last change.
+- In headless Chrome:
+  - all five themes were captured;
+  - the tooltip shows on hover and hides after Escape plus moving away;
+  - a hit on the warm-up target records a reaction time and moves it;
+  - with reduced motion, nothing stays hidden.
+- Not run: signed-in paths (they need Google) and the Vercel preview.
+- Found: the all-time leader has 9,999,999 in Survival. That's almost certainly not a real score, and it now appears as social proof. It was raised with the user.
+
+**Collaboration**
+
+- The user chose *Loud and flat* over the recommended *Product performs*, and approved the warm-up target as the live thing.
+- The assistant settled the clashes between the sheet and this project by the skill's own precedence:
+  - the hero image is kept, beside the headline and never over it;
+  - the margins follow the app container;
+  - the footer is redrawn, because the dealt one needed a phone or email the project doesn't publish.
+
+### Interaction 10 — U2 browser checks; landing sign-in now lands on `/play`
+
+**User Prompt**
+
+> browser checks: signed out, all passed.
+>
+> when a user clicks Start training, one authenticated, they should land on the `/play` page, instead of the landing page.
+>
+> other pages look right.
+
+**Agent Outcome**
+
+- **Clarified first.** The request could mean three different flows, so the assistant asked which. The user chose: signing in from the landing page (the navbar's or the closing panel's "Continue with Google") returns the player to `/play`. Start Training keeps its signed-out tooltip.
+- **How it works:**
+  - `signInWithGoogle({ returnTo })` builds the absolute callback with a new pure `utils/callbackUrl.js`.
+  - `GoogleSignInButton` takes `returnTo`.
+  - The closing panel passes `/play`. `AuthControls` passes `/play` only on `/`, so sign-in from any other page still returns there.
+- **Checked before building:** whether `/play`'s `ProtectedRoute` would bounce the returning player home. The SDK source (`adapter-core`) exchanges the verifier inside the first `getSession` call, which `useSession` reports as pending, so the route waits.
+
+**Changes**
+
+- New: [`src/utils/callbackUrl.js`](src/utils/callbackUrl.js), with a test.
+- Edited:
+  - `services/auth.js`, `GoogleSignInButton.jsx`, `AuthControls.jsx` and `landing/ClosingCall.jsx`;
+  - tests for `GoogleSignInButton`, `Navbar` (landing vs. other pages) and `Home` (the closing button passes `/play`);
+  - `ARCHITECTURE.md` (the sign-in flow), `README.md` (test count) and `PLAN-UI.md`.
+
+**Verification**
+
+- Lint, format check, tests (231, up from 225) and build pass. The entry chunk is 3.44 kB gzip.
+- The user reported that all the signed-out checks passed and the other pages look right.
+- Not run: a real Google sign-in that lands on `/play`. It's listed as an open user check in PLAN-UI.
+
+### Interaction 11 — Landing sign-in confirmed; the exploited score removed
+
+**User Prompt**
+
+> I manually purged that exploited score entry from the Neon Console--that issue will be addressed later on.
+>
+> the `Continue with Google` buttons on the landing page route to `/play`, and the button from leaderboards keeps me there
+
+**Agent Outcome**
+
+- The real Google sign-in checks passed and are now recorded in PLAN-UI.md's U2 verification. Every U2 browser check has now been reported as passing.
+- The user deleted the 9,999,999 Survival row by hand. Stopping exploited scores is deferred. The README's anti-cheat note already names the fix: a server-signed match token.
+
+### Interaction 12 — Anti-cheat logged as an action item
+
+**User Prompt**
+
+> cite this anti-cheat fix note within prompt-history as an action item to be addressed
+
+**Agent Outcome**
+
+Recorded the action item below.
+
+> **ACTION ITEM — Anti-cheat: server-authoritative score submission** *(open, raised 2026-10-28)*
+>
+> **Why:**
+>
+> - A signed-in player posted **9,999,999** in Survival to the all-time board, and it appeared as the leader in the landing page's social-proof sentence. The user deleted it by hand in the Neon Console.
+> - It passed every existing check. `MAX_SCORE` is `10_000_000` in [`api/_lib/scoreInput.js`](api/_lib/scoreInput.js), and the `scores.score` CHECK in [`db/migrations/001_init.sql`](db/migrations/001_init.sql) is `between 0 and 10000000`.
+> - The score is computed in the browser, so the server can only check bounds and ownership.
+>
+> **The fix,** cited from [README.md](README.md), *Server-authoritative scoring*:
+>
+> > The server now validates every score's bounds, ties it to the signed-in player's verified token, and backs both with database constraints, but the score itself is still computed in the browser, so a signed-in player can post a plausible fake. Closing that fully means the server issuing a signed match token at start and checking the submitted match against it (duration, plausible hit rate). With a server in place, that's now a feature to build, not a hosting limitation.
+>
+> **Possible steps:**
+>
+> 1. **Quick win:** replace the single 10,000,000 cap with a reachable cap per mode, derived from each mode's config in `src/game/modes.js` (duration, spawn rate, target value, combo multiplier). Enforce it in `scoreInput.js`, and as a SQL backstop if practical. Survival has no time limit (`duration: Infinity`), so it needs its own rule, such as a cap tied to its difficulty ramp or a minimum match length.
+> 2. **The full fix:** a `POST /api/matches` endpoint issues a signed, short-lived match token (mode, start time, uid) when a round starts. `POST /api/scores` then requires the token and rejects a submission whose duration or implied hit rate is implausible.
+> 3. Rate-limit score submissions per player. That gap was noted in PLAN-V2 (M5, "Known gap").
+> 4. Optionally, a moderation path for removing a bad row without the Neon Console.
+>
+> **Where:** a later milestone, after the UI refactor. It belongs in a plan document when it starts.
+
+**Changes**
+
+- `PROMPT-HISTORY.md`: this entry.
+
+### Interaction 13 — U2 approved and committed
+
+**User Prompt**
+
+> Mark U2 done, and commit it along with the history entry
+
+**Agent Outcome**
+
+U2 was marked Done in PLAN-UI.md and committed on `refactor/UI`, together with Interactions 9–13, which completes U0–U2. The anti-cheat action item (Interaction 12) stays open.

@@ -32,11 +32,11 @@ React owns everything around gameplay: routing, menus, auth state, settings, the
 | Folder | Role |
 |---|---|
 | `pages/` | One component per route. Each is code-split with `lazy()`; `/play` and `/profile` sit behind `ProtectedRoute`, and the navbar shows page links only to signed-in players. |
-| `components/` | Small presentational pieces (`Leaderboard`, `ProfileCard`, `InsightPanel`, …) plus the game bridge (`GameArea`, `GameCanvas`, `GameHud`). |
-| `hooks/` | Stateful logic: `useAuth`, `useLeaderboard`, `useUserProfile`, `useInsight`, and `useGameSession`, which owns one engine instance. |
+| `components/` | Small presentational pieces (`Leaderboard`, `ProfileCard`, `InsightPanel`, …) plus the game bridge (`GameArea`, `GameCanvas`, `GameHud`). `components/landing/` holds the home page's sections, including a DOM warm-up target that reports reaction times (no canvas, nothing animated per frame). |
+| `hooks/` | Stateful logic: `useAuth`, `useLeaderboard`, `useUserProfile`, `useInsight`, `useGameSession` (which owns one engine instance), and the landing page's `useReveal`, `useCycle` and `useWarmupTarget`. |
 | `contexts/` | `AuthProvider` (the Neon Auth session, mapped to `{ uid, displayName, photoURL }`) and `ThemeProvider`. |
 | `services/` | The only modules that leave the browser: `auth.js` (Neon Auth SDK) and `fetch` wrappers over `/api`. |
-| `utils/` | Pure functions (error messages, form parsing, user mapping), tested without mocks. |
+| `utils/` | Pure functions (error messages, form parsing, user mapping, mode facts, reaction timing), tested without mocks. |
 
 **Services.** `services/api.js` holds `apiFetch`, the single place the browser calls `/api`. With `auth: true` it attaches `Authorization: Bearer <jwt>` from `getAuthToken()`; when no one is signed in, it fails with a 401 before making any request. A non-2xx response becomes an `ApiError { status, message, details }`, so the UI can word each failure: the leaderboard tells a 401 apart from an outage, and the insight panels say how many more matches are needed or when the daily limit resets. The other services (`users`, `scores`, `leaderboard`, `insights`) are thin wrappers that take no user id, because the server already knows who is asking.
 
@@ -103,7 +103,7 @@ Profile stats (games played, best score, average accuracy, favourite mode) are n
 
 ### Sign-in and identity
 
-1. "Continue with Google" calls Neon Auth's `signIn.social`. That's a full-page redirect through Google and back to the same page, where the SDK exchanges a one-time verifier for the session.
+1. "Continue with Google" calls Neon Auth's `signIn.social`. That's a full-page redirect through Google and back to the same page (from the landing page, on to `/play`), where the SDK exchanges a one-time verifier for the session. `useSession` stays pending during that exchange, so `ProtectedRoute` waits instead of redirecting.
 2. `AuthProvider` exposes the session user, and `getAuthToken()` supplies a short-lived Ed25519 JWT (15 minutes), cached by the SDK.
 3. `/api` verifies each JWT against Neon Auth's JWKS. It pins `EdDSA`, checks the issuer, audience and expiry, and requires `sub`. The uid is `sub`.
 4. A token can stay valid for up to 15 minutes after its user is deleted. `/api/me` answers it with a 401 because the user row is gone, and `POST /api/scores` with a 401 because the insert breaks the foreign key.

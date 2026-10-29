@@ -9,6 +9,27 @@
  */
 @import './styles/themes.css';
 
+/* Type: Unbounded for display (always uppercase), Onest for text. Five
+   size steps cover every page; nothing else sets a font size. */
+@theme {
+  --font-sans: 'Onest', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Unbounded', 'Onest', system-ui, sans-serif;
+
+  --text-caption: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+  --text-copy: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  --text-copy--line-height: 1.5;
+  --text-lead: clamp(1.375rem, 1rem + 1.4vw, 2.25rem);
+  --text-lead--line-height: 1.25;
+  --text-head: clamp(1.375rem, 0.6rem + 3.4vw, 3rem);
+  --text-head--line-height: 1;
+  --text-display: clamp(3.25rem, 9vw, 8.75rem);
+  --text-display--line-height: 0.86;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.33, 1, 0.68, 1);
+}
+
 /* Motion tokens: generate animate-* utilities for page and modal
    transitions. Reduced-motion handling is global (see media query). */
 @theme {
@@ -71,9 +92,98 @@
 body {
   margin: 0;
   background-color: var(--bg);
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Display headings: the dealt type system sets them in capitals, tight. */
+.font-display {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+}
+
+/*
+ * Masked line reveal: each authored line of a headline rises from behind
+ * its own baseline. The padding/negative-margin pair keeps descenders
+ * clear of the mask. Reduced motion simply shows the finished state.
+ */
+.mask-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+.mask-line > span {
+  display: block;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mask-line > span {
+    animation: line-up 900ms var(--ease-expo) both;
+    animation-delay: calc(var(--line, 0) * 110ms + 150ms);
+  }
+  .rise-in {
+    animation: fade-in-up 600ms var(--ease-out) both;
+    animation-delay: 650ms;
+  }
+}
+@keyframes line-up {
+  from {
+    transform: translateY(105%);
+  }
+}
+
+/* The hero's seam runs through the middle of this line: the lower half is
+   repainted in the ink of the field below. A pseudo-element, so it rides
+   the line's reveal and adds no second copy of the text to the page. */
+.waterline {
+  position: relative;
+}
+.waterline::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: var(--on-accent);
+  clip-path: inset(50% 0 0 0);
+}
+
+/*
+ * Reveal on scroll, once (useReveal). Nothing is hidden until the hook has
+ * marked its container ready, so content never stays invisible if the
+ * observer can't run.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal-ready] [data-reveal] {
+    transition:
+      opacity 700ms var(--ease-out),
+      transform 900ms var(--ease-out);
+    transition-delay: calc(var(--stagger, 0) * 70ms);
+  }
+  [data-reveal-ready] [data-reveal]:not(.is-in) {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+/* The hero screenshot drifts slowly: the page's one moving picture. */
+@media (prefers-reduced-motion: no-preference) {
+  .slow-drift {
+    animation: slow-drift 14s var(--ease-soft) infinite alternate;
+  }
+}
+@keyframes slow-drift {
+  to {
+    transform: translate3d(-1.5%, -2%, 0) scale(1.04);
+  }
+}
+
+/* Mode list: hovering one row dims the other names to the soft ink
+   (still full-contrast text, never faded). */
+@media (hover: hover) and (pointer: fine) {
+  .mode-list:hover .mode-row:not(:hover) .mode-name {
+    color: var(--muted);
+  }
 }
 
 /* Visible keyboard focus everywhere (buttons opt into their own ring). */

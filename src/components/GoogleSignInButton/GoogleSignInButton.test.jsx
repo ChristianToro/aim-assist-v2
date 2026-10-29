@@ -19,7 +19,18 @@ describe('GoogleSignInButton', () => {
       screen.getByRole('button', { name: 'Continue with Google' })
     )
 
-    expect(mockSignIn).toHaveBeenCalledOnce()
+    expect(mockSignIn).toHaveBeenCalledExactlyOnceWith({ returnTo: undefined })
+  })
+
+  it('passes the page to return to after sign-in', () => {
+    mockSignIn.mockResolvedValue()
+    render(<GoogleSignInButton returnTo="/play" />)
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue with Google' })
+    )
+
+    expect(mockSignIn).toHaveBeenCalledWith({ returnTo: '/play' })
   })
 
   it('logs a failed sign-in instead of throwing', async () => {

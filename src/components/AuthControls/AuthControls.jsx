@@ -1,17 +1,31 @@
+import { useLocation } from 'react-router-dom'
 import Button from '../Button/Button'
 import GoogleSignInButton from '../GoogleSignInButton/GoogleSignInButton'
 import { useAuth } from '../../hooks/useAuth'
 import { signOutUser } from '../../services/auth'
 
+// Signing in from the landing page means "I want to play"; anywhere else,
+// the player returns to the page they were on.
+const returnPathFor = (pathname) => (pathname === '/' ? '/play' : undefined)
+
 // Navbar auth section: Google sign-in when signed out; avatar +
 // sign-out when signed in.
 const AuthControls = () => {
   const { user, isLoading } = useAuth()
+  const { pathname } = useLocation()
 
   // Reserve width during session restore to avoid layout shift.
   if (isLoading) return <div className="w-24" aria-hidden="true" />
 
-  if (!user) return <GoogleSignInButton variant="secondary" size="sm" />
+  if (!user) {
+    return (
+      <GoogleSignInButton
+        variant="secondary"
+        size="sm"
+        returnTo={returnPathFor(pathname)}
+      />
+    )
+  }
 
   return (
     <div className="flex items-center gap-2">

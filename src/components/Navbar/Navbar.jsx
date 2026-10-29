@@ -10,7 +10,7 @@ const navLinks = [
 ]
 
 const linkClass = ({ isActive }) =>
-  `rounded-lg px-2.5 py-2 text-sm font-medium whitespace-nowrap transition-colors sm:px-3 ${
+  `px-2.5 py-2 text-caption font-medium whitespace-nowrap transition-colors sm:px-3 ${
     isActive
       ? 'bg-surface text-heading'
       : 'text-muted hover:bg-surface hover:text-heading'
@@ -23,11 +23,11 @@ const Navbar = () => {
   const { user } = useAuth()
 
   return (
-    <header className="sticky top-0 z-10 border-b border-edge bg-bg/80 backdrop-blur">
+    <header className="bg-bg">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
         <Link
           to="/"
-          className="flex shrink-0 items-center gap-2 text-base font-semibold tracking-tight text-heading sm:text-lg"
+          className="flex shrink-0 items-center gap-2 font-display text-caption text-heading"
         >
           <span aria-hidden="true" className="text-accent">
             ◎

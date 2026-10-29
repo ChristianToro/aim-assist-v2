@@ -26,7 +26,7 @@ const tabClass = (isActive) =>
 const SignInPrompt = () => (
   <Card className="flex flex-col items-center gap-4 py-12 text-center">
     <p className="text-muted">Sign in to track your personal best scores.</p>
-    <GoogleSignInButton variant="secondary" />
+    <GoogleSignInButton />
   </Card>
 )
 
