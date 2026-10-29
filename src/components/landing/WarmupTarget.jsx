@@ -17,19 +17,28 @@ const Readout = ({ label, value }) => (
  * The page's one live thing: a warm-up target drawn in the active theme's
  * own ring colours. Hitting it (pointer or keyboard) reports the reaction
  * time and moves it. Plain DOM: no canvas, nothing animates per frame.
- * The `action` slot holds the panel's primary button.
+ * The optional `action` slot holds the panel's primary button. With
+ * `riseIn` (the 404, where the panel is on the first screen) its parts
+ * rise one after another on load.
  */
-const WarmupTarget = ({ action }) => {
+const WarmupTarget = ({ action, riseIn = false }) => {
   const { position, lastMs, bestMs, hit } = useWarmupTarget()
+  const part = riseIn ? 'rise-in' : ''
 
   return (
     <div
       data-ui
-      className={`w-full max-w-[27.5rem] bg-bg p-5 text-body ${PANEL_FRAME}`}
+      style={{ '--rise': 2 }}
+      className={`w-full max-w-[27.5rem] bg-bg p-5 text-body ${PANEL_FRAME} ${part}`}
     >
-      <p className="font-medium text-heading">Warm-up</p>
+      <p style={{ '--rise': 3 }} className={`font-medium text-heading ${part}`}>
+        Warm-up
+      </p>
 
-      <div className="relative mt-4 aspect-[4/3] bg-surface">
+      <div
+        style={{ '--rise': 4 }}
+        className={`relative mt-4 aspect-[4/3] bg-surface ${part}`}
+      >
         <button
           type="button"
           onClick={hit}
@@ -43,12 +52,16 @@ const WarmupTarget = ({ action }) => {
         </button>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-4" aria-live="polite">
+      <dl
+        style={{ '--rise': 5 }}
+        className={`mt-4 grid grid-cols-2 gap-4 ${part}`}
+        aria-live="polite"
+      >
         <Readout label="Last reaction" value={formatMs(lastMs)} />
         <Readout label="Best" value={formatMs(bestMs)} />
       </dl>
 
-      <div className="mt-5 [&>*]:w-full">{action}</div>
+      {action && <div className="mt-5 [&>*]:w-full">{action}</div>}
     </div>
   )
 }

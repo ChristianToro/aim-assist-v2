@@ -21,4 +21,19 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Play' })).toBeNull()
   })
+
+  it('holds a protected route on the loading frame while the session restores', () => {
+    renderWithAuth(<AppRoutes />, { route: '/play', isLoading: true })
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading page')
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+  })
+
+  it('renders the 404 page for an unknown address', async () => {
+    renderWithAuth(<AppRoutes />, { route: '/nowhere' })
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: '404 Missed' })
+    ).toBeInTheDocument()
+  })
 })

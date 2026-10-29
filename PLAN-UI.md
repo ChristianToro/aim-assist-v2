@@ -58,7 +58,7 @@ The first target is the landing page:
 | U4 | Done | **Leaderboards.** The view tabs as app tabs, the `Leaderboard` table to the app's table rules (figures right-aligned in tabular numerals, the player's own row marked, quiet dividers), and the Personal Best sign-in prompt. Every state: loading, empty per view, error and signed out. | `Leaderboards.jsx`, `Leaderboard` |
 | U5 | Done | **Profile.** Settle the signed-in check first. Then `ProfileCard` and `StatTile`, the two AI insight panels (`InsightPanel`, `HardwareInsight` and `PlatformInsight`, including their loading, empty and error states), and Best Matches through U4's table. The screen's one question decides what's biggest. | `Profile.jsx`, `ProfileCard`, `StatTile`, `InsightPanel`, `HardwareInsight`, `PlatformInsight` |
 | U6 | Done | **Play.** The mode picker, the match controls, the HUD, the idle and paused overlays on the canvas, `ResultsModal` (its save status included) and the session history. No engine changes. `Modal`'s backdrop blur and large shadow go, per the house rules. | `Play.jsx`, `ModePicker`, `GameArea`, `GameHud`, `Modal`, `ResultsModal`, `SessionHistory` |
-| U7 | Planned | **NotFound, shared states and the final pass.** NotFound in the landing direction. `LoadingScreen` and `LoadingSpinner` matched to the app style. Remove `PagePlaceholder`, which nothing imports. Then a whole-app pass: all five themes, reduced motion, increased contrast, the bundle against U2's numbers, the Vercel preview, and ARCHITECTURE.md and README.md updated. | `NotFound.jsx`, `LoadingScreen`, `LoadingSpinner`, `PagePlaceholder/`, docs |
+| U7 | Done | **NotFound, shared states and the final pass.** NotFound in the landing direction. `LoadingScreen` and `LoadingSpinner` matched to the app style. Remove `PagePlaceholder`, which nothing imports. Then a whole-app pass: all five themes, reduced motion, increased contrast, the bundle against U2's numbers, the Vercel preview, and ARCHITECTURE.md and README.md updated. | `NotFound.jsx`, `LoadingScreen`, `LoadingSpinner`, `PagePlaceholder/`, docs |
 
 ## U0 detail
 
@@ -628,6 +628,95 @@ The *Data terminal* sheet applies. Play is a working screen whose biggest block 
   - **Colour:** only the tab and nav accent lines and the targets themselves.
   - **Phone:** the six mode tabs wrap to a second row with nothing off-screen, the HUD folds 3 by 2, and the session rows fold their figures under the mode.
 - *2026-10-29, user report: the browser checks passed: a real match on the user's account saved ("Saved to your profile."), and the phone controls row held still at match start.*
+
+## U7 detail
+
+NotFound is a page, so it takes U2's *Loud and flat* sheet (seed `1164839022`) without a redeal: the skill's "single section" case matches the surrounding design. The loading states take U3's *Data terminal* rules (§11: the final layout with grey bars, no shimmer).
+
+1. **NotFound** in the hero's composition:
+   - **Headline:** the hero's waterline device, with "404 / Missed" as its two lines. Hero's `Headline` moves into a shared `WaterlineHeadline` that takes the lines, so the device isn't copied.
+   - **Lower field:** one sentence saying the page doesn't exist, and the warm-up target panel (the landing page's live thing) holding the one action, "Back to home". The panel closes the right half, where the hero has its screenshot.
+2. **Loading states:**
+   - **`LoadingScreen`** (the Suspense fallback): the "◎" glyph goes. It becomes the app screens' title row in grey bars, inside the page frame, with an `sr-only` status. It fades in after a short delay, so a fast chunk shows nothing.
+   - **`ProtectedRoute`** shows the same `LoadingScreen` while the session restores, instead of a bare spinner.
+   - **`LoadingSpinner`** stays only inline (InsightPanel's "Asking Claude"). It turns ink on a quiet ring, since the accent is kept for the selection line.
+3. **Remove `PagePlaceholder/`,** which nothing imports.
+4. **Tests:** NotFound (the h1, the home link, the warm-up target), `LoadingScreen`'s status, and `ProtectedRoute`'s loading state.
+5. **The whole-app pass:**
+   - `lint.mjs` over all of `src/` (pages and the app screens with `--app`).
+   - `inspect.mjs` on `/` and the 404 page, and `inspect.mjs --app` on `/settings` and `/leaderboards`, on the production build. Play and Profile through U6's faked session.
+   - All five themes, reduced motion and increased contrast, screenshotted on every screen.
+   - The bundle against U2's numbers.
+   - ARCHITECTURE.md and README.md brought up to date with U0–U7.
+   - **Not runnable here:** the Vercel preview, which needs the user's push.
+6. Stop for review.
+
+### As built
+
+- **`WaterlineHeadline`** (new, `components/landing/`): Hero's headline, moved out unchanged and given a `lines` prop. Hero and NotFound both use it.
+- **`NotFound`:**
+  - The hero's two fields and seam, with "404 / Missed" as the headline, the seam cutting "Missed".
+  - Under it: "There's no page at this address. Take a warm-up shot, or head back home." and **Back to home** (`inverse`, the page's one action).
+  - **The warm-up panel:** from `md` it's pinned at the right, centred on the seam, `min(27.5rem, 40vw)` wide, and the sentence column stops short of it. Below `md` it follows the button.
+  - **Round 1, changed:** the first build put the sentence at the foot of the field and the button inside the panel, which ran past the first screen. The inspector also failed `still-page` (5 moving elements).
+- **`WarmupTarget`:**
+  - `action` is now optional.
+  - `riseIn` staggers the panel and its parts on load. Only the 404 sets it; on the landing page the panel still reveals on scroll.
+  - `.rise-in` takes a `--rise` index for the stagger. Hero's single use is unchanged.
+- **`LoadingScreen`:**
+  - The "◎" glyph and the spinner go. It's the app screens' title row as two `bg-surface` bars at the title's and subline's real sizes, in the page frame, with `aria-busy` and an `sr-only` "Loading page" status.
+  - It fades in after 300 ms, so a fast chunk shows nothing.
+- **`ProtectedRoute`** shows `LoadingScreen` during the session restore, so the Suspense fallback and the session wait look the same.
+- **`LoadingSpinner`:** an inline `span`, ink on an `edge` ring (the accent is kept for the selection line). It's only used beside InsightPanel's "Asking Claude" now.
+- **Removed:** `PagePlaceholder/`.
+- **`Navbar`:** the selection line carries `taste-skill-ignore`, since the page lint reads it as a hairline. The app lint has always passed it, and it's the U3 style's one mark.
+- **Tests:** 280, up from 277: `NotFound` (1: the h1, the home link, the target) and `AppRoutes` (+2: the loading frame on a protected route while the session restores, and the 404 for an unknown address).
+- **Docs:**
+  - ARCHITECTURE.md: the components, utils and new `styles/` rows, and a **Styling** paragraph (semantic tokens, the two type scales, the selection line, motion and contrast).
+  - README.md: a UI-refactor paragraph in Project Plan, the test count, and the entry chunk size.
+
+### U7 verification
+
+- `npm run lint`, `npm run format:check`, `npm test` (280) and `npm run build` pass.
+- **`lint.mjs`:** **0 FAIL, 0 WARN** over the page source (Home, NotFound, `landing/`, Navbar, Footer, Button, Card, Tooltip, Layout). `--app` over all of `src/pages` and `src/components`: **0 FAIL, 1 WARN.** The WARN, `em-dash`, counts 5: the grey "none yet" dashes that app-screens §11 calls for, in `ReactionTime`, `StatStrip` and `WarmupTarget`.
+- **`inspect.mjs`** on the production build (`vite preview`, `/api` proxied to `vercel dev`):
+
+  | Screen | Result | WARNs |
+  |---|---|---|
+  | `/nowhere` (404) | **0 FAIL**, 2 WARN | `no-footage`; `still-page`, 9 moving elements, under the 16 it would like. A one-screen 404 has 9 parts to move. |
+  | `/` | **0 FAIL**, 1 WARN | `no-footage`, as at U2. |
+  | `/settings` (`--app`) | **0 FAIL**, 1 WARN | the skip-link `unused-canvas` false positive (U3). |
+  | `/leaderboards` (`--app`) | **0 FAIL**, 3 WARN | the same as U4: the skip link, and the gap under a two-row board. |
+
+  - **404, measured:** "404 MISSED" on 2 lines at 1440, 768 and 390 (130, 69 and 52 px). Unbounded and Onest at 14/19/36/130 px.
+- **The whole app in headless Chrome** (scratchpad `app-pass.mjs`), signed in through U6's faked session. Profile's `/api/me` and personal board were answered locally with a stand-in player's 7 matches.
+  - **All six screens** (Home, Play, Profile, Leaderboards, Settings, 404) in **all five themes** at 1440, and Dark and Light at 390, reviewed on contact sheets. Every screen takes each theme's colours. The 404's fields, headline and target follow the landing page in each, and Light's 404 uses `accent-strong` like its hero.
+  - **No console errors** in any run.
+  - **Reduced motion:** on `/` and the 404, no `[data-reveal]`, `.rise-in` or headline line is left below full opacity after load.
+  - **Increased contrast** (`prefers-contrast: more`): each theme's `--muted` and `--edge` switch to its stronger values (e.g. Dark `#d4d4d8` / `#52525b`), with Leaderboards screenshotted in all five.
+  - **The 404's target:** a real mouse click recorded a reaction time in Last and Best.
+  - **Loading frame:** with the session call held for 3 s, `/profile` showed the two title bars at y = 104 px, where every screen's h1 sits, with `aria-busy` and the "Loading page" status. Checked in Dark at 1440 and Light at 390.
+- **Bundle,** against U2 (and v2.0):
+
+  | Chunk (gzip) | v2.0 | U2 | U7 |
+  |---|---|---|---|
+  | Entry | 3.30 kB | 3.44 kB | 3.62 kB |
+  | CSS | 6.29 kB | 7.80 kB | 8.27 kB |
+  | Home | – | 3.58 kB | 2.96 kB, plus 1.10 kB `WaterlineHeadline` shared with the 404 |
+  | NotFound | – | – | 0.69 kB |
+  | `react-vendor` / `auth-vendor` | 71.80 / 67.04 kB | unchanged | unchanged |
+
+  The entry chunk grew 0.18 kB since U2, from `Button`'s `solid` variant, the shared table classes and the loading frame.
+- **Not run:**
+  - The Vercel preview of `refactor/UI`, which needs the user's push.
+  - A real Google sign-in. The signed-in screens were seen through the faked session only.
+- **Browser checks (user),** under `npm run dev:full`:
+  1. Visit `/anything`: the 404 in your theme. Hit the target, then **Back to home**.
+  2. The 404 at a phone width: the headline, the sentence and the button on the first screen, with the panel below.
+  3. Throttle the network in DevTools (Slow 4G) and open `/profile` in a fresh tab: the grey title bars, not a spinner, until the page arrives.
+  4. Profile → Get recommendation: the small ink spinner beside "Asking Claude".
+  5. After pushing: the same checks on the Vercel preview.
+- *2026-10-29, user report: the browser checks passed.*
 
 ## Verification (every gate)
 

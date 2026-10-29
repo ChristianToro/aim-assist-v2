@@ -17,9 +17,9 @@ const linkClass = ({ isActive }) =>
   }`
 
 // The current page carries the app's one selection mark: a 1px accent
-// line exactly as wide as its label.
+// line exactly as wide as its label. (The page lint reads it as a rule.)
 const labelClass = (isActive) =>
-  `border-b pb-1 ${isActive ? 'border-accent' : 'border-transparent'}`
+  `border-b pb-1 ${isActive ? 'border-accent' : 'border-transparent'}` // taste-skill-ignore
 
 /*
  * The page links are for signed-in players only; signed-out visitors

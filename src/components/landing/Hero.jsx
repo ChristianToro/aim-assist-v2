@@ -1,37 +1,12 @@
-import { Fragment } from 'react'
 import heroImage from '../../assets/hero-img.webp'
 import StartTrainingButton from './StartTrainingButton'
+import WaterlineHeadline from './WaterlineHeadline'
 
 const HEADLINE_LINES = ['Train', 'your aim']
 const HERO_IMAGE_SIZE = { width: 1319, height: 1192 }
 
-/*
- * "Waterline" hero: two flat fields meet at --seam-y, and the seam cuts
- * through the headline's second line. The h1 is anchored so that line's
- * middle sits exactly on the seam; its `.waterline` copy (a ::after in
- * the on-accent ink, styles in index.css) covers the lower half, so the
- * letters change colour where the fields meet. The space between the
- * block lines keeps the accessible name readable.
- */
-const Headline = () => (
-  <h1 className="absolute top-(--seam-y) -translate-y-3/4 font-display text-display text-accent">
-    {HEADLINE_LINES.map((line, index) => (
-      <Fragment key={line}>
-        {index > 0 && ' '}
-        <span className="mask-line">
-          <span
-            style={{ '--line': index }}
-            className={index === 1 ? 'waterline' : undefined}
-            data-text={line}
-          >
-            {line}
-          </span>
-        </span>
-      </Fragment>
-    ))}
-  </h1>
-)
-
+// "Waterline" hero: two flat fields meet at --seam-y, and the seam cuts
+// through the headline's second line (see WaterlineHeadline).
 const Hero = () => (
   <section className="relative overflow-hidden bg-bg [--seam-y:calc((100svh-var(--nav-h))*0.46)] sm:[--seam-y:calc((100svh-var(--nav-h))*0.5)]">
     <div className="h-(--seam-y)" aria-hidden="true" />
@@ -63,7 +38,7 @@ const Hero = () => (
 
     <div className="pointer-events-none absolute inset-0">
       <div className="relative mx-auto h-full max-w-6xl px-4 sm:px-6">
-        <Headline />
+        <WaterlineHeadline lines={HEADLINE_LINES} />
       </div>
     </div>
   </section>

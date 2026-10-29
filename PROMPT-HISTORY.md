@@ -386,3 +386,75 @@ The user chose the faked session over driving their own signed-in Chrome.
 - The user reported that U6's browser checks passed on their real account: a match saved, and the phone controls row held still at match start.
 - U6 is marked Done in PLAN-UI.md and committed on `refactor/UI` with Interactions 10–12.
 - U7 (NotFound, shared states and the final pass) is next.
+
+---
+
+## Session: 2026-10-29
+
+**Objective:** Execute U7: NotFound, the shared loading states, and the whole-app final pass.
+
+### Interaction 1 — U7 built and verified; stopped at the review gate
+
+**User Prompt**
+
+> working tree is clean. execute U7
+
+**Agent Outcome**
+
+- **U7's steps** written into PLAN-UI.md first. NotFound takes U2's *Loud and flat* sheet without a redeal, because the skill's "single section" case matches the surrounding design. The loading states take U3's *Data terminal* §11 rules.
+- **NotFound:**
+  - The landing hero's waterline device, with "404 / Missed" as the headline.
+  - The sentence and **Back to home** sit under it.
+  - The warm-up target panel is pinned on the seam at the right from `md`.
+  - Hero's headline moved into a shared `WaterlineHeadline` rather than being copied.
+- **Loading:**
+  - `LoadingScreen` is now the title row in grey bars with a delayed fade-in, used by both Suspense and `ProtectedRoute`.
+  - `LoadingSpinner` is a quiet ink ring, left only inline in InsightPanel.
+- **Removed:** `PagePlaceholder/`.
+- **Docs:** a Styling paragraph and updated rows in ARCHITECTURE.md, and a UI-refactor paragraph, the test count and the bundle size in README.md.
+
+**Attempted Approach / Resolution**
+
+- **First NotFound build:** the sentence sat at the foot of the field, and the "Back to home" button sat inside a panel that ran past the first screen. The inspector also failed `still-page` (5 moving elements).
+  - **Fix:** the sentence and button now sit under the headline. The panel moved onto the seam, and its parts rise in a stagger (`WarmupTarget`'s new `riseIn`, and `--rise` on `.rise-in`), which brought the count to 9.
+- **At 768:** the in-flow panel left the right half empty, so the pinning starts at `md`, not `lg`.
+- **Rejected:** rendering two panels, one per breakpoint. That meant duplicate state and a duplicate button in the DOM.
+- **Page lint:** it flagged the navbar's accent selection line as a hairline. It carries `taste-skill-ignore` now: it's the app style's one mark, and the app lint has always passed it.
+
+**Changes**
+
+- New: `components/landing/WaterlineHeadline.jsx`, `pages/NotFound.test.jsx`.
+- Edited: `NotFound.jsx`, `Hero.jsx`, `WarmupTarget.jsx`, `LoadingScreen.jsx`, `LoadingSpinner.jsx`, `ProtectedRoute.jsx`, `Navbar.jsx` (comment only), `index.css`, `App.test.jsx`, `PLAN-UI.md`, `ARCHITECTURE.md`, `README.md`.
+- Deleted: `components/PagePlaceholder/`.
+- The check scripts (`app-pass.mjs`, `sheet.mjs`, `loading-shot.mjs`) live in the agent's scratchpad, not the repo.
+
+**Verification**
+
+- Lint, format check, tests (280, up from 277) and build pass.
+- `lint.mjs`: 0 FAIL on the page and app source.
+- `inspect.mjs`: 0 FAIL on `/`, the 404, `/settings` and `/leaderboards`. The WARNs are listed and explained in PLAN-UI.md.
+- **Headless Chrome, signed in through U6's faked session** (Profile's reads answered locally):
+  - All six screens in all five themes, with no console errors.
+  - Reduced motion leaves nothing hidden.
+  - Increased contrast switches each theme's muted and edge colours.
+  - The 404's target records a hit.
+  - With the session held, the loading frame sits at the h1's position.
+- **Bundle:** entry chunk 3.62 kB gzip (3.44 at U2), CSS 8.27 kB.
+- **Not run:** the Vercel preview (it needs the user's push), and a real Google sign-in.
+
+**Collaboration**
+
+- U7 stopped at the review gate and is uncommitted.
+- Five browser checks for the user are listed under U7 verification in PLAN-UI.md.
+
+### Interaction 2 — U7 approved and committed
+
+**User Prompt**
+
+> browser checks passed. commit U7
+
+**Agent Outcome**
+
+- The user reported that U7's browser checks passed.
+- U7 is marked Done in PLAN-UI.md and committed on `refactor/UI` with this session's history. Every milestone, U0–U7, is now done.
+- **Left to the user:** pushing `refactor/UI`, then checking the Vercel preview.

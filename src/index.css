@@ -151,9 +151,10 @@ body {
     animation: line-up 900ms var(--ease-expo) both;
     animation-delay: calc(var(--line, 0) * 110ms + 150ms);
   }
+  /* After the headline; --rise staggers a group's parts. */
   .rise-in {
     animation: fade-in-up 600ms var(--ease-out) both;
-    animation-delay: 650ms;
+    animation-delay: calc(var(--rise, 0) * 80ms + 650ms);
   }
 }
 @keyframes line-up {
