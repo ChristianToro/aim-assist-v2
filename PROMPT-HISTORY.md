@@ -198,3 +198,76 @@ A tiebreak was first written as `order by created_at desc, id desc`. In Postgres
     - taste-skill lint at 0 FAIL, 0 WARN.
   - **Merge Danger:** a two-way door, since `005` is additive and already applied, and the `POST` response only gains fields. The blast radius is Profile: two capped, indexed `GET`s on load, and a failed `GET` that leaves Generate usable.
 - The branch is pushed (`improvement/insights` tracks `origin/improvement/insights`). The PR wasn't opened by the agent. This entry was committed at the user's "commit it".
+
+---
+
+## Session: 2026-10-29 (fifth)
+
+**Objective:** Bring the README up to date with the merged work and explain its data flow with Mermaid diagrams (`improvement/Readme`).
+
+### Interaction 1 — README architecture as Mermaid diagrams
+
+**User Prompt**
+
+> On branch `improvement/Readme`, update the readme to reflect the latest state of the project. include mermaid diagrams explaining data flow
+
+**Agent Outcome**
+
+- Created `improvement/Readme` from `main` (`3844410`, the merged insights PR).
+- **README's Architecture section** swaps the ASCII sketch for six Mermaid diagrams:
+  - **System overview** (flowchart): React UI, canvas engine and `src/services/*` in the browser; `/api` on Vercel; Neon Auth, Neon Postgres and the Anthropic API, with each edge labelled.
+  - **Sign-in and identity** (sequence): the Google redirect, the one-time verifier exchange, the 15-minute Ed25519 JWT, and `/api` verifying it against the JWKS, ending at `uid = sub`.
+  - **Playing and saving a match** (sequence): the match ticket requested in parallel with `start()`, the rAF loop, `onHud` only on a hit, miss or tick, `onGameOver`'s summary carrying the event log, and the submit that checks, scores and claims in one statement.
+  - **Score submission gates** (flowchart): 401 → 400 (shape) → 404/409/410 → 400 (`checkMatch`) → `scoreEvents` → 201.
+  - **Data model** (ER): `neon_auth.user`, `matches`, `scores` and `insights` as the migrations define them, with `matches |o--o| scores` for the nullable, unique `match_id`.
+  - **AI insights** (flowchart): the free history read on mount, then the 5-match minimum (422), the input-hash cache, the daily cap (429), the Claude call and its answer check (502).
+- The section now lists the three rules ARCHITECTURE.md states, adding the token-identity rule to the README's two, plus a short leaderboards and profile-stats paragraph.
+- **Smaller fixes:** test count 400+ → 430+, links to all three prompt-history archives, and the "see below" under replay-proof scoring now links to the match-saving section.
+
+**Rationale**
+
+- The ER diagram names the Neon Auth table `NEON_AUTH_USER` instead of using Mermaid's entity-alias syntax, which older renderers don't parse.
+- Every diagram label that holds a `/`, parentheses or braces is quoted, since `["/api…"]` would otherwise parse as a Mermaid trapezoid.
+
+**Changes**
+
+- [`README.md`](README.md): the Architecture section, the tech-stack test count, the AI-tools archive links, and one anchor link.
+
+**Verification**
+
+- Each Mermaid block was extracted and rendered with `@mermaid-js/mermaid-cli@11.4.2` (via the system Chrome): all six parse. The overview and the match sequence were also looked at as PNGs.
+- Facts were checked against the code: `api/scores.js`, `matchSubmit.js`'s order of checks, `useMatchSave`, the migrations, and `GameSession`'s `onGameOver({ ...scoreEvents(mode, events), events })`. An early label, `onGameOver(summary, event log)`, was corrected to a single summary that carries the log.
+- `npm test` (436 passed) and `npm run build` pass. The entry chunk is 3.62 kB gzip, so the README's 3.6 kB claim holds. `npx prettier --check README.md` passes (Markdown is in `.prettierignore` anyway).
+
+**Collaboration**
+
+- The agent found that ARCHITECTURE.md still called `matchCheck.js` "not yet wired to a route", although `matchSubmit.js` runs it, and asked before going beyond the README.
+
+### Interaction 2 — ARCHITECTURE.md fix and commit
+
+**User Prompt**
+
+> /prompt-history fix the ARCHITECTURE.md line too, then commit
+
+**Agent Outcome**
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): `matchCheck.js` is now described as what `matchSubmit.js` runs before scoring.
+- This session is logged here, and the README, ARCHITECTURE.md and this file are committed on `improvement/Readme`. Nothing is pushed.
+
+**Collaboration**
+
+- The user approved the README as presented and chose to include the ARCHITECTURE.md correction in the same commit.
+
+### Interaction 3 — PR body for `improvement/Readme` → `main`
+
+**User Prompt**
+
+> Pushed, write the PR body
+
+**Agent Outcome**
+
+- **The body:** written to the agent's scratchpad (`PR-readme.md`) for the user to paste. It follows the `pr` skill's template:
+  - **Summary:** a diff sketch of the README's new architecture subsections (one line per diagram and what it traces), the test count and archive links, the ARCHITECTURE.md line and the new history session. It also names the code each diagram was checked against.
+  - **Evidence:** the old ASCII block and the stale `matchCheck.js` line, then all six blocks rendering in mermaid-cli 11.4.2, plus 436 tests and the 3.62 kB entry chunk that the README's figures rely on.
+  - **Merge Danger:** a two-way door with a docs-only blast radius. The one risk named is GitHub's renderer disagreeing with mermaid-cli, so the user should look at the rendered README on the branch before merging.
+- `improvement/Readme` tracks `origin/improvement/Readme`. The PR wasn't opened by the agent. This entry was committed at the user's "commit it".

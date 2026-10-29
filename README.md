@@ -44,7 +44,7 @@ The approach was to plan the architecture completely before writing any code. A 
 
 ### Which features considered next?
 
-- **Replay-proof scoring** — Saved scores are now computed on the server from a checked event log (see below), which rules out impossible scores but not a bot that fabricates a plausible log. Closing that means a seeded, fixed-step engine and the server replaying the player's raw input, which only pays off if the boards ever carry stakes.
+- **Replay-proof scoring** — Saved scores are now computed on the server from a checked event log (see [Architecture](#playing-and-saving-a-match)), which rules out impossible scores but not a bot that fabricates a plausible log. Closing that means a seeded, fixed-step engine and the server replaying the player's raw input, which only pays off if the boards ever carry stakes.
 - **Progress charts** — Every match is already stored with a timestamp; plotting score and accuracy over time is mostly a query and a chart component, and it's the single feature that would most change how the app feels to a returning user.
 - **Persistent session history** — Currently in-memory only, so a refresh clears it.
 - **Sensitivity calibration** — Target sizes and speeds tuned to match the game a player is warming up for.
@@ -62,32 +62,193 @@ The approach was to plan the architecture completely before writing any code. A 
 | AI | Anthropic API (Claude Opus 5.5), structured JSON output, server-side only |
 | Hosting | Vercel, with GitHub Actions running lint, tests, and build |
 | Build | Vite 8 (Rolldown) |
-| Quality | ESLint 10, Prettier, Vitest + React Testing Library (400+ tests) |
+| Quality | ESLint 10, Prettier, Vitest + React Testing Library (430+ tests) |
 
 ## AI Tools Used
 
-The v1 planning phase was completed in conjunction with OpenAI's ChatGPT, and the implementation with Claude's Fable model; see the [v1 prompt history](./Prototype/V1-PROMPT-HISTORY.md). v2 was planned and built with Claude Code, milestone by milestone, with each one stopping for my review before it was committed. The [v2 prompt history](./PROMPT-HISTORY.md) (and its [archive](./PROMPT-HISTORY-2026-Q4.md)) records each request, the decisions behind it, and how it was verified.
+The v1 planning phase was completed in conjunction with OpenAI's ChatGPT, and the implementation with Claude's Fable model; see the [v1 prompt history](./Prototype/V1-PROMPT-HISTORY.md). v2 was planned and built with Claude Code, milestone by milestone, with each one stopping for my review before it was committed. The [v2 prompt history](./PROMPT-HISTORY.md) (and its archives: [1](./PROMPT-HISTORY-2026-Q4.md), [2](./PROMPT-HISTORY-2026-Q4-02.md), [3](./PROMPT-HISTORY-2026-Q4-03.md)) records each request, the decisions behind it, and how it was verified.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI["React UI<br/>pages · hooks · contexts"]
+    Engine["Canvas engine<br/>src/game/"]
+    Services["src/services/*<br/>fetch + Bearer JWT"]
+    UI -- "start / pause / resume / stop" --> Engine
+    Engine -- "onHud · onGameOver" --> UI
+    UI --> Services
+  end
+
+  subgraph Vercel["Vercel Functions"]
+    API["/api/me · matches · scores<br/>leaderboard · insights/*"]
+  end
+
+  NeonAuth["Neon Auth<br/>Google sign-in"]
+  DB[("Neon Postgres<br/>matches · scores · insights")]
+  Claude["Anthropic API<br/>Claude Opus 5.5"]
+
+  Services -- "sign-in, session, JWT" --> NeonAuth
+  Services -- "JSON over HTTPS" --> API
+  API -- "verify JWT against JWKS" --> NeonAuth
+  API -- "SQL" --> DB
+  API -- "structured output" --> Claude
 ```
-React (menus, auth, stats, insights, routing)
-   │  start / pause / resume / stop
-   ▼
-Game Engine (rAF loop, targets, collision, particles)
-   │  event-driven callbacks: onHud, onGameOver
-   ▼
-React services ──fetch + Bearer JWT──▶ Vercel Functions (/api)
-                                          ├─ Neon Auth (verify tokens)
-                                          ├─ Neon Postgres (matches, scores, insights)
-                                          └─ Anthropic API (recommendations)
+
+Three rules hold the design together:
+
+1. **React never animates gameplay.** The `GameEngine` owns the `requestAnimationFrame` loop and pushes stats to React only when something displayed changes (hit, miss, or second tick) — never per frame. A game mode is pure configuration (`src/game/modes.js`); all six modes and the difficulty ramp run on the same engine with zero bespoke mode logic.
+2. **The browser never touches data directly.** Every database read and write, every token check, and every AI call happens in `/api`. The browser reaches it only through `src/services/*`.
+3. **Identity comes from a verified token, never from the request body.** `/api` takes the user id from the `sub` of a Neon Auth JWT it has verified.
+
+### Sign-in and identity
+
+Sign-in is a full-page redirect through Google and back. After that, every `/api` call carries a short-lived JWT, and the server derives the caller from it.
+
+```mermaid
+sequenceDiagram
+  participant B as Browser (Neon Auth SDK)
+  participant NA as Neon Auth
+  participant G as Google
+  participant API as /api
+
+  B->>NA: signIn.social("google")
+  NA->>G: OAuth redirect
+  G-->>B: back to the app with a one-time verifier
+  B->>NA: exchange the verifier for a session
+  B->>NA: getAuthToken()
+  NA-->>B: Ed25519 JWT, valid 15 min (cached by the SDK)
+  B->>API: request with Authorization: Bearer JWT
+  API->>NA: fetch JWKS (cached)
+  API->>API: pin EdDSA, check issuer, audience, expiry
+  Note over API: uid = sub, never a field from the body
 ```
 
-The non-negotiable rule: **React never animates gameplay.** The `GameEngine` owns the `requestAnimationFrame` loop and pushes stats to React only when something displayed changes (hit, miss, or second tick) — never per frame. A game mode is pure configuration (`src/game/modes.js`); all six modes and the difficulty ramp run on the same engine with zero bespoke mode logic.
+### Playing and saving a match
 
-The second rule is new in v2: **the browser never touches data directly.** Every database read and write, every token check, and every AI call happens in `/api`, and a request's identity comes only from a verified token, never from what the browser sends.
+The browser never sends a score. The server issues a match ticket when the round starts, and at game over the client sends the match's event log. The server checks the log and computes the score with the same pure `scoring.js` the results screen uses, so the two always agree.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design.
+```mermaid
+sequenceDiagram
+  actor P as Player
+  participant UI as React (Play)
+  participant E as GameEngine + GameSession
+  participant API as /api
+  participant DB as Neon Postgres
+
+  P->>UI: Start
+  par match ticket
+    UI->>API: POST /api/matches { mode }
+    API->>DB: insert matches row, started_at = now()
+    API-->>UI: 201 { matchId, expiresAt }
+  and gameplay
+    UI->>E: start()
+    loop every frame (requestAnimationFrame)
+      E->>E: update(dt) and render(), log each hit, miss and expiry
+    end
+    E-->>UI: onHud(snapshot) only on a hit, miss or clock tick
+  end
+  E-->>UI: onGameOver(summary), which carries the event log
+  UI->>API: POST /api/scores { matchId, events }
+  API->>API: verify JWT, check the log, scoreEvents(mode, events)
+  API->>DB: claim the match and insert the score in one statement
+  API-->>UI: 201 { score, accuracy, reactionTime }
+```
+
+Each submission passes the same gates in order, and every refusal has its own status, which the results screen words as *rejected* rather than as an outage:
+
+```mermaid
+flowchart TD
+  A["POST /api/scores"] --> B{"JWT valid?"}
+  B -- no --> R401["401"]
+  B -- yes --> C{"Body well-formed?<br/>≤ 512 KB, ≤ 10,000 events"}
+  C -- no --> R400a["400, naming the bad fields"]
+  C -- yes --> D{"The caller's match?"}
+  D -- "unknown or another player's" --> R404["404"]
+  D -- "already submitted" --> R409["409"]
+  D -- "expired" --> R410["410"]
+  D -- open --> E{"checkMatch<br/>mode rules, human limits,<br/>database elapsed time"}
+  E -- fails --> R400b["400, naming the failed rules"]
+  E -- passes --> F["scoreEvents(mode, events)"]
+  F --> G["Claim submitted_at and insert<br/>the score in one statement"]
+  G --> OK["201 with the stored figures"]
+```
+
+Because the claim and the insert happen together, a replayed request finds nothing to claim. A composite foreign key from `scores` to `matches` makes the database refuse a score whose player or mode differs from its match's.
+
+### Leaderboards and profile stats
+
+Nothing derived is stored. `GET /api/me` computes games played, best score, average accuracy and favourite mode from `scores` on every read, so two matches saved at once can't lose an update. The all-time, daily and weekly boards keep each player's best entry with `DISTINCT ON (user_id)`, rank the top 100 in UTC windows, and join names and avatars live from Neon Auth's user table.
+
+```mermaid
+erDiagram
+  NEON_AUTH_USER ||--o{ MATCHES : starts
+  NEON_AUTH_USER ||--o{ SCORES : owns
+  NEON_AUTH_USER ||--o{ INSIGHTS : receives
+  MATCHES |o--o| SCORES : "redeemed as"
+
+  NEON_AUTH_USER {
+    uuid id PK
+    text name
+    text image
+  }
+  MATCHES {
+    uuid id PK
+    uuid user_id FK
+    text mode
+    timestamptz started_at
+    timestamptz expires_at
+    timestamptz submitted_at
+  }
+  SCORES {
+    bigint id PK
+    uuid user_id FK
+    uuid match_id FK "unique, null for legacy rows"
+    text mode
+    integer score
+    real accuracy
+    integer reaction_time
+    timestamptz created_at
+  }
+  INSIGHTS {
+    bigint id PK
+    uuid user_id FK
+    text kind "hardware or platforms"
+    text input_hash
+    jsonb result
+    jsonb context
+    text model
+    timestamptz created_at
+  }
+```
+
+### AI insights
+
+Each Profile panel opens on the player's saved answers, a plain database read with no Claude call. Only the Generate button can reach Claude, and the server puts three gates in front of that paid call: enough matches to say something, a cache keyed by the inputs, and a daily cap.
+
+```mermaid
+flowchart TD
+  Open["Profile panel mounts"] --> List["GET /api/insights/kind<br/>10 latest saved answers"]
+  List --> Show["Show the latest,<br/>with a picker for older ones"]
+
+  Click["Player presses Generate"] --> Post["POST /api/insights/kind"]
+  Post --> Enough{"At least 5 matches?"}
+  Enough -- no --> R422["422 with matches needed and played"]
+  Enough -- yes --> Hash{"Hash of stats and setup<br/>matches the latest answer?"}
+  Hash -- yes --> Cached["Return the latest answer as cached"]
+  Hash -- no --> Cap{"5 fresh answers<br/>in the last 24 h?"}
+  Cap -- yes --> R429["429 with Retry-After"]
+  Cap -- no --> Call["Claude Opus 5.5<br/>JSON-schema output"]
+  Call --> Check{"Passes the checks a<br/>schema can't express?"}
+  Check -- no --> R502["502"]
+  Check -- yes --> Store["Insert into insights<br/>with its context"]
+  Store --> Fresh["Return the fresh answer"]
+  Cached --> Show
+  Fresh --> Show
+```
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design: every route, the `api/_lib` modules, the security model and the test strategy.
 
 ## Getting Started
 
