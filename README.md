@@ -28,6 +28,8 @@ The approach was to plan the architecture completely before writing any code. A 
 
 **The UI refactor** then reworked the interface without touching the engine or the API, in eight more milestones (U0–U7). The landing and 404 pages share one poster-like direction: flat colour fields and heavy display type. Play, Leaderboards, Profile and Settings share a quieter app style: tabular figures, one accent line for the selection, and a loading, empty and error state for every block. Signed-out visitors get no page links, only the way to sign in, and `/play` needs an account. Both directions were dealt by the [taste-skill](https://github.com/Leonxlnx/taste-skill) design skill and checked in headless Chrome at three widths. [PLAN-UI.md](./PLAN-UI.md) records each decision and its verification.
 
+**Past insights** made the AI answers the database already kept visible. Each Profile panel now opens on the player's latest saved answer, with no Claude call, and a picker shows the earlier ones. A hardware answer also records the mouse setup it was for. It ran as four milestones (I0–I3). [PLAN-INSIGHTS.md](./PLAN-INSIGHTS.md) records them.
+
 ## Features
 
 - **Six game modes** — Gridshot, Precision, Speed, Tracking, Flick, and an endless Survival mode with escalating difficulty
@@ -36,7 +38,7 @@ The approach was to plan the architecture completely before writing any code. A 
 - **Google sign-in** — profiles with stats derived from every match you've played (highest score, games played, average accuracy, favorite mode)
 - **Leaderboards** — all-time, daily, and weekly top 100 (one entry per player, with days in UTC) and personal bests
 - **Server-checked scores** — every saved score is computed by the server from the match's event log, after checks against the mode's rules and the real time played
-- **AI insights** — on your profile, Claude reads your per-mode stats and recommends a DPI, sensitivity, and polling rate (optionally relative to your current mouse), and 3–5 shooters whose aiming demands suit your strengths
+- **AI insights** — on your profile, Claude reads your per-mode stats and recommends a DPI, sensitivity, and polling rate (optionally relative to your current mouse), and 3–5 shooters whose aiming demands suit your strengths. Past answers are kept: each panel opens on your latest one, with the earlier ones a pick away
 - **Five themes** — Dark, Light, Cyberpunk, Terminal, and Aimlabs, applied to the UI *and* the canvas, remembered per browser
 - **Feel** — particle bursts, floating score text, and Web Audio–synthesized sound effects (no audio assets)
 

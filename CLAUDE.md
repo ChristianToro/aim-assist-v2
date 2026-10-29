@@ -4,7 +4,8 @@ Browser-based aim trainer (Aimlabs-inspired), portfolio quality. v2 moves the v1
 
 ## Documents
 
-- [PLAN-SCORING.md](PLAN-SCORING.md) — **read first.** Server-checked scoring on `hotfix/server-checked-scoring`: the audit it answers, decisions and milestone tracker (S0–S5). Update a milestone's status when it changes.
+- [PLAN-INSIGHTS.md](PLAN-INSIGHTS.md) — **read first.** Past AI insights on Profile, on `improvement/insights`: decisions and milestone tracker (I0–I3). Update a milestone's status when it changes.
+- [PLAN-SCORING.md](PLAN-SCORING.md) — server-checked scoring (S0–S5, all done, merged): the audit it answers and its decisions.
 - [AUDIT-RESPONSE.md](AUDIT-RESPONSE.md) — the response to the 2026-10-29 audit that PLAN-SCORING.md answers: each finding's verdict, the fix and the remaining risk.
 - [PLAN-UI.md](PLAN-UI.md) — the UI refactor (taste-skill, U0–U7, all done, merged): its decisions, the app style and the design rules below.
 - [PLAN-V2.md](PLAN-V2.md) — the v2.0 milestone tracker (M0–M9, all done) and its decisions.
@@ -17,7 +18,7 @@ Use the `prompt-history` skill to maintain PROMPT-HISTORY.md — invoke it at th
 
 ## Workflow
 
-v2.0 (`release/v2.0`) and the UI refactor (`refactor/UI`) are merged into `main`. Server-checked scoring happens on `hotfix/server-checked-scoring` in small milestones from PLAN-SCORING.md. Each milestone ends at a **review gate**: present the changes and verification results, then wait. Commit only after the user approves, and start the next milestone only when the user says so. Detail a milestone's steps when it starts.
+v2.0 (`release/v2.0`), the UI refactor (`refactor/UI`) and server-checked scoring (`hotfix/server-checked-scoring`) are merged into `main`. Past AI insights on Profile happen on `improvement/insights` in small milestones from PLAN-INSIGHTS.md. Each milestone ends at a **review gate**: present the changes and verification results, then wait. Commit only after the user approves, and start the next milestone only when the user says so. Detail a milestone's steps when it starts.
 
 ## Stack
 

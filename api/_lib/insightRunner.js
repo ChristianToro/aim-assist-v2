@@ -1,4 +1,5 @@
 import { HttpError } from './http.js'
+import { toEntry } from './insightHistory.js'
 import {
   DAILY_LIMIT,
   inputHash,
@@ -13,6 +14,8 @@ const TOO_MANY_REQUESTS = 429
  * `inputs` is everything the answer depends on; if it hashes the same as
  * the player's latest answer of this kind, that answer is returned without
  * calling Claude. Otherwise a fresh one counts against DAILY_LIMIT.
+ * `context` (the request's own part of `inputs`) is stored with a fresh
+ * answer, so the history can show what it was for.
  *
  * The limit is checked, then the row is written after generation, so two
  * simultaneous requests can both slip under it: a soft cap, which is
@@ -20,17 +23,12 @@ const TOO_MANY_REQUESTS = 429
  */
 export const createInsightRunner =
   (store) =>
-  async ({ uid, kind, inputs, generate, now = new Date() }) => {
+  async ({ uid, kind, inputs, context = {}, generate, now = new Date() }) => {
     const hash = inputHash(inputs)
 
     const latest = await store.latest(uid, kind)
     if (latest?.inputHash === hash) {
-      return {
-        recommendation: latest.result,
-        model: latest.model,
-        generatedAt: latest.createdAt,
-        cached: true,
-      }
+      return { ...toEntry(latest), cached: true }
     }
 
     const { count, oldestAt } = await store.countSince(
@@ -49,15 +47,14 @@ export const createInsightRunner =
     }
 
     const { result, model } = await generate()
-    const { createdAt } = await store.save(uid, kind, {
+    const { id, createdAt } = await store.save(uid, kind, {
       inputHash: hash,
       result,
+      context,
       model,
     })
     return {
-      recommendation: result,
-      model,
-      generatedAt: createdAt,
+      ...toEntry({ id, result, context, model, createdAt }),
       cached: false,
     }
   }

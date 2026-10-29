@@ -33,15 +33,15 @@ React owns everything around gameplay: routing, menus, auth state, settings, the
 |---|---|
 | `pages/` | One component per route. Each is code-split with `lazy()`; `/play` and `/profile` sit behind `ProtectedRoute`, and the navbar shows page links only to signed-in players. |
 | `components/` | Small presentational pieces (`Leaderboard`, `ProfileHeader`, `StatStrip`, `Tabs`, `InsightPanel`, …) plus the game bridge (`GameArea`, `GameCanvas`, `GameHud`). `LoadingScreen` is the one "page not ready" frame, shown both while a route's chunk downloads and while `ProtectedRoute` waits for the session. `components/landing/` holds the home page's sections, including the waterline headline the 404 page reuses and a DOM warm-up target that reports reaction times (no canvas, nothing animated per frame). |
-| `hooks/` | Stateful logic: `useAuth`, `useLeaderboard`, `useUserProfile`, `useInsight`, `useGameSession` (which owns one engine instance), the landing page's `useReveal`, `useCycle` and `useWarmupTarget`, and Settings' `useMediaQuery` (the OS's motion and contrast preferences). |
+| `hooks/` | Stateful logic: `useAuth`, `useLeaderboard`, `useUserProfile`, `useInsightHistory`, `useInsight`, `useGameSession` (which owns one engine instance), the landing page's `useReveal`, `useCycle` and `useWarmupTarget`, and Settings' `useMediaQuery` (the OS's motion and contrast preferences). |
 | `contexts/` | `AuthProvider` (the Neon Auth session, mapped to `{ uid, displayName, photoURL }`) and `ThemeProvider`. |
 | `services/` | The only modules that leave the browser: `auth.js` (Neon Auth SDK) and `fetch` wrappers over `/api`. |
 | `utils/` | Pure functions (error messages, form parsing, user mapping, mode facts, reaction timing, leaderboard and profile formatting), tested without mocks. |
-| `styles/` | `themes.css` (the five themes as one set of semantic colour roles, which the canvas reads too), the theme list, and the shared data-table class lists. |
+| `styles/` | `themes.css` (the five themes as one set of semantic colour roles, which the canvas reads too), the theme list, and the class lists shared by the data tables and the form controls. |
 
 **Services.** `services/api.js` holds `apiFetch`, the single place the browser calls `/api`. With `auth: true` it attaches `Authorization: Bearer <jwt>` from `getAuthToken()`; when no one is signed in, it fails with a 401 before making any request. A non-2xx response becomes an `ApiError { status, message, details }`, so the UI can word each failure: the leaderboard tells a 401 apart from an outage, and the insight panels say how many more matches are needed or when the daily limit resets. The other services (`users`, `scores`, `leaderboard`, `insights`) are thin wrappers that take no user id, because the server already knows who is asking.
 
-**Data fetching.** The read hooks key their results by request (view and uid), and derive loading state by comparing the requested key with the key of the last result, so there's no synchronous `setState` inside effects. `useInsight` is the exception by design. It runs on a button click, never on mount, because each fresh answer is a paid Claude call. It keeps the previous answer on screen while a new one loads, and only the latest of overlapping requests is applied.
+**Data fetching.** The read hooks key their results by request (view and uid), and derive loading state by comparing the requested key with the key of the last result, so there's no synchronous `setState` inside effects. `useInsightHistory` is one of them: each insight panel loads the player's saved answers on mount, opens on the latest and lets a picker show an older one. That read costs no Claude call. `useInsight` is the exception by design. It runs on a button click, never on mount, because each fresh answer is a paid Claude call. It hands the answer to the history, which lists it first (or flags it as cached, if the server reused the latest) and shows it. Only the latest of overlapping requests is applied.
 
 **Styling.** Components use only the semantic utilities that `src/index.css` maps onto the theme roles (`bg-surface`, `text-muted`, `text-accent`, …), so switching theme changes no markup. The same file holds two type scales: a page scale in Unbounded and Onest for the landing and 404 pages, and an app scale (title, label, ui, meta) for the screens players work in. The accent appears on actions and on one selection mark, a 1px line under the chosen tab or nav link. Motion is CSS only (transform and opacity), and `prefers-reduced-motion` collapses it globally. Each theme strengthens its own borders and secondary text under `prefers-contrast: more`. [PLAN-UI.md](PLAN-UI.md) records the design decisions.
 
@@ -80,6 +80,7 @@ Every `.js` file directly under `api/` is a Vercel Function, and its path is its
 | `GET /api/leaderboard?view=all\|daily\|weekly\|personal` | `personal` only | The top 100 (one best entry per player), or the caller's own top 10. |
 | `POST /api/insights/hardware` | required | DPI, sensitivity and polling-rate advice from Claude. The body may carry the current `{ setup }`. |
 | `POST /api/insights/platforms` | required | 3–5 shooter games, with their platforms, that suit the caller's aim. |
+| `GET /api/insights/hardware`, `GET /api/insights/platforms` | required | The caller's 10 latest answers of that kind, newest first, as `{ entries }`. A database read, with no Claude call and no limit. |
 
 Every response is JSON with `Cache-Control: private, no-store`, so a saved score shows up immediately. `handle()` in `http.js` maps an `AuthError` to 401 and an `HttpError` to its own status and details; anything else is a bug or an outage, and Vercel answers 500.
 
@@ -93,7 +94,7 @@ Modules that touch the outside world are split into a pure factory and a small w
 | `scoreStore.js`, `matchStore.js`, `insightStore.js`: queries over a tagged-template `sql` | `db.js`: Neon's HTTP driver | `@neondatabase/serverless` |
 | `structuredOutput.js`: `createStructuredCaller(client)` | `claude.js`: `new Anthropic()` | `@anthropic-ai/sdk` |
 
-The rest are pure functions with unit tests: request validation (`scoreInput.js`, `matchPolicy.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`, `rateLimit.js`, and `matchPolicy.js`'s ticket lifetimes), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`). `matchIssue.js` (the issue limit) and `matchSubmit.js` (redeeming a match) run around the stores they're given, and their tests use in-memory ones.
+The rest are pure functions with unit tests: request validation (`scoreInput.js`, `matchPolicy.js`, `checks.js`), the event-log plausibility rules (`matchCheck.js`, not yet wired to a route; tested against engine-made logs and the real matches in `fixtures/`), the UTC board windows (`leaderboardView.js`), the cache key and limit arithmetic (`insightPolicy.js`, `rateLimit.js`, and `matchPolicy.js`'s ticket lifetimes), the insight history's response shape (`insightHistory.js`), and each insight kind's prompt, schema and answer check (`hardwareAdvice.js`, `platformAdvice.js`). `matchIssue.js` (the issue limit) and `matchSubmit.js` (redeeming a match) run around the stores they're given, and their tests use in-memory ones.
 
 ### Data model (`db/migrations/`)
 
@@ -103,7 +104,7 @@ Plain SQL. `npm run db:migrate` applies the files in order, each in its own tran
 - **`scores`** has one row per finished match: `user_id` (a foreign key to `neon_auth."user"`, deleted with the user), `mode`, `score`, `accuracy`, `reaction_time` and `created_at`. `CHECK` constraints repeat the handler's validation bounds as a second line of defence. Indexes support the all-time board, per-player bests and time windows.
 - **`matches`** has one row per match a signed-in player started: a uuid `id`, `user_id` (deleted with the user), `mode`, `started_at` (the database's clock), `expires_at` (the duration plus 30 minutes, or 2 hours for Survival) and `submitted_at`. `CHECK`s keep `expires_at` after `started_at`, and any submit inside that window.
 - **`scores.match_id`** names the match a score was computed from. It's `unique`, so a match can be redeemed only once. A composite foreign key `(match_id, user_id, mode)` makes the database refuse a score whose player or mode differs from its match's. It's null for the rows saved before matches existed, which the key doesn't check.
-- **`insights`** has one row per generated AI answer: `user_id`, `kind`, `input_hash`, `result jsonb`, `model` and `created_at`. It serves as both the cache and the rate limit.
+- **`insights`** has one row per generated AI answer: `user_id`, `kind`, `input_hash`, `result jsonb`, `context jsonb`, `model` and `created_at`. It serves as the cache, the rate limit and the player's history. `context` is the request's own input (`{ setup }` for hardware, `{}` for platforms), so a past answer can say what it was for. It's null for rows saved before migration `005`, which kept only the hash.
 
 Profile stats (games played, best score, average accuracy, favourite mode) are never stored. `GET /api/me` derives them with `count`, `max`, `avg` and `mode() within group`, so two matches saved at the same moment can't lose an update.
 
@@ -145,7 +146,9 @@ The profile stats and the leaderboards pick the match up on their next read.
 2. Hash `{ PROMPT_VERSION, modeStats, ...context }`. If the hash matches the player's latest answer of this kind, return that answer as `cached` without calling Claude.
 3. Otherwise, a player who already has 5 fresh answers in the last 24 hours gets 429 with `Retry-After`.
 4. Otherwise, make one `claude-opus-5-5` call with structured output (a JSON schema) and `effort: 'medium'`. The `fallbacks: 'default'` option makes the API retry a refused request on a fallback model within the same call.
-5. Check the answer against what the schema can't express (the DPI range, the pick count, no repeated titles), store it, and return it.
+5. Check the answer against what the schema can't express (the DPI range, the pick count, no repeated titles), store it with the request's `context`, and return it.
+
+Every answer, fresh or cached, comes back in the history's entry shape, `{ id, recommendation, context, model, generatedAt }`, plus `cached`. `GET` returns the 10 latest entries, and each stored answer goes back through its kind's check on the way out. A row saved in a shape an older prompt version produced is left out rather than sent to a UI that can't render it.
 
 | Outcome | Status |
 |---|---|

@@ -1,17 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { SIGNED_IN_USER, renderWithAuth } from '../test/renderWithAuth'
 
-const { mockProfile, mockBoard } = vi.hoisted(() => ({
+const { mockProfile, mockBoard, insights } = vi.hoisted(() => ({
   mockProfile: vi.fn(),
   mockBoard: vi.fn(),
+  insights: {
+    getHardwareInsight: vi.fn(),
+    getPlatformInsight: vi.fn(),
+    listHardwareInsights: vi.fn(),
+    listPlatformInsights: vi.fn(),
+  },
 }))
 vi.mock('../hooks/useUserProfile', () => ({ useUserProfile: mockProfile }))
 vi.mock('../hooks/useLeaderboard', () => ({ useLeaderboard: mockBoard }))
-vi.mock('../services/insights', () => ({
-  getHardwareInsight: vi.fn(),
-  getPlatformInsight: vi.fn(),
-}))
+vi.mock('../services/insights', () => insights)
 
 import Profile from './Profile'
 
@@ -48,8 +51,41 @@ const figure = (label) =>
 const renderProfile = () =>
   renderWithAuth(<Profile />, { user: SIGNED_IN_USER, route: '/profile' })
 
+const HARDWARE = {
+  id: '4',
+  recommendation: {
+    summary: 'Fast flicks, late corrections.',
+    dpi: { recommended: 800, rationale: 'Finer corrections.' },
+    sensitivity: { recommendation: 'Lower by 10%', rationale: 'Overshoot.' },
+    pollingRateHz: { recommended: 1000, rationale: 'Smoother tracking.' },
+  },
+  context: { setup: { dpi: 1600, pollingRateHz: 500 } },
+  model: 'claude-opus-5-5',
+  generatedAt: '2026-10-28T12:00:00.000Z',
+}
+const PLATFORMS = {
+  id: '5',
+  recommendation: {
+    summary: 'A tracker at heart.',
+    picks: [
+      {
+        title: 'Apex Legends',
+        genre: 'Battle royale',
+        platforms: ['PC'],
+        fit: 'Long tracking fights.',
+      },
+    ],
+    avoidForNow: 'Tactical shooters.',
+  },
+  context: {},
+  model: 'claude-opus-5-5',
+  generatedAt: '2026-10-28T12:00:00.000Z',
+}
+
 describe('Profile', () => {
   beforeEach(() => {
+    insights.listHardwareInsights.mockResolvedValue([])
+    insights.listPlatformInsights.mockResolvedValue([])
     mockBoard.mockReturnValue({
       entries: [BEST],
       error: null,
@@ -113,5 +149,46 @@ describe('Profile', () => {
     ).toBeNull()
     expect(within(table).getByText('Gridshot')).toBeInTheDocument()
     expect(within(table).getByText('8,560')).toBeInTheDocument()
+  })
+
+  it('opens the AI panels on the last saved answers, without asking Claude', async () => {
+    profileState({ profile: PROFILE })
+    insights.listHardwareInsights.mockResolvedValue([HARDWARE])
+    insights.listPlatformInsights.mockResolvedValue([PLATFORMS])
+    renderProfile()
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('Fast flicks, late corrections.')
+      ).toBeInTheDocument()
+    )
+    expect(screen.getByText('For 1600 DPI at 500 Hz.')).toBeInTheDocument()
+    expect(await screen.findByText('Apex Legends')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Update' })).toHaveLength(2)
+    expect(insights.getHardwareInsight).not.toHaveBeenCalled()
+    expect(insights.getPlatformInsight).not.toHaveBeenCalled()
+  })
+
+  it('puts a fresh answer above the saved one and keeps both', async () => {
+    profileState({ profile: PROFILE })
+    insights.listHardwareInsights.mockResolvedValue([HARDWARE])
+    insights.getHardwareInsight.mockResolvedValue({
+      ...HARDWARE,
+      id: '6',
+      recommendation: { ...HARDWARE.recommendation, summary: 'Calmer now.' },
+      context: { setup: { dpi: null, pollingRateHz: null } },
+      generatedAt: '2026-10-29T12:00:00.000Z',
+      cached: false,
+    })
+    renderProfile()
+
+    await screen.findByText('Fast flicks, late corrections.')
+    // The hardware panel comes first.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Update' })[0])
+
+    expect(await screen.findByText('Calmer now.')).toBeInTheDocument()
+    expect(screen.getByText('No current setup was given.')).toBeInTheDocument()
+    const picker = screen.getByRole('combobox', { name: 'Showing' })
+    expect(within(picker).getAllByRole('option')).toHaveLength(2)
   })
 })
