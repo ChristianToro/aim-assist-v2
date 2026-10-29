@@ -325,3 +325,20 @@ A tiebreak was first written as `order by created_at desc, id desc`. In Postgres
 - `npm run lint`, `prettier --check src` and `npm run build`: clean.
 - taste-skill `lint.mjs --app` on `Tooltip/`, `HardwareInsight/` and `StartTrainingButton.jsx`: 0 FAIL, 0 WARN.
 - **Rendered check:** Profile needs a Google sign-in, which `inspect.mjs` can't do, so the user looked at the hint on the running app and replied "looks good". This entry was committed at the user's "commit the changes".
+
+### Interaction 3 — PR body for `feature/mouse-tool-tip` → `main`
+
+**User Prompt**
+
+> looks good; commit the changes
+>
+> Pushed, write the PR body
+
+**Agent Outcome**
+
+- The user checked the hint on the running app, and the feature was committed as `8ff1b8b`. The user pushed it (`feature/mouse-tool-tip` tracks `origin/feature/mouse-tool-tip`).
+- **The body:** written to the agent's scratchpad (`PR-mouse-tool-tip.md`) for the user to paste, following the `pr` skill's template:
+  - **Summary:** a component-tree diff of the new help under the Mouse settings fields, and a diff of `Tooltip`'s new `align`/`size` props and its padding gap.
+  - **Evidence:** 436 → 438 tests with the two new tests in pseudocode, lint, Prettier, build and taste-skill lint clean, and the user's hand check on a signed-in Profile.
+  - **Merge Danger:** a two-way door with a cosmetic blast radius. The one other place it could show is the landing page's sign-in hint, since `Tooltip` gains a wrapper span.
+- The PR wasn't opened by the agent. This entry was committed at the user's "commit the prompt history".
