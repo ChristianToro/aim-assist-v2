@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import InsightPanel from '../InsightPanel/InsightPanel'
+import MouseSetupHelp from './MouseSetupHelp'
 import { useInsight } from '../../hooks/useInsight'
 import { useInsightHistory } from '../../hooks/useInsightHistory'
 import {
@@ -117,6 +118,9 @@ const HardwareInsight = ({ uid }) => {
           {MAX_DPI.toLocaleString()}.
         </p>
       )}
+      <div className="col-span-2">
+        <MouseSetupHelp />
+      </div>
     </div>
   )
 
