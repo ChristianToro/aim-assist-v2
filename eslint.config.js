@@ -19,8 +19,9 @@ export default defineConfig([
     },
   },
   {
-    // Serverless functions and CLI scripts run in Node, not the browser.
-    files: ['api/**/*.js', 'scripts/**/*.js'],
+    // Serverless functions, CLI scripts and the Node-RED watcher's modules
+    // run in Node, not the browser.
+    files: ['api/**/*.js', 'scripts/**/*.js', 'automation/**/*.js'],
     languageOptions: { globals: globals.node },
   },
 ])
