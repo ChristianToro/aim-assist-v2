@@ -268,6 +268,8 @@ Node-RED v5.0.9 on Node 24, user directory `~/.node-red`, outside the repo. The 
 
 ## Demo (Day 5)
 
+The 90-second pitch, with its pre-demo checklist and backups, is in [`automation/PITCH.md`](automation/PITCH.md).
+
 The daily board resets at 00:00 UTC, which is 19:00 Eastern standard time. Before the demo, press **Check now: daily** once, so the board's state is current and only the live match counts as a takeover.
 
 1. **Check now: daily**: the node status shows `daily: none` (the board is empty or unchanged).

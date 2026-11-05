@@ -309,12 +309,75 @@ Marked A4 Done, and added the label check to A5's row as build-log evidence: run
 
 Wrote this file, separate from [PROMPT-HISTORY.md](PROMPT-HISTORY.md).
 
+**Collaboration**
+
+> commit it and move to A5
+
+Committed `68e7a3b`.
+
+### Interaction 13 — Proposal, build log and label check (A5)
+
+**Agent Outcome**
+
+Asked for the two facts the proposal's value figure depends on, rather than estimating them:
+
+- the user checked the leaderboard by hand **a few times a week**, so a new #1 could wait 2–3 days;
+- celebrating players and catching cheaters **matter equally**.
+
+Then wrote:
+
+- [`automation/PROPOSAL.md`](automation/PROPOSAL.md) — one page: problem, solution, value (from up to 2–3 days to notice a new #1 down to under 30 minutes, and no manual checks), cost (effectively $0 a month, about $0.00024 per alert), failure modes, next step.
+- [`automation/BUILD-LOG.md`](automation/BUILD-LOG.md) — the assignment's build log:
+  - a Mermaid flow diagram, every step and change rule;
+  - the AI step: an example input and output from a real run, the request settings, the schema, and the full system prompt as sent;
+  - the prompt's one revision, with the incident and the old-versus-new label table (23 of 25 → 25 of 25);
+  - the failure table with how each path was tested, the measured cost, the timeline with commits, and how to run it.
+- [`automation/label-check.js`](automation/label-check.js) — the A4 check moved into the repo, run with `npm run automation:label-check -- [runs] [--show]`. It reads the key from `~/.node-red/.env`, sends five valid cases through the flow's own `claudeInput` and `claudeRequest`, and exits 1 on a miss. It isn't a `*.test.js`, so `npm test` never calls the paid API.
+- [`package.json`](package.json) — the `automation:label-check` script.
+
+**Verification**
+
+- `npm run automation:label-check -- 5 --show`: 25 of 25, about $0.008. The build log's example verdicts come from this run.
+- `npm test`: 497 passed, 59 of them the watcher's. Lint and Prettier are clean.
+
+**Attempted Approach / Resolution**
+
+Case B was first called "the real all-time takeover". The live board shows the Flick score was set after the Speed one, so it's now "the real top two scores, set up as a takeover", in the script, the build log and the plan.
+
+**Collaboration**
+
+> approved, commit A5
+
+Committed `01adbdf`. A0–A5 are all done.
+
+### Interaction 14 — Pitch script, CLAUDE.md entry, and this log closed
+
+**User Prompt**
+
+> write the 90-second pitch script, add A5 to prompt-history-automation to close the open items, CLAUDE.md's "Documents" entry for "PLAN-AUTOMATION.md". I will conduct the pull request at a later time.
+
+**Agent Outcome**
+
+- [`automation/PITCH.md`](automation/PITCH.md) — the 90-second pitch in four timed parts (problem, solution, value, cost and failure), with demo cues at the points where the live posts appear, a pre-demo checklist, and backups for when the demo misbehaves. One backup row was corrected while writing: with the Wi-Fi down, the watchdog notice can't reach Discord either.
+- [`CLAUDE.md`](CLAUDE.md) — a Documents entry for PLAN-AUTOMATION.md, pointing at `automation/` and this log. It was written with the `writing-for-agents` guidance: what the document is and when to reach it, in the existing entries' style.
+- [`PLAN-AUTOMATION.md`](PLAN-AUTOMATION.md) — the Demo section points at the pitch.
+- This file: Interactions 13–14 and the closed summary.
+
+**Collaboration**
+
+The user is leaving the PR for `feature/automation` → `main` to a later time.
+
+> yes, update those two lines and commit everything
+
+The agent had pointed out two stale CLAUDE.md lines, and the user had them fixed. `improvement/insights` was merged in PR #4, so PLAN-INSIGHTS.md's entry now reads "all done, merged", and **read first** moved to PLAN-AUTOMATION.md, now first in the list. The Workflow paragraph lists the insights work as merged and names `feature/automation` as the current branch, with its PR left to the user.
+
 ### Session Summary
 
 **Completed**
 
-- A0–A4 on `feature/automation`: `08d692e`, `216e476`, `dec0a6e`, `8084fe6`, `94a9628`. Not pushed.
+- A0–A5 on `feature/automation`: `08d692e`, `216e476`, `dec0a6e`, `8084fe6`, `94a9628`, `01adbdf`, plus this log (`68e7a3b`). Not pushed.
 - A Node-RED watcher that checks the all-time board every 30 min, 08:00–24:00 Eastern. Rule flags and Claude Haiku triage each new #1, `celebrate` posts to #announcements, and `review` posts to #mod-alerts. A watchdog, a 429 retry and a rule-only fallback cover failures.
+- The assignment's deliverables: the proposal, the build log with the AI prompt, the label check as evidence, and the Demo Day pitch.
 
 **Key Decisions**
 
@@ -322,15 +385,16 @@ Wrote this file, separate from [PROMPT-HISTORY.md](PROMPT-HISTORY.md).
 - Claude never sees player names, which blocks prompt injection and keeps personal data away from the AI.
 - The logic is in tested repo modules, and the Node-RED function nodes are glue.
 - The triage prompt is tied to the rule constants and was measured before and after its fix.
+- The proposal's value figure comes from the user's own checking habit, not an estimate.
 
 **Verification**
 
 - 497 tests pass; lint and Prettier are clean.
 - Every fixture and failure path was run live: Discord, the mock and an invalid key.
+- The label check from the repo: 25 of 25.
 - The user confirmed each milestone's posts in Discord.
 
 **Open Items**
 
-- A5: the one-page proposal, the build log, and the label check in the repo.
-- The CLAUDE.md "Documents" entry for PLAN-AUTOMATION.md (offered, not done).
+- The PR for `feature/automation` → `main`, which the user will open later.
 - Node-RED is running as a background process from this session. Restart it from a terminal for ongoing use.
