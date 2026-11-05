@@ -212,14 +212,14 @@ Node-RED v5.0.9 on Node 24, user directory `~/.node-red`, outside the repo. The 
    - **Save, or retry once on 429** (formerly "Save on 2xx") saves the state only on 2xx, resends the same body once after the wait, and otherwise leaves the alert for the next check. Notices have no state to save, so a failed notice is lost.
    - A **catch** node sends errors to an **errors** debug node, in the sidebar and the console.
    - **Fixture: reset** also clears the fixture board's watchdog count.
-3. **How the failure paths were tried without spamming Discord or paying for Claude:** `process.loadEnvFile` doesn't override variables already set. So a test instance started with an invalid `ANTHROPIC_API_KEY` and the two webhook URLs pointing at a local mock (in the session scratchpad) used those, and left `.env` alone. The mock answered the first `/announce` post with a 429 asking for 1.5 s. The test instance was started just after the 14:30 timer tick, so no real check could post to the mock.
+3. **How the failure paths were tried without spamming Discord or paying for Claude:** `process.loadEnvFile` doesn't override variables already set. So a test instance started with an invalid `ANTHROPIC_API_KEY` and the two webhook URLs pointing at a local mock used those, and left `.env` alone. The mock was a scratchpad script at first. It's now [`automation/mock-discord.js`](automation/mock-discord.js), and BUILD-LOG.md says how to re-run the tests. The mock answered the first `/announce` post with a 429 asking for 1.5 s. The test instance was started just after the 14:30 timer tick, so no real check could post to the mock.
 
 4. **Prompt fix from the dry run.** The user's live daily takeover went to #mod-alerts:
    - The run: Tracking 6,100, 82% of the ceiling, 97.3% accuracy, 642 ms, an empty board before it.
    - No rule fired: Claude labelled it `review` on its own.
    - The cause: the prompt said to review a score "close to the ceiling" without saying how close, so the theoretical ceiling made a strong human run look suspicious.
    - The new prompt explains that the ceiling is a theoretical maximum, and that strong human play is often 60–85% of it. It states the three rules (built from `flags.js`'s exported thresholds, so the two can't drift) and says Claude's job is what they miss: a concrete reason tied to figures, never the percentage or the accuracy alone.
-   - Measured with a throwaway label check (in the session scratchpad) that runs five valid cases 5 times each on Haiku, about $0.008 a run:
+   - Measured with a label check, first a scratchpad script and in A5 [`automation/label-check.js`](automation/label-check.js), that runs five valid cases 5 times each on Haiku, about $0.008 a run:
      - A: the user's run.
      - B: the real board's top two scores (Speed 66%, Flick 80%), as a takeover.
      - C: an 85% Flick run.

@@ -8,6 +8,7 @@ A Node-RED flow on the owner's machine checks Aim Assist's public leaderboard ev
 | The logic, unit-tested with Vitest | [`watcher/`](watcher/) |
 | The AI prompt and the request | [`watcher/claude.js`](watcher/claude.js) |
 | The label check (calls the paid API) | [`label-check.js`](label-check.js) |
+| Mock Discord webhooks for the failure tests | [`mock-discord.js`](mock-discord.js) |
 | Node-RED settings and secrets | `~/.node-red/settings.js` and `~/.node-red/.env`, outside the repo |
 
 ## How it works
@@ -172,11 +173,26 @@ npm run automation:label-check -- 5 --show   # reads ANTHROPIC_API_KEY from ~/.n
 | The machine is off or asleep | No checks. The next check sees the current #1, so the alert comes late, not never. | By design: each check compares against the current state. |
 | The leaderboard can't be reached | Nothing changes. After 3 failures in a row (~90 min), #mod-alerts hears once, and again when it's back. | Fixture "fetch fails" ×4: a notice on the 3rd only, then "reachable again". |
 | Claude is down, refuses or returns bad JSON | The rules decide, and the plain factual post goes out. | A test instance with an invalid API key: a 401, then "no verdict, the rules decide", then the plain post. |
-| Discord rate-limits a post (429) | Waits `retry_after` (at most 60 s) and resends once. Otherwise the next check tries again. | A local mock webhook answered the first post with a 429 asking for 1.5 s: retried after 1,500 ms and accepted. The state was saved only then. |
+| Discord rate-limits a post (429) | Waits `retry_after` (at most 60 s) and resends once. Otherwise the next check tries again. | A local mock webhook ([`mock-discord.js`](mock-discord.js)) answered the first post with a 429 asking for 1.5 s: retried after 1,500 ms and accepted. The state was saved only then. |
 | Discord is down | Nothing is saved, so the next check retries. Watchdog notices aren't retried. | Covered by the same save-on-2xx path. |
 | Claude labels wrongly | The rules force `review` regardless. A wrong `celebrate` costs one post, a wrong `review` one look. | The incident above, then the label check. |
 
 The invalid key and the mock webhooks were tried without touching `.env`. `process.loadEnvFile` doesn't override variables already set, so a test instance started with them in its environment used them.
+
+### Re-running the failure tests
+
+1. **Stop your Node-RED.** Port 1880 must be free.
+2. **Start the mock:** `node automation/mock-discord.js`. It listens on 127.0.0.1:18790, answers the first post to `/announce` with a 429, and prints every request as a JSON line.
+3. **Just after a timer tick** (:00 or :30, between 08:00 and 24:00), start a test instance:
+   ```bash
+   ANTHROPIC_API_KEY=invalid DISCORD_ANNOUNCE_URL=http://127.0.0.1:18790/announce DISCORD_MODS_URL=http://127.0.0.1:18790/mods node-red
+   ```
+   Starting it right after a tick matters. A real check would post to the mock and save the new #1, and that real alert would never reach Discord.
+4. **In the editor,** press Fixture: reset, then Fixture 1, Fixture: fetch fails ×4, and Fixture 2. Expect:
+   - a "can't be reached" post to `/mods` on the 3rd failure, and a "reachable again" post before the takeover;
+   - "no verdict from Claude (401), the rules decide" in the log;
+   - a 429, then the same body accepted on the retry.
+5. **Stop both** (Ctrl-C), then start `node-red` as usual.
 
 ## Cost, measured
 
@@ -196,7 +212,7 @@ The invalid key and the mock webhooks were tried without touching `.env`. `proce
 | A2 Check and decide | `dec0a6e` | Every change rule via fixtures; the real board seeded and stayed `none` across a restart. |
 | A3 AI step and routing | `8084fe6` | Live: two `celebrate` posts to #announcements and one `review` to #mod-alerts. |
 | A4 Failure handling | `94a9628` | The failure table above, the prompt revision and the label check. |
-| A5 Proposal and build log | this commit | This log, [PROPOSAL.md](PROPOSAL.md), and the label check from the repo: 25 of 25. |
+| A5 Proposal and build log | `01adbdf` | This log, [PROPOSAL.md](PROPOSAL.md), and the label check from the repo: 25 of 25. |
 
 Unit tests: `npm test` covers the watcher's logic in 59 tests (`automation/watcher/*.test.js`), and the whole suite passes.
 

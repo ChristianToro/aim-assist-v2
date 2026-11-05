@@ -371,11 +371,38 @@ The user is leaving the PR for `feature/automation` → `main` to a later time.
 
 The agent had pointed out two stale CLAUDE.md lines, and the user had them fixed. `improvement/insights` was merged in PR #4, so PLAN-INSIGHTS.md's entry now reads "all done, merged", and **read first** moved to PLAN-AUTOMATION.md, now first in the list. The Workflow paragraph lists the insights work as merged and names `feature/automation` as the current branch, with its PR left to the user.
 
+### Interaction 15 — The mock Discord moves into the repo
+
+**User Prompt**
+
+> no logging, no writing files:
+>
+> there is a shell still open, using node-red and a scratchpad file. Is anything crucial there for demonstration/functionality if I close the shell?
+
+> add the mock to automation/ and commit it
+
+**Agent Outcome**
+
+- **The answer:** closing the shell stops the background Node-RED, which only pauses checks. The flow, saved state, settings and logic live in `~/.node-red` and the repo. Of the scratchpad files, only the mock Discord had no copy in the repo.
+- **[`automation/mock-discord.js`](automation/mock-discord.js):** the mock, rewritten to the repo's standards. The first `/announce` post gets a 429 asking for 1.5 s, every other post gets a 204, and each request prints as a JSON line.
+- **[`automation/BUILD-LOG.md`](automation/BUILD-LOG.md):** the mock in the table of files, a new "Re-running the failure tests" section (start the test instance just after a timer tick, or a real alert could go to the mock), and A5's commit in the timeline in place of "this commit".
+- **[`PLAN-AUTOMATION.md`](PLAN-AUTOMATION.md):** A4's notes link the mock and the label check in the repo, where they said "the session scratchpad".
+
+**Verification**
+
+- Against the mock on a spare port: `/announce` → 429, then `/announce` → 204, `/mods` → 204, `/announce` → 204, each logged.
+- `npx eslint automation`: clean. Prettier: clean.
+- The real Node-RED on port 1880 was untouched.
+
+**Attempted Approach / Resolution**
+
+The first check put a trailing `&` on an `&&` chain, which sent the whole chain to the background, so the requests ran before the mock started. The stray chain then started a mock on that port. The check ran against it, and both stray processes were stopped.
+
 ### Session Summary
 
 **Completed**
 
-- A0–A5 on `feature/automation`: `08d692e`, `216e476`, `dec0a6e`, `8084fe6`, `94a9628`, `01adbdf`, plus this log (`68e7a3b`). Not pushed.
+- A0–A5 on `feature/automation`: `08d692e`, `216e476`, `dec0a6e`, `8084fe6`, `94a9628`, `01adbdf`, plus this log (`68e7a3b`), the pitch and CLAUDE.md (`07c92ad`), and the mock. Not pushed.
 - A Node-RED watcher that checks the all-time board every 30 min, 08:00–24:00 Eastern. Rule flags and Claude Haiku triage each new #1, `celebrate` posts to #announcements, and `review` posts to #mod-alerts. A watchdog, a 429 retry and a rule-only fallback cover failures.
 - The assignment's deliverables: the proposal, the build log with the AI prompt, the label check as evidence, and the Demo Day pitch.
 
