@@ -116,11 +116,36 @@ The full prompt is written in A3 and recorded in the build log.
 | # | Status | Milestone | Key files |
 |---|---|---|---|
 | A0 | Done | **Plan.** This document. | `PLAN-AUTOMATION.md` |
-| A1 | In progress | **Node-RED setup.** The `settings.js` changes, env vars, the two webhooks. Check: the editor is reachable only on 127.0.0.1, and flow context survives a restart. | `~/.node-red/settings.js` |
-| A2 | Not started | **Check and decide.** Inject, fetch, Decide with file-backed state. Every row of the change-detection table tested with fixture injects. A plain Discord post. | `automation/leaderboard-watch.flow.json` |
+| A1 | Done | **Node-RED setup.** The `settings.js` changes, env vars, the two webhooks. Check: the editor is reachable only on 127.0.0.1, and flow context survives a restart. | `~/.node-red/settings.js` |
+| A2 | In progress | **Check and decide.** Inject, fetch, Decide with file-backed state. Every row of the change-detection table tested with fixture injects. A plain Discord post. | `automation/leaderboard-watch.flow.json` |
 | A3 | Not started | **AI step and routing.** Hard flags, the Claude request and schema, Merge, Switch, both webhooks, the `{player}` fill-in. | flow, Claude prompt |
 | A4 | Not started | **Failure handling and demo.** Fallback template, 429 retry, watchdog, the suspicious-takeover fixture, a dry run of the demo on the daily board. | flow |
 | A5 | Not started | **Proposal and build log.** The one-page proposal (problem, solution, value with a number, cost ≈ $0 a month) and the build log (automation steps plus the AI prompt) that the assignment asks for. | `automation/PROPOSAL.md`, `automation/BUILD-LOG.md` |
+
+## A1 detail
+
+Node-RED v5.0.9 on Node 24, user directory `~/.node-red`, outside the repo. The original settings are kept as `settings.js.orig`.
+
+1. `settings.js` loads `~/.node-red/.env` with `process.loadEnvFile` before `module.exports`. A missing file just leaves the variables unset.
+2. `credentialSecret` comes from `NODE_RED_CREDENTIAL_SECRET` in `.env`. If it's unset, Node-RED falls back to the key it generated in `.config.runtime.json`.
+3. `uiHost: "127.0.0.1"`, since the editor has no `adminAuth`.
+4. `contextStorage.default` uses `localfilesystem`, which flushes every 30 s and on a clean stop.
+5. `.env` is created with mode `600`:
+   - blanks for `ANTHROPIC_API_KEY`, `DISCORD_ANNOUNCE_URL` and `DISCORD_MODS_URL`
+   - `AIM_ASSIST_URL=https://aim-assist-v2.vercel.app`
+   - a generated `NODE_RED_CREDENTIAL_SECRET`
+6. **The user's steps:**
+   - Paste an Anthropic API key into `.env`. A separate key from the same Console account can be revoked on its own and shows its own usage.
+   - Create two webhooks in the existing Discord server (Server Settings → Integrations → Webhooks → New Webhook), one for #announcements and one for #mod-alerts, and paste their URLs.
+   - Restart Node-RED.
+7. A temporary tab, **A1 check (temporary)**, logs `A1 {boots, …}` on every start. It counts boots in flow context and reports whether each secret is set, never its value. It's removed when A2 starts.
+
+**Verification:**
+
+- The startup log shows `Context store : 'default' [module=localfilesystem]` and `Server now running at http://127.0.0.1:1880/`.
+- `ss -ltnp` shows Node-RED on `127.0.0.1:1880` only.
+- The check flow logged `boots: 1`, and after a clean stop and restart, `boots: 2`. `AIM_ASSIST_URL` read from `.env`.
+- The user filled `.env` and restarted: `boots: 4`, with `true` for all three secrets. The editor opens at `http://localhost:1880` from the Windows browser, and a test post through each webhook reached its channel.
 
 ## Demo (Day 5)
 
