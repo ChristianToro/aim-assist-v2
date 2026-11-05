@@ -6,6 +6,9 @@
 
 const BOARD_NAMES = { all: 'all-time', daily: 'daily', weekly: 'weekly' }
 
+// A board's name in a post: "all-time" for `all`, else the view as is.
+export const boardName = (view) => BOARD_NAMES[view] ?? view
+
 const MINUTE_MS = 60 * 1000
 const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
@@ -54,7 +57,7 @@ export const webhookBody = (content) => ({
 
 // The plain alert for a decide() event: the facts, no AI.
 export const plainPost = (event) => {
-  const board = BOARD_NAMES[event.view] ?? event.view
+  const board = boardName(event.view)
   const lines =
     event.kind === 'extended'
       ? extendedLines(event, playerName(event), board)

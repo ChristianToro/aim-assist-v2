@@ -75,7 +75,7 @@ The owner wants to know when someone takes all-time #1. A new #1 is also exactly
 7. **Switch**: picks the #announcements or #mod-alerts webhook.
 8. **Discord POST**: on a 429, waits `retry_after` once, then leaves the alert for the next check.
 9. **Commit** (function): saves the new #1 only after Discord returns 2xx, so a failed post is retried on the next check.
-10. **Catch + watchdog**: after 3 failed fetches in a row (~90 min), posts "watcher can't reach the leaderboard" to #mod-alerts once.
+10. **Catch + watchdog**: after 3 failed fetches in a row (~90 min), posts "watcher can't reach the leaderboard" to #mod-alerts once, and "reachable again" when a fetch succeeds after that (added in A4). A catch node sends any unexpected error to the sidebar and the log.
 
 ### Claude prompt (gist)
 
@@ -94,7 +94,7 @@ The full prompt is written in A3 and recorded in the build log.
 ### Failure modes
 
 1. **Machine off or asleep:** checks stop. When it comes back, the next check sees the current #1, so the alert comes late rather than never. Running all day would need a host and an account, which are ruled out.
-2. **Leaderboard unreachable:** the watchdog alerts #mod-alerts after about 90 minutes.
+2. **Leaderboard unreachable:** the watchdog alerts #mod-alerts after about 90 minutes, and again when the board is back.
 3. **Claude down or bad JSON:** the alert still goes out, with the rule label and a template message.
 4. **Discord down:** the state isn't saved, so the next check retries.
 5. **Claude gets it wrong:** the hard flags still force `review` without the AI, and a wrong `celebrate` costs one Discord post.
@@ -120,8 +120,8 @@ The full prompt is written in A3 and recorded in the build log.
 | A1 | Done | **Node-RED setup.** The `settings.js` changes, env vars, the two webhooks. Check: the editor is reachable only on 127.0.0.1, and flow context survives a restart. | `~/.node-red/settings.js` |
 | A2 | Done | **Check and decide.** Inject, fetch, Decide with file-backed state. Every row of the change-detection table tested with fixture injects. A plain Discord post. | `automation/leaderboard-watch.flow.json` |
 | A3 | Done | **AI step and routing.** Hard flags, the Claude request and schema, Merge, Switch, both webhooks, the `{player}` fill-in. | flow, Claude prompt |
-| A4 | Not started | **Failure handling and demo.** The fallback tried live, 429 retry, watchdog, a dry run of the demo on the daily board. (The suspicious-takeover fixture moved to A3, which needed it to test the #mod-alerts route.) | flow |
-| A5 | Not started | **Proposal and build log.** The one-page proposal (problem, solution, value with a number, cost ≈ $0 a month) and the build log (automation steps plus the AI prompt) that the assignment asks for. | `automation/PROPOSAL.md`, `automation/BUILD-LOG.md` |
+| A4 | Done | **Failure handling and demo.** The fallback tried live, 429 retry, watchdog, a dry run of the demo on the daily board. (The suspicious-takeover fixture moved to A3, which needed it to test the #mod-alerts route.) | flow |
+| A5 | Not started | **Proposal and build log.** The one-page proposal (problem, solution, value with a number, cost ≈ $0 a month) and the build log (automation steps plus the AI prompt) that the assignment asks for. The A4 label check joins the repo as evidence for the build log: a script, run by hand because it calls the paid API (not part of `npm test`), with its cases and the old-versus-new prompt results. | `automation/PROPOSAL.md`, `automation/BUILD-LOG.md`, the label check |
 
 ## A1 detail
 
@@ -200,8 +200,56 @@ Node-RED v5.0.9 on Node 24, user directory `~/.node-red`, outside the repo. The 
 - The real all-time board still returns `none`, with no Claude call.
 - The user saw the Ben posts in #announcements in Claude's wording with "Ben" put in, and the Cara post in #mod-alerts with the rule flags and Claude's reasons.
 
+## A4 detail
+
+1. **Modules** in `automation/watcher/`:
+   - `watchdog.js`: `trackFetch(saved, ok)` counts failed fetches per board. It returns `'down'` on the 3rd in a row, once, and `'recovered'` on the next success after that. `watchdogPost` builds the #mod-alerts text.
+   - `retry.js`: `retryDelayMs(msg)` returns the wait for a 429: Discord's `retry_after` (in the body), else the `Retry-After` header, else 5 s, rounded up to a millisecond. It returns null for anything but a 429, or for a wait over 60 s.
+   - `message.js` exports `boardName`, which both posts use.
+2. **The flow:**
+   - **Decide** has two outputs. The second carries watchdog notices to **→ #mod-alerts**. The count is saved per board in the `file` store (`watchdog_<view>`).
+   - **Merge verdict** keeps a copy of the webhook body (`post`), because the http request node replaces `payload` with the reply.
+   - **Save, or retry once on 429** (formerly "Save on 2xx") saves the state only on 2xx, resends the same body once after the wait, and otherwise leaves the alert for the next check. Notices have no state to save, so a failed notice is lost.
+   - A **catch** node sends errors to an **errors** debug node, in the sidebar and the console.
+   - **Fixture: reset** also clears the fixture board's watchdog count.
+3. **How the failure paths were tried without spamming Discord or paying for Claude:** `process.loadEnvFile` doesn't override variables already set. So a test instance started with an invalid `ANTHROPIC_API_KEY` and the two webhook URLs pointing at a local mock (in the session scratchpad) used those, and left `.env` alone. The mock answered the first `/announce` post with a 429 asking for 1.5 s. The test instance was started just after the 14:30 timer tick, so no real check could post to the mock.
+
+4. **Prompt fix from the dry run.** The user's live daily takeover went to #mod-alerts:
+   - The run: Tracking 6,100, 82% of the ceiling, 97.3% accuracy, 642 ms, an empty board before it.
+   - No rule fired: Claude labelled it `review` on its own.
+   - The cause: the prompt said to review a score "close to the ceiling" without saying how close, so the theoretical ceiling made a strong human run look suspicious.
+   - The new prompt explains that the ceiling is a theoretical maximum, and that strong human play is often 60–85% of it. It states the three rules (built from `flags.js`'s exported thresholds, so the two can't drift) and says Claude's job is what they miss: a concrete reason tied to figures, never the percentage or the accuracy alone.
+   - Measured with a throwaway label check (in the session scratchpad) that runs five valid cases 5 times each on Haiku, about $0.008 a run:
+     - A: the user's run.
+     - B: the real all-time takeover.
+     - C: an 85% Flick run.
+     - D: a daily Precision run at 87%, 100% accuracy and 165 ms that no rule catches.
+     - E: Cara.
+
+     | Prompt | Off | Where |
+     |---|---|---|
+     | Old | 2 of 25 | Both on A: "82% … close to the top", "97.3% is very high" |
+     | New | 0 of 25 | — |
+
+     A and B–C come back `celebrate` and D–E `review` every time. The first draft of the check had two impossible boards (a lower score taking #1). Claude flagged them as inconsistent, so they were fixed before comparing. The check moves into the repo in A5 as build-log evidence.
+
+**Verification (2026-11-05):**
+
+- `npm test`: 497 passed, 59 of them the watcher's. Lint and Prettier are clean.
+- Test instance, in order:
+  - Reset, then 1 → seed.
+  - Fetch fails ×4: 1, 2, and on the 3rd a **down** notice posted to `/mods`. Nothing on the 4th.
+  - Fixture 2: a **recovered** notice posted to `/mods`, then the takeover. Claude answered 401, so "no verdict, the rules decide" and the plain post.
+  - The post to `/announce` got a 429, waited 1,500 ms, and the same body was accepted on the retry. The fixture state saved Ben's #1 (id 903) only after that.
+- The real instance is back on `.env`: **Check now** on all-time and daily return `none`, and the real state is untouched (all-time #1 id `23`, daily empty, watchdog at 0).
+- **Dry run (the user):** a live match took the daily #1 and posted, but to #mod-alerts. That's the prompt fix above, now loaded, and the daily state is unchanged (`daily: none`).
+- With the new prompt, the user's Fixture 2 posted to #announcements (`celebrate`).
+
 ## Demo (Day 5)
 
-1. **Check now** on the daily board: it shows the empty board or today's #1.
-2. Play a match live, then **Check now**: the post appears in #announcements.
-3. **Fixture: suspicious takeover** (Speed at 97% of its ceiling, 120 ms): the post lands in #mod-alerts. Say on stage that it's a fixture.
+The daily board resets at 00:00 UTC, which is 19:00 Eastern standard time. Before the demo, press **Check now: daily** once, so the board's state is current and only the live match counts as a takeover.
+
+1. **Check now: daily**: the node status shows `daily: none` (the board is empty or unchanged).
+2. Play a match live, then **Check now: daily**: within a few seconds, Claude's announcement appears in #announcements.
+3. **Fixture 6: suspicious takeover** (after Reset and Fixture 1): the review lands in #mod-alerts with the rule flags and Claude's reasons. Say on stage that it's a fixture.
+4. **The failure mode**: press **Fixture: fetch fails** 3 times. The watchdog notice lands in #mod-alerts, and the next fixture brings the "reachable again" notice.

@@ -11,10 +11,11 @@ export const MODE_CEILINGS = Object.fromEntries(
   GAME_MODES.map((mode) => [mode.label, maxPlausibleScore(mode)])
 )
 
-const NEAR_CEILING = 0.9
+// The rule thresholds, also stated in Claude's prompt (claude.js).
+export const NEAR_CEILING = 0.9
 // Sustained average reaction under this is beyond human (~200–300 ms).
-const MIN_HUMAN_REACTION_MS = 150
-const BIG_LEAD_RATIO = 1.5
+export const MIN_HUMAN_REACTION_MS = 150
+export const BIG_LEAD_RATIO = 1.5
 
 // A run's score as a whole percentage of its mode's ceiling.
 export const pctOfCeiling = ({ mode, score }) =>

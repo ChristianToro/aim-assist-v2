@@ -103,6 +103,12 @@ describe('claudeRequest', () => {
     expect(body).not.toHaveProperty('temperature')
   })
 
+  it("states the rules' thresholds as flags.js sets them", () => {
+    expect(SYSTEM_PROMPT).toContain(
+      'a score at 90% of the ceiling or more, an average reaction under 150 ms, and a lead of 50% or more over #2 in the same mode'
+    )
+  })
+
   it('lists every game mode in the prompt', () => {
     for (const mode of ['Gridshot', 'Precision', 'Speed', 'Flick']) {
       expect(SYSTEM_PROMPT).toContain(`- ${mode} (`)

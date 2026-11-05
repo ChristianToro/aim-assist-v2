@@ -11,3 +11,5 @@ export {
 } from './claude.js'
 export { alertPost } from './alert.js'
 export { plainPost } from './message.js'
+export { retryDelayMs } from './retry.js'
+export { trackFetch, watchdogPost } from './watchdog.js'

@@ -1,5 +1,10 @@
 import { MODE_REFERENCE } from '../../api/_lib/modeReference.js'
-import { pctOfCeiling } from './flags.js'
+import {
+  BIG_LEAD_RATIO,
+  MIN_HUMAN_REACTION_MS,
+  NEAR_CEILING,
+  pctOfCeiling,
+} from './flags.js'
 
 /*
  * The AI step of the takeover triage (PLAN-AUTOMATION.md): the request
@@ -17,6 +22,10 @@ const MAX_REASONS = 3
 const MAX_MESSAGE_CHARS = 280
 const MS_PER_HOUR = 60 * 60 * 1000
 
+const asPct = (ratio) => Math.round(ratio * 100)
+const NEAR_CEILING_PCT = asPct(NEAR_CEILING)
+const BIG_LEAD_PCT = asPct(BIG_LEAD_RATIO - 1)
+
 export const LABELS = ['celebrate', 'review']
 
 export const SYSTEM_PROMPT = `You triage takeovers of first place on the leaderboard of Aim Assist, a browser aim trainer. The owner gets one Discord alert per takeover and wants to know which ones deserve a closer look before players see them.
@@ -26,11 +35,13 @@ The server scores every match from its click log and rejects matches that are im
 Game modes:
 ${MODE_REFERENCE}
 
-Each mode has a ceiling, the highest score the server accepts; pctOfModeCeiling is a score as a percentage of it. reactionMs is the average time from a target appearing to its hit: it runs longer in modes where targets wait to be hit, and an average under about 150 ms is not humanly sustainable. The all-time board ranks raw scores across modes, so a gap between runs in different modes means little.
+Each mode has a ceiling, the highest score the server accepts; pctOfModeCeiling is a score as a percentage of it. The ceiling is a theoretical maximum (every target hit at the fastest spawn rate with the full combo multiplier), so strong human play lands well below it, often between 60% and 85%. reactionMs is the average time from a target appearing to its hit: it runs longer in modes where targets wait to be hit, and an average under about ${MIN_HUMAN_REACTION_MS} ms is not humanly sustainable. The all-time board ranks raw scores across modes, so a gap between runs in different modes means little.
 
 The input gives the new #1 (new), the #1 it replaced (previous, null when the board was empty), the current #2 (runnerUp), whether the new #1 is the same player raising their own score (samePlayer), and the rule-based flags already raised (ruleFlags).
 
-Label "review" when the numbers look unusual for a human: close to the ceiling, a reaction time far below what the mode allows, or a jump far beyond the previous best in the same mode. Rule flags already send the alert to review; take them into account, and judge the rest yourself. Otherwise label "celebrate". Give your confidence in the label from 0 to 1.
+Rules already send three cases to review, and appear in ruleFlags when they fire: a score at ${NEAR_CEILING_PCT}% of the ceiling or more, an average reaction under ${MIN_HUMAN_REACTION_MS} ms, and a lead of ${BIG_LEAD_PCT}% or more over #2 in the same mode. Your job is what they miss.
+
+Label "review" only for a concrete reason tied to figures in the input: a combination that is unlikely together (such as perfect accuracy with a reaction time near the floor), or a jump far beyond the previous #1 in the same mode. A score under ${NEAR_CEILING_PCT}% of the ceiling is not a reason on its own, and neither is high accuracy on its own. Otherwise label "celebrate". When rule flags were raised, still give your own label and reasons. Give your confidence in the label from 0 to 1.
 
 Give at most ${MAX_REASONS} reasons, each one short sentence tied to a figure from the input.
 
