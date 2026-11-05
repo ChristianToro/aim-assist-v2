@@ -9,6 +9,7 @@
     "build": "vite build",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.js",
     "db:legacy-report": "node --env-file-if-exists=.env.local scripts/legacy-report.js",
+    "automation:label-check": "node --env-file-if-exists=$HOME/.node-red/.env automation/label-check.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

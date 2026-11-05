@@ -121,7 +121,7 @@ The full prompt is written in A3 and recorded in the build log.
 | A2 | Done | **Check and decide.** Inject, fetch, Decide with file-backed state. Every row of the change-detection table tested with fixture injects. A plain Discord post. | `automation/leaderboard-watch.flow.json` |
 | A3 | Done | **AI step and routing.** Hard flags, the Claude request and schema, Merge, Switch, both webhooks, the `{player}` fill-in. | flow, Claude prompt |
 | A4 | Done | **Failure handling and demo.** The fallback tried live, 429 retry, watchdog, a dry run of the demo on the daily board. (The suspicious-takeover fixture moved to A3, which needed it to test the #mod-alerts route.) | flow |
-| A5 | Not started | **Proposal and build log.** The one-page proposal (problem, solution, value with a number, cost ≈ $0 a month) and the build log (automation steps plus the AI prompt) that the assignment asks for. The A4 label check joins the repo as evidence for the build log: a script, run by hand because it calls the paid API (not part of `npm test`), with its cases and the old-versus-new prompt results. | `automation/PROPOSAL.md`, `automation/BUILD-LOG.md`, the label check |
+| A5 | Done | **Proposal and build log.** The one-page proposal (problem, solution, value with a number, cost ≈ $0 a month) and the build log (automation steps plus the AI prompt) that the assignment asks for. The A4 label check joins the repo as evidence for the build log: a script, run by hand because it calls the paid API (not part of `npm test`), with its cases and the old-versus-new prompt results. | `automation/PROPOSAL.md`, `automation/BUILD-LOG.md`, `automation/label-check.js` |
 
 ## A1 detail
 
@@ -221,7 +221,7 @@ Node-RED v5.0.9 on Node 24, user directory `~/.node-red`, outside the repo. The 
    - The new prompt explains that the ceiling is a theoretical maximum, and that strong human play is often 60–85% of it. It states the three rules (built from `flags.js`'s exported thresholds, so the two can't drift) and says Claude's job is what they miss: a concrete reason tied to figures, never the percentage or the accuracy alone.
    - Measured with a throwaway label check (in the session scratchpad) that runs five valid cases 5 times each on Haiku, about $0.008 a run:
      - A: the user's run.
-     - B: the real all-time takeover.
+     - B: the real board's top two scores (Speed 66%, Flick 80%), as a takeover.
      - C: an 85% Flick run.
      - D: a daily Precision run at 87%, 100% accuracy and 165 ms that no rule catches.
      - E: Cara.
@@ -244,6 +244,27 @@ Node-RED v5.0.9 on Node 24, user directory `~/.node-red`, outside the repo. The 
 - The real instance is back on `.env`: **Check now** on all-time and daily return `none`, and the real state is untouched (all-time #1 id `23`, daily empty, watchdog at 0).
 - **Dry run (the user):** a live match took the daily #1 and posted, but to #mod-alerts. That's the prompt fix above, now loaded, and the daily state is unchanged (`daily: none`).
 - With the new prompt, the user's Fixture 2 posted to #announcements (`celebrate`).
+
+## A5 detail
+
+1. **[`automation/label-check.js`](automation/label-check.js)**, run with `npm run automation:label-check -- [runs] [--show]`:
+   - The A4 label check, moved into the repo. It holds five valid cases with expected labels, and the cases are fake runs with no names.
+   - It sends each one through the flow's own `claudeInput`, `ruleFlags` and `claudeRequest`, prints the label counts and the token cost, and exits 1 on any miss.
+   - The npm script reads `ANTHROPIC_API_KEY` from `~/.node-red/.env` with `--env-file-if-exists`. The file isn't a `*.test.js`, so `npm test` never calls the paid API.
+2. **[`automation/BUILD-LOG.md`](automation/BUILD-LOG.md)**, the assignment's build log:
+   - a flow diagram, the automation's steps and change rules;
+   - the AI step: an example input and output, the request settings, the schema, and the full rendered system prompt;
+   - the prompt's one revision, with the incident and the old-versus-new label table;
+   - the failure modes and how each was tested, the measured cost, the build timeline with commits, and how to run it.
+3. **[`automation/PROPOSAL.md`](automation/PROPOSAL.md)**, one page: problem, solution, value, cost, failure modes, next step.
+   - The value figure comes from the user: they checked the leaderboard by hand a few times a week, so a new #1 could wait 2–3 days. With the watcher it's under 30 minutes.
+   - The user weighs celebrating players and catching cheaters equally.
+
+**Verification (2026-11-05):**
+
+- `npm run automation:label-check -- 5 --show`: 25 of 25 labels as expected, 39,430 tokens in and 8,532 out, about $0.008. The example verdicts in the build log come from this run.
+- `npm test`: 497 passed, 59 of them the watcher's. Lint and Prettier are clean.
+- Case B was first described as "the real all-time takeover". The live board shows the Flick score was set after the Speed one, so it's now described as the real top two scores set up as a takeover.
 
 ## Demo (Day 5)
 
