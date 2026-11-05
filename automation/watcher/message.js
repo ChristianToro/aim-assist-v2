@@ -1,10 +1,10 @@
 /*
- * Discord webhook bodies for the leaderboard watcher's alerts. A2's plain
- * post: the facts of a takeover, before Claude's classification (A3).
+ * Discord webhook bodies for the leaderboard watcher's alerts. The plain
+ * post states the facts of a takeover. It's the A2 alert, and the fallback
+ * when Claude's verdict is missing (alert.js).
  */
 
 const BOARD_NAMES = { all: 'all-time', daily: 'daily', weekly: 'weekly' }
-const FIXTURE_VIEW = 'fixture'
 
 const MINUTE_MS = 60 * 1000
 const HOUR_MS = 60 * MINUTE_MS
@@ -42,17 +42,22 @@ const extendedLines = ({ current, previous }, name, board) => [
   `${name} raised their own #1 on the ${board} board: ${describeRun(current)}, up from ${formatScore(previous.score)} in ${previous.mode}.`,
 ]
 
-// The webhook body for a decide() event.
+// The new #1's name, escaped and bold.
+export const playerName = (event) =>
+  `**${escapeMarkdown(event.current.displayName)}**`
+
+// A webhook body that can never ping anyone, whatever the text holds.
+export const webhookBody = (content) => ({
+  content,
+  allowed_mentions: { parse: [] },
+})
+
+// The plain alert for a decide() event: the facts, no AI.
 export const plainPost = (event) => {
-  const name = `**${escapeMarkdown(event.current.displayName)}**`
   const board = BOARD_NAMES[event.view] ?? event.view
   const lines =
     event.kind === 'extended'
-      ? extendedLines(event, name, board)
-      : takeoverLines(event, name, board)
-  const prefix = event.view === FIXTURE_VIEW ? '[fixture] ' : ''
-  return {
-    content: prefix + lines.join('\n'),
-    allowed_mentions: { parse: [] },
-  }
+      ? extendedLines(event, playerName(event), board)
+      : takeoverLines(event, playerName(event), board)
+  return webhookBody(lines.join('\n'))
 }

@@ -135,7 +135,7 @@
     "libs": [],
     "x": 780,
     "y": 140,
-    "wires": [["f_post", "d_event"]]
+    "wires": [["f_claude", "d_event"]]
   },
   {
     "id": "d_event",
@@ -155,19 +155,144 @@
     "wires": []
   },
   {
-    "id": "f_post",
+    "id": "f_claude",
     "type": "function",
     "z": "lbwatch",
-    "name": "Plain Discord post",
-    "func": "// A2's plain post. A3 replaces it with Claude's classification and routing.\nmsg.url = env.get('DISCORD_ANNOUNCE_URL')\nmsg.headers = { 'content-type': 'application/json' }\nmsg.payload = global.get('watcher').plainPost(msg.event)\nmsg.requestTimeout = 10000\nreturn msg",
+    "name": "Flags + Claude request",
+    "func": "// The AI step: rule flags, then the Messages API request. The request is\n// built in the repo (automation/watcher/claude.js); Claude sees figures\n// only, never a player's name.\nconst watcher = global.get('watcher')\nmsg.flags = watcher.ruleFlags(msg.event)\nmsg.url = watcher.MESSAGES_URL\nmsg.headers = {\n  'content-type': 'application/json',\n  'x-api-key': env.get('ANTHROPIC_API_KEY'),\n  'anthropic-version': watcher.API_VERSION,\n}\nmsg.payload = watcher.claudeRequest(watcher.claudeInput(msg.event, msg.flags))\nmsg.requestTimeout = 30000\nreturn msg",
     "outputs": 1,
     "timeout": 0,
     "noerr": 0,
     "initialize": "",
     "finalize": "",
     "libs": [],
-    "x": 990,
+    "x": 1000,
     "y": 140,
+    "wires": [["h_claude"]]
+  },
+  {
+    "id": "h_claude",
+    "type": "http request",
+    "z": "lbwatch",
+    "name": "POST Claude",
+    "method": "POST",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 1190,
+    "y": 140,
+    "wires": [["f_merge"]]
+  },
+  {
+    "id": "f_merge",
+    "type": "function",
+    "z": "lbwatch",
+    "name": "Merge verdict",
+    "func": "// Rule flags plus Claude's verdict give the label and the post. Without a\n// verdict (an error, a refusal, bad JSON) the rules alone decide.\nconst watcher = global.get('watcher')\nconst verdict = msg.statusCode === 200 ? watcher.parseVerdict(msg.payload) : null\nif (verdict) {\n  const usage = msg.payload.usage ?? {}\n  node.log(`${msg.view}: Claude says ${verdict.label} (${usage.input_tokens} in, ${usage.output_tokens} out)`)\n} else {\n  node.warn(`${msg.view}: no verdict from Claude (${msg.statusCode}), the rules decide`)\n}\nconst { label, payload } = watcher.alertPost({ event: msg.event, flags: msg.flags, verdict })\nnode.status({ fill: label === 'review' ? 'yellow' : 'green', shape: 'dot', text: `${msg.view}: ${label}${verdict ? '' : ' (rules only)'}` })\n// A fresh message, so the API key header goes no further.\nreturn {\n  view: msg.view,\n  stateKey: msg.stateKey,\n  nextState: msg.nextState,\n  event: msg.event,\n  flags: msg.flags,\n  verdict,\n  label,\n  payload,\n  headers: { 'content-type': 'application/json' },\n  requestTimeout: 10000,\n}",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1360,
+    "y": 140,
+    "wires": [["s_route", "d_verdict"]]
+  },
+  {
+    "id": "d_verdict",
+    "type": "debug",
+    "z": "lbwatch",
+    "name": "verdict",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "verdict",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1540,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "s_route",
+    "type": "switch",
+    "z": "lbwatch",
+    "name": "Route by label",
+    "property": "label",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "celebrate",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "review",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 2,
+    "x": 1550,
+    "y": 140,
+    "wires": [["ch_announce"], ["ch_mods"]]
+  },
+  {
+    "id": "ch_announce",
+    "type": "change",
+    "z": "lbwatch",
+    "name": "→ #announcements",
+    "rules": [
+      {
+        "t": "set",
+        "p": "url",
+        "pt": "msg",
+        "to": "DISCORD_ANNOUNCE_URL",
+        "tot": "env"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 1750,
+    "y": 120,
+    "wires": [["h_post"]]
+  },
+  {
+    "id": "ch_mods",
+    "type": "change",
+    "z": "lbwatch",
+    "name": "→ #mod-alerts",
+    "rules": [
+      {
+        "t": "set",
+        "p": "url",
+        "pt": "msg",
+        "to": "DISCORD_MODS_URL",
+        "tot": "env"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 1740,
+    "y": 160,
     "wires": [["h_post"]]
   },
   {
@@ -186,7 +311,7 @@
     "authType": "",
     "senderr": false,
     "headers": [],
-    "x": 1190,
+    "x": 1960,
     "y": 140,
     "wires": [["f_commit"]]
   },
@@ -202,7 +327,7 @@
     "initialize": "",
     "finalize": "",
     "libs": [],
-    "x": 1370,
+    "x": 2130,
     "y": 140,
     "wires": [[]]
   },
@@ -210,9 +335,9 @@
     "id": "c_fixtures",
     "type": "comment",
     "z": "lbwatch",
-    "name": "Fixtures: press Reset, then 1 to 5 in order",
-    "info": "Fake boards fed straight into Decide under view \"fixture\", with their own saved state (top_fixture). Fixtures 2 and 3 post to Discord, marked [fixture].",
-    "x": 230,
+    "name": "Fixtures: press Reset, then 1 to 5 in order (6 after 1)",
+    "info": "Fake boards fed straight into Decide under view \"fixture\", with their own saved state (top_fixture). Fixtures 2, 3 and 6 go through Claude and post to Discord like real alerts.",
+    "x": 250,
     "y": 260,
     "wires": []
   },
@@ -305,7 +430,7 @@
     "once": false,
     "onceDelay": 0.1,
     "topic": "",
-    "payload": "{\"entries\":[{\"id\":903,\"uid\":\"fixture-ben\",\"displayName\":\"Ben\",\"photoURL\":null,\"mode\":\"Flick\",\"score\":13000,\"accuracy\":95.5,\"reactionTime\":640,\"createdAt\":\"2026-11-02T12:00:00Z\"},{\"id\":901,\"uid\":\"fixture-ana\",\"displayName\":\"Ana\",\"photoURL\":null,\"mode\":\"Speed\",\"score\":12000,\"accuracy\":95.5,\"reactionTime\":640,\"createdAt\":\"2026-11-01T10:00:00Z\"}]}",
+    "payload": "{\"entries\":[{\"id\":903,\"uid\":\"fixture-ben\",\"displayName\":\"Ben\",\"photoURL\":null,\"mode\":\"Speed\",\"score\":13000,\"accuracy\":95.5,\"reactionTime\":640,\"createdAt\":\"2026-11-02T12:00:00Z\"},{\"id\":901,\"uid\":\"fixture-ana\",\"displayName\":\"Ana\",\"photoURL\":null,\"mode\":\"Speed\",\"score\":12000,\"accuracy\":95.5,\"reactionTime\":640,\"createdAt\":\"2026-11-01T10:00:00Z\"}]}",
     "payloadType": "json",
     "x": 200,
     "y": 380,
@@ -336,7 +461,7 @@
     "once": false,
     "onceDelay": 0.1,
     "topic": "",
-    "payload": "{\"entries\":[{\"id\":904,\"uid\":\"fixture-ben\",\"displayName\":\"Ben\",\"photoURL\":null,\"mode\":\"Flick\",\"score\":13400,\"accuracy\":95.5,\"reactionTime\":640,\"createdAt\":\"2026-11-03T08:00:00Z\"},{\"id\":901,\"uid\":\"fixture-ana\",\"displayName\":\"Ana\",\"photoURL\":null,\"mode\":\"Speed\",\"score\":12000,\"accuracy\":95.5,\"reactionTime\":640,\"createdAt\":\"2026-11-01T10:00:00Z\"}]}",
+    "payload": "{\"entries\":[{\"id\":904,\"uid\":\"fixture-ben\",\"displayName\":\"Ben\",\"photoURL\":null,\"mode\":\"Speed\",\"score\":13400,\"accuracy\":95.5,\"reactionTime\":640,\"createdAt\":\"2026-11-03T08:00:00Z\"},{\"id\":901,\"uid\":\"fixture-ana\",\"displayName\":\"Ana\",\"photoURL\":null,\"mode\":\"Speed\",\"score\":12000,\"accuracy\":95.5,\"reactionTime\":640,\"createdAt\":\"2026-11-01T10:00:00Z\"}]}",
     "payloadType": "json",
     "x": 200,
     "y": 420,
@@ -402,6 +527,37 @@
     "payloadType": "json",
     "x": 190,
     "y": 500,
+    "wires": [["f_decide"]]
+  },
+  {
+    "id": "i_fx6",
+    "type": "inject",
+    "z": "lbwatch",
+    "name": "Fixture 6: suspicious takeover (review)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "view",
+        "v": "fixture",
+        "vt": "str"
+      },
+      {
+        "p": "statusCode",
+        "v": "200",
+        "vt": "num"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"entries\":[{\"id\":905,\"uid\":\"fixture-cara\",\"displayName\":\"Cara\",\"photoURL\":null,\"mode\":\"Speed\",\"score\":19300,\"accuracy\":100,\"reactionTime\":120,\"createdAt\":\"2026-11-04T15:00:00Z\"},{\"id\":901,\"uid\":\"fixture-ana\",\"displayName\":\"Ana\",\"photoURL\":null,\"mode\":\"Speed\",\"score\":12000,\"accuracy\":95.5,\"reactionTime\":640,\"createdAt\":\"2026-11-01T10:00:00Z\"}]}",
+    "payloadType": "json",
+    "x": 210,
+    "y": 580,
     "wires": [["f_decide"]]
   },
   {

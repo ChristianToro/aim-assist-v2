@@ -51,13 +51,6 @@ describe('plainPost', () => {
     )
   })
 
-  it('marks fixture posts so they are never mistaken for real ones', () => {
-    const { content } = plainPost(takeover({ view: 'fixture', previous: null }))
-    expect(content.startsWith('[fixture] **Ana** took #1 on the fixture')).toBe(
-      true
-    )
-  })
-
   it('never lets a name ping anyone', () => {
     const event = takeover({ current: run({ displayName: '@everyone' }) })
     expect(plainPost(event).allowed_mentions).toEqual({ parse: [] })
