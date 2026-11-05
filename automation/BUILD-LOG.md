@@ -5,6 +5,7 @@ A Node-RED flow on the owner's machine checks Aim Assist's public leaderboard ev
 | Piece | Where |
 |---|---|
 | The flow (importable, no secrets) | [`leaderboard-watch.flow.json`](leaderboard-watch.flow.json) |
+| What the flow looks like in the editor | [`node-RED-GUI.md`](node-RED-GUI.md) |
 | The logic, unit-tested with Vitest | [`watcher/`](watcher/) |
 | The AI prompt and the request | [`watcher/claude.js`](watcher/claude.js) |
 | The label check (calls the paid API) | [`label-check.js`](label-check.js) |

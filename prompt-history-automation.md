@@ -398,11 +398,35 @@ The agent had pointed out two stale CLAUDE.md lines, and the user had them fixed
 
 The first check put a trailing `&` on an `&&` chain, which sent the whole chain to the background, so the requests ran before the mock started. The stray chain then started a mock on that port. The check ran against it, and both stray processes were stopped.
 
+### Interaction 16 — The Node-RED editor, drawn
+
+**User Prompt**
+
+> since the node-RED GUI lives on my machine, design a `node-RED-GUI.md` using mermaid to illustrate what the nodes and their flow look like.
+
+**Agent Outcome**
+
+[`automation/node-RED-GUI.md`](automation/node-RED-GUI.md) draws the Leaderboard watch tab, with names, wires and output ports read from the flow file:
+
+- six Mermaid diagrams: the whole tab, then trigger and fetch, Decide's two outputs, the AI step and routing, posting and saving (the dashed 429 retry loop), and fixtures and errors;
+- nodes coloured by type as the editor colours them, with a legend;
+- a table of each node's status text, and a table of what the message carries along each wire.
+
+The build log's table of files links to it.
+
+**Verification**
+
+All six diagrams, and the build log's, parse with Mermaid 11.17's own parser. It was installed in a scratchpad folder with the repo's `jsdom`, so the repo gained no dependency. The rendered layout wasn't checked: that needs a browser, or GitHub after a push.
+
+**Collaboration**
+
+> commit it
+
 ### Session Summary
 
 **Completed**
 
-- A0–A5 on `feature/automation`: `08d692e`, `216e476`, `dec0a6e`, `8084fe6`, `94a9628`, `01adbdf`, plus this log (`68e7a3b`), the pitch and CLAUDE.md (`07c92ad`), and the mock. Not pushed.
+- A0–A5 on `feature/automation`: `08d692e`, `216e476`, `dec0a6e`, `8084fe6`, `94a9628`, `01adbdf`, plus this log (`68e7a3b`), the pitch and CLAUDE.md (`07c92ad`), the mock (`15faf8e`), and the editor page. Not pushed.
 - A Node-RED watcher that checks the all-time board every 30 min, 08:00–24:00 Eastern. Rule flags and Claude Haiku triage each new #1, `celebrate` posts to #announcements, and `review` posts to #mod-alerts. A watchdog, a 429 retry and a rule-only fallback cover failures.
 - The assignment's deliverables: the proposal, the build log with the AI prompt, the label check as evidence, and the Demo Day pitch.
 
